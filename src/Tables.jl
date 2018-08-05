@@ -46,12 +46,6 @@ function producescolumns end
 "`Tables.getcolumn(source, ::Type{T}, col)` gets an individual column from source"
 function getcolumn end
 
-"`Tables.acceptscells(::Type{T}) where {T} = true` to signal your table type can accept individual cell values"
-function acceptscells end
-acceptscells(x) = false
-
-"`Tables.setcell!(sink, val::T, row, col` used to set the value of an individual cell in a table type"
-function setcell! end
 "`Tables.acceptscolumns(::Type{T}) where {T} = true` to signal your table type can accept column values"
 function accceptscolumns end
 accceptscolumns(x) = false
@@ -66,14 +60,9 @@ function collect(::Type{T}, itr::S) where {T, S}
         sch = schema(itr)
         sink = T(sch)
         return collectcolumns(sink, sch, itr)
-    elseif acceptscells(T) && producescells(S) && !(size(itr)[1] isa Missing)
-        sch = schema(itr)
-        sink = T(sch)
-        return collectcells(sink, sch, iter)
-    else
-        # default assumes `x` can take care of a NamedTuple-iterator by itself
-        return x(itr)
     end
+    # default assumes `x` can take care of a NamedTuple-iterator by itself
+    return T(itr)
 end
 
 include("namedtuples.jl")

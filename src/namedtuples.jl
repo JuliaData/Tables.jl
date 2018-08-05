@@ -6,35 +6,17 @@ schema(x::RowTable{T}) where {T} = Schema(T)
 
 producescells(::Type{T}) where {T <: RowTable} = true
 getcell(source::RowTable, ::Type{T}, row, col) where {T} = source[row][col]
-acceptscells(::Type{T}) where {T <: RowTable} = true
-
-function setcell!(sink::RowTable, val::T, row, col) where {T}
-    row > length(sink) && throw(ArgumentError("out of bounds; tried to Tables.setcell! on row $row where this sink only has $(length(sink)) rows"))
-    r = sink[row]
-    col > length(r) && throw(ArgumentError("out of bounds; tried to Tables.setcell! on col $col where this sink only has $(length(r)) cols"))
-    r[col] = val
-    return val
-end
 
 rowtable(itr) = Base.collect(rows(itr))
 
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
 
-schema(df::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N} =
+schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N} =
     Schema((eltype(x) for x in T.parameters), Base.collect(map(string, names)))
 
 producescells(::Type{T}) where {T <: ColumnTable} = true
 getcell(source::ColumnTable, ::Type{T}, row, col) where {T} = source[col][row]
-acceptscells(::Type{T}) where {T <: ColumnTable} = true
-
-function setcell!(sink::ColumnTable, val::T, row, col) where {T}
-    col > length(sink) && throw(ArgumentError("out of bounds; tried to Tables.setcell! on col $col where this sink only has $(length(sink)) cols"))
-    c = sink[col]
-    row > length(c) && throw(ArgumentError("out of bounds; tried to Tables.setcell! on row $row where this sink only has $(length(c)) rows"))
-    c[row] = val
-    return val
-end
 
 producescolumns(::Type{T}) where {T <: ColumnTable} = true
 getcolumn(source::ColumnTable, ::Type{T}, col) where {T} = source[col]
@@ -46,13 +28,48 @@ function setcolumn!(sink::ColumnTable, column::AbstractVector{T}, col) where {T}
     return sink[col]
 end
 
+makecolumn(::Type{T}, len=0) where {T} = Vector{T}(undef, len)
+
+function Base.NamedTuple(sch::Schema)
+    typs = types(sch)
+    return NamedTuple{Tuple(map(Symbol, sch.header))}(Tuple(makecolumn(T) for T in typs))
+end
+
+function columntable(rows::Vector{NamedTuple{names, T}}) where {names, T}
+    if @generated
+        vals = Tuple(:(makecolumn($typ, len)) for typ in T.parameters)
+        innerloop = Expr(:block)
+        for i = 1:length(names)
+            push!(innerloop.args, :(nt[$i][i] = row[$i]))
+        end
+        q = quote
+            len = length(rows)
+            nt = NamedTuple{names}(($(vals...),))
+            for (i, row) in enumerate(rows)
+                $innerloop
+            end
+            return nt
+        end
+        @show q
+        return q
+    else
+        nt = NamedTuple{names}(Tuple(makecolumn(typ, length(rows)) for typ in T.parameters))
+        for (i, row) in enumerate(rows)
+            for (j, val) in enumerate(row)
+                nt[j][i] = val
+            end
+        end
+        return nt
+    end
+end
+
 # Row iteration for Data.Sources
 struct Rows{S <: ColumnTable, NT}
     source::S
 end
 
 Base.eltype(rows::Rows{S, NT}) where {S, NT} = NT
-Base.length(rows::Rows) = length(rows.source) == 0 ? 0 : length(getfield(rows.source, 1))
+Base.length(rows::Rows) = length(rows.source)
 
 # NamedTuples don't allow duplicate names, so make sure there are no duplicates in header
 function makeunique(names::Vector{String})
