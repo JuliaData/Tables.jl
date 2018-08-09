@@ -12,15 +12,20 @@ rowtable(itr) = Base.collect(rows(itr))
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
 
-schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N} =
-    Schema((eltype(x) for x in T.parameters), Base.collect(map(string, names)))
+function schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+    if @generated
+        types = Tuple{(eltype(x) for x in T.parameters)...}
+        return :(Schema{$types}(Base.collect(map(string, names))))
+    else
+        return Schema{Tuple{(eltype(x) for x in T.parameters)...}}(Base.collect(map(string, names)))
+    end
+end
 
 producescells(::Type{T}) where {T <: ColumnTable} = true
 getcell(source::ColumnTable, ::Type{T}, row, col) where {T} = source[col][row]
 
 producescolumns(::Type{T}) where {T <: ColumnTable} = true
 getcolumn(source::ColumnTable, ::Type{T}, col) where {T} = source[col]
-acceptscolumns(::Type{T}) where {T <: ColumnTable} = true
 
 function setcolumn!(sink::ColumnTable, column::AbstractVector{T}, col) where {T}
     col > length(sink) && throw(ArgumentError("out of bounds; tried to Tables.setcolumn! on col $col where this sink only has $(length(sink)) cols"))
@@ -30,12 +35,16 @@ end
 
 makecolumn(::Type{T}, len=0) where {T} = Vector{T}(undef, len)
 
-function Base.NamedTuple(sch::Schema)
+function columntable end
+
+acceptscolumns(::typeof(columntable)) = true
+
+function columntable(sch::Schema)
     typs = types(sch)
     return NamedTuple{Tuple(map(Symbol, sch.header))}(Tuple(makecolumn(T) for T in typs))
 end
 
-function columntable(rows::Vector{NamedTuple{names, T}}) where {names, T}
+function columntable(rows)
     if @generated
         vals = Tuple(:(makecolumn($typ, len)) for typ in T.parameters)
         innerloop = Expr(:block)

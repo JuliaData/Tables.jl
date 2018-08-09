@@ -1,6 +1,7 @@
-authors = ["quinnj <quinn.jacobd@gmail.com>"]
 name = "Tables"
 uuid = "f31cc48a-97c4-11e8-115d-f1beebab189a"
+authors = ["quinnj <quinn.jacobd@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
