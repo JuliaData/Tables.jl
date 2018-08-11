@@ -1,8 +1,13 @@
 module Tables
 
-using IteratorInterfaceExtensions
+using Requires
 
 export rowtable, columntable
+
+function __init__()
+    @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" include("datavalues.jl")
+    @require IteratorInterfaceExtensions="82899510-4779-5014-852e-03e436cf321d" include_string(Tables, "IteratorInterfaceExtensions.getiterator(x::Tables.Table) = Tables.datavaluerows(x)")
+end
 
 # helper functions
 names(::Type{NamedTuple{nms, typs}}) where {nms, typs} = nms
@@ -71,6 +76,7 @@ AccessStyle(x) = RowAccess()
 
 "Tables.schema(s) => NamedTuple{names, types}"
 function schema end
+schema(x) = eltype(x)
 
 ## generic fallbacks; if a table provides Tables.rows or Tables.columns,
 ## provide the inverse interface function
