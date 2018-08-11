@@ -138,7 +138,7 @@ function buildcolumns(::Type{NamedTuple{names, types}}, rows) where {names, type
             end
             return nt
         end
-        @show q
+        # @show q
         return q
     else
         nt = NamedTuple{names}(Tuple(Vector{typ}(undef, 0) for typ in T.parameters))
