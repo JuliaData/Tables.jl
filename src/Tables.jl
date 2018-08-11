@@ -61,25 +61,13 @@ Obviously every table type is different, but via a combination of `Tables.schema
 """
 abstract type Table end
 
+abstract type AccessStyle end
+struct RowAccess <: AccessStyle end
+struct ColumnAccess <: AccessStyle end
+AccessStyle(x) = RowAccess()
+
 "Tables.schema(s) => NamedTuple{names, types}"
 function schema end
-
-"`Tables.producescells(::Type{<:MyTable}) = true` to signal your table type can produce individual cells"
-function producescells end
-producescells(x) = false
-
-"`Tables.getcell(source, ::Type{T}, row, col)::T` gets an individual cell value from source"
-function getcell end
-
-"`Tables.isdonefunction(::Type{<:MyTable})::Function` returns a function which, when called on an instance of `MyTable`, returns a `Bool` indicating if the table is done iterating rows yet or not"
-function isdonefunction end
-
-"`Tables.producescolumns(::Type{<:MyTable}) = true` to signal your table type can produce individual columns"
-function producescolumns end
-producescolumns(x) = false
-
-"`Tables.getcolumn(source, ::Type{T}, col::Int)` gets an individual column from source"
-function getcolumn end
 
 # Row iteration
 struct RowIterator{S, F, NT}
@@ -158,11 +146,7 @@ end
 
 include("namedtuples.jl")
 
-# IteratorInterfaceExtensions.getiterator(x::Table) = rows(x)
-
 end # module
 
 #TODO
  # test various code paths
- # getiterator
- # datavalues iterator

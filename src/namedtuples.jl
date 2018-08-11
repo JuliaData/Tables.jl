@@ -4,10 +4,6 @@ const RowTable{T} = Vector{T} where {T <: NamedTuple}
 rows(x::RowTable) = x
 schema(x::RowTable{T}) where {T} = T
 
-producescells(::Type{<:RowTable}) = true
-getcell(source::RowTable, ::Type{T}, row, col) where {T} = source[row][col]
-isdonefunction(::Type{<:RowTable}) = (x, row) -> row > length(x)
-
 rowtable(itr) = collect(rows(itr))
 
 # NamedTuple of Vectors
@@ -22,11 +18,7 @@ function schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVec
     end
 end
 
-producescells(::Type{<:ColumnTable}) = true
-getcell(source::ColumnTable, ::Type{T}, row, col) where {T} = source[col][row]
-isdonefunction(::Type{<:ColumnTable}) = (x, row) -> row > (length(x) > 0 ? length(x[1]) : 0)
+AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
+columns(x::ColumnTable) = x
 
-producescolumns(::Type{<:ColumnTable}) = true
-getcolumn(source::ColumnTable, ::Type{T}, col) where {T} = source[col]
-
-columntable(rows) = Tables.columns(rows)
+columntable(rows) = columns(rows)
