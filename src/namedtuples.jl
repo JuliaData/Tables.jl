@@ -4,7 +4,33 @@ const RowTable{T} = Vector{T} where {T <: NamedTuple}
 rows(x::RowTable) = x
 schema(x::RowTable{T}) where {T} = T
 
-rowtable(itr) = collect(rows(itr))
+struct NamedTupleIterator{NT, T}
+    x::T
+end
+Base.eltype(rows::NamedTupleIterator{NT, S}) where {NT, S} = NT
+Base.IteratorSize(::Type{<:NamedTupleIterator}) = Base.SizeUnknown()
+
+function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st=()) where {names, types, T}
+    if @generated
+        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm))) for nm in names))
+        return quote
+            x = iterate(rows.x, st...)
+            x === nothing && return nothing
+            row, st = x
+            return ($(NamedTuple{names, types})(($(vals...),)), st)
+        end
+    else
+        x = iterate(rows.x, st...)
+        x === nothing && return nothing
+        row, st = x
+        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), st
+    end
+end
+
+function rowtable(itr)
+    r = rows(itr)
+    return collect(eltype(r) <: NamedTuple ? r : NamedTupleIterator{schema(itr), typeof(r)}(r))
+end
 
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
@@ -21,4 +47,13 @@ end
 AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
 columns(x::ColumnTable) = x
 
-columntable(rows) = columns(rows)
+function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types}
+    if @generated
+        vals = Tuple(:(collect(getproperty(cols, $(Meta.QuoteNode(nm)))) for nm in names))
+        return :(NamedTuple{names}(($(vals...),)))
+    else
+        return NamedTuple{names}(Tuple(collect(getproperty(cols, nm)) for nm in names))
+    end
+end
+
+columntable(rows) = columntable(schema(rows), columns(rows))

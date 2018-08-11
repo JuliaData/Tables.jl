@@ -118,7 +118,7 @@ end
 
 function rows(x::T) where {T}
     if AccessStyle(T) === ColumnAccess()
-        return RowIterator{schema(x), T}(x)
+        return RowIterator{schema(x), T}(Tables.columns(x))
     else
         return x # assume x implicitly implements row interface
     end
@@ -138,7 +138,7 @@ function buildcolumns(::Type{NamedTuple{names, types}}, rows) where {names, type
             end
             return nt
         end
-        # @show q
+        @show q
         return q
     else
         nt = NamedTuple{names}(Tuple(Vector{typ}(undef, 0) for typ in T.parameters))
@@ -154,7 +154,7 @@ end
 function columns(x::T) where {T}
     @assert AccessStyle(T) === RowAccess()
     sch = Tables.schema(x)
-    return buildcolumns(sch, x)
+    return buildcolumns(sch, Tables.rows(x))
 end
 
 include("namedtuples.jl")
