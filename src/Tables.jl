@@ -70,23 +70,15 @@ AccessStyle(x) = RowAccess()
 function schema end
 
 # Row iteration
-struct RowIterator{S, F, NT}
+struct RowIterator{NT, S}
     source::S
-    f::F
 end
 
-Base.eltype(rows::RowIterator{S, F, NT}) where {S, F, NT} = NT
+Base.eltype(rows::RowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{<:RowIterator}) = Base.SizeUnknown()
 
-"Returns a NamedTuple-iterator"
-function RowIterator(source::S, f::F) where {S, F}
-    sch = schema(source)
-    return RowIterator{S, F, NamedTuple{names(sch), Tuple{types(sch)...}}}(source, f)
-end
-
-function Base.iterate(rows::RowIterator{S, F, NamedTuple{names, types}}, st=1) where {S, F, names, types}
+function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, st=1) where {names, types, S}
     if @generated
-        vals = Tuple(:(Tables.getcell(rows.source, $typ, st, $col)) for (col, typ) in enumerate(types.parameters) )
         q = quote
             rows.f(rows.source, st) && return nothing
             return ($(NamedTuple{names, types}))(($(vals...),)), st + 1
@@ -98,15 +90,14 @@ function Base.iterate(rows::RowIterator{S, F, NamedTuple{names, types}}, st=1) w
 end
 
 function rows(x::T) where {T}
-    if producescells(T)
-        return RowIterator(x, Tables.isdonefunction(T))
+    if AccessStyle(T) === ColumnAccess()
+        return RowIterator{schema(x), T}(x)
     else
-        # throw(ArgumentError("Type $T doesn't seem to support the `Tables.rows` interface; it should overload `Tables.rows(x::$T)` directly or define `Tables.producescells(::Type{$T}) = true` and `Tables.getcell(t::$T, ::Type{T}, row::Int, col::Int)::T`"))
-        return x # assume x implicitly satisfies interface by iterating Rows
+        return x # assume x implicitly implements row interface
     end
 end
 
-function buildcolumns(rows::RowIterator{S, F, NamedTuple{names, types}}) where {S, F, names, types}
+function buildcolumns(::Type{NamedTuple{names, types}}, rows) where {names, types}
     if @generated
         vals = Tuple(:(Vector{$typ}(undef, 0)) for typ in types.parameters)
         innerloop = Expr(:block)
@@ -134,14 +125,9 @@ function buildcolumns(rows::RowIterator{S, F, NamedTuple{names, types}}) where {
 end
 
 function columns(x::T) where {T}
-    if producescolumns(T)
-        sch = Tables.schema(x)
-        return NamedTuple{names(sch)}(Tuple(Tables.getcolumn(x, T, i) for (i, T) in enumerate(types(sch))))
-    elseif producescells(T)
-        return buildcolumns(RowIterator(x, Tables.isdonefunction(T)))
-    else
-        return x # assume x implicitly satisfies interface by return a NamedTuple of AbstractVectors
-    end
+    @assert AccessStyle(T) === RowAccess()
+    sch = Tables.schema(x)
+    return buildcolumns(sch, x)
 end
 
 include("namedtuples.jl")
