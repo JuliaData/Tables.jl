@@ -69,6 +69,9 @@ AccessStyle(x) = RowAccess()
 "Tables.schema(s) => NamedTuple{names, types}"
 function schema end
 
+## generic fallbacks; if a table provides Tables.rows or Tables.columns,
+## provide the inverse interface function
+
 # Row iteration
 struct RowIterator{NT, S}
     source::S
@@ -77,36 +80,13 @@ end
 Base.eltype(rows::RowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{<:RowIterator}) = Base.SizeUnknown()
 
-function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}) where {names, types, S}
-    if @generated
-        itrblock = Expr(:block)
-        for key in names
-            push!(itrblock.args, quote
-                $(Symbol("x_$key")) = getproperty(rows.source, $(Meta.QuoteNode(key)))
-                $(Symbol("val_$key")) = iterate($(Symbol("x_$key")))
-                $(Symbol("val_$key")) === nothing && return nothing
-                $(Symbol("value_$key")), $(Symbol("state_$key")) = $(Symbol("val_$key"))
-            end)
-        end
-        vals = Tuple(Symbol("value_$key") for key in names)
-        states = Tuple(Symbol("state_$key") for key in names)
-        q = quote
-            $itrblock
-            return ($(NamedTuple{names, types}))(($(vals...),)), ($(states...),)
-        end
-    else
-        rows.f(rows.source, st) && return nothing
-        return NamedTuple{names, types}(Tuple(Tables.getcell(rows.source, T, st, col) for (col, T) in enumerate(types.parameters))), st + 1
-    end
-end
-
-function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, states) where {names, types, S}
+function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, states=ntuple(x->(), length(names))) where {names, types, S}
     if @generated
         itrblock = Expr(:block)
         for (i, key) in enumerate(names)
             push!(itrblock.args, quote
                 $(Symbol("x_$key")) = getproperty(rows.source, $(Meta.QuoteNode(key)))
-                $(Symbol("val_$key")) = iterate($(Symbol("x_$key")), states[$i])
+                $(Symbol("val_$key")) = iterate($(Symbol("x_$key")), states[$i]...)
                 $(Symbol("val_$key")) === nothing && return nothing
                 $(Symbol("value_$key")), $(Symbol("state_$key")) = $(Symbol("val_$key"))
             end)
@@ -117,11 +97,19 @@ function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, states) wh
             $itrblock
             return ($(NamedTuple{names, types}))(($(vals...),)), ($(states...),)
         end
-        @show q
+        # @show q
         return q
     else
-        rows.f(rows.source, st) && return nothing
-        return NamedTuple{names, types}(Tuple(Tables.getcell(rows.source, T, st, col) for (col, T) in enumerate(types.parameters))), st + 1
+        values = []
+        states = []
+        for (i, key) in enumerate(names)
+            x = getproperty(rows.source, key)
+            val = iterate(x, states[i]...)
+            val === nothing && return nothing
+            push!(values, val[1])
+            push!(states, val[2])
+        end
+        return NamedTuple{names, types}(Tuple(values)), Tuple(states)
     end
 end
 
@@ -169,6 +157,3 @@ end
 include("namedtuples.jl")
 
 end # module
-
-#TODO
- # test various code paths
