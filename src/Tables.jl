@@ -28,13 +28,13 @@ Essentially, for any table type that implements the interface requirements, one 
 
 So how does one go about satisfying these interface functions? It mainly depends on the `Tables.AccessStyle(T)` of your table:
 
-* `Tables.schema`: given an _instance_ of a table type, generate a `NamedTuple` type, with a tuple of symbols for column names (e.g. `(:a, :b, :c)`), and a tuple type of types as the 2nd parameter (e.g. `Tuple{Int, Float64, String}`); like `NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}`
+* `Tables.schema(x)`: given an _instance_ of a table type, generate a `NamedTuple` type, with a tuple of symbols for column names (e.g. `(:a, :b, :c)`), and a tuple type of types as the 2nd parameter (e.g. `Tuple{Int, Float64, String}`); like `NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}`
 
 * `Tables.RowAccess()`:
-  * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)`
+  * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)` (like a NamedTuple type)
 
 * `Tables.ColumnAccess()`:
-  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)`
+  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (like a NamedTuple of Vectors, for examples)
 
 The final question is how `MyTableType` can be a "sink" for any other table type:
 
@@ -49,14 +49,17 @@ function MyTableType(x)
     end
     return mytbl
 end
-```julia
-Alternatively, if `MyTableType` is column-oriented, perhaps my definition would be more like:
 ```
+
+Alternatively, if `MyTableType` is column-oriented, perhaps my definition would be more like:
+
+```julia
 function MyTableType(x)
     cols = Tables.columns(x)
     return MyTableType(collect(map(String, keys(cols))), [col for col in cols])
 end
 ```
+
 Obviously every table type is different, but via a combination of `Tables.schema`, `Tables.rows`, and `Tables.columns`, each table type should be able to construct an instance of itself.
 """
 abstract type Table end
