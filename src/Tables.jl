@@ -84,28 +84,22 @@ include("namedtuples.jl")
 ## provide the inverse interface function
 
 # generic row iteration of columns
-struct RowIterator{NT, S}
-    source::S
+struct ColumnsRow{T}
+    columns::T # a ColumnTable; NamedTuple of Vectors
+    row::Int
 end
 
-RowIterator(c::T) where {T <: ColumnTable} = RowIterator{schema(c), T}(c)
+Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 
-Base.eltype(rows::RowIterator{NT, S}) where {NT, S} = NT
-Base.length(x::RowIterator) = ntlength(x.source)
+struct RowIterator{S}
+    source::S # a ColumnTable; NamedTuple of Vectors
+end
+Base.eltype(x::RowIterator{S}) where {S} = ColumnsRow{S}
+Base.length(x::RowIterator) = rowcount(x.source)
 
-function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, st=1) where {names, types, S}
-    if @generated
-        vals = Tuple(:(rows.source[$(Meta.QuoteNode(nm))][st]) for nm in names)
-        q = quote
-            st > length(rows) && return nothing
-            return NamedTuple{names, types}(($(vals...),)), st + 1
-        end
-        # @show q
-        return q
-    else
-        st > length(rows) && return nothing
-        return NamedTuple{names, types}(Tuple(rows.source[nm][st] for nm in names)), st + 1
-    end
+function Base.iterate(rows::RowIterator, st=1)
+    st > rowcount(rows.source) && return nothing
+    return ColumnsRow(rows.source, st), st + 1
 end
 
 function rows(x::T) where {T}

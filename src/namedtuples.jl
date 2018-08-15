@@ -12,7 +12,7 @@ Base.IteratorSize(::Type{<:NamedTupleIterator}) = Base.SizeUnknown()
 
 function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}) where {names, types, T}
     if @generated
-        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm))) for nm in names))
+        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm)))) for nm in names)
         return quote
             x = iterate(rows.x)
             x === nothing && return nothing
@@ -29,7 +29,7 @@ end
 
 function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st) where {names, types, T}
     if @generated
-        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm))) for nm in names))
+        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm)))) for nm in names)
         return quote
             x = iterate(rows.x, st)
             x === nothing && return nothing
@@ -51,7 +51,7 @@ end
 
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
-ntlength(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
+rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 function schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
     if @generated
@@ -64,10 +64,11 @@ end
 
 AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
 columns(x::ColumnTable) = x
+rows(x::ColumnTable) = RowIterator(x)
 
 function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types}
     if @generated
-        vals = Tuple(:(collect(getproperty(cols, $(Meta.QuoteNode(nm)))) for nm in names))
+        vals = Tuple(:(collect(getproperty(cols, $(Meta.QuoteNode(nm))))) for nm in names)
         return :(NamedTuple{names}(($(vals...),)))
     else
         return NamedTuple{names}(Tuple(collect(getproperty(cols, nm)) for nm in names))
@@ -75,3 +76,4 @@ function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types
 end
 
 columntable(rows) = columntable(schema(rows), columns(rows))
+columntable(x::ColumnTable) = x
