@@ -6,7 +6,7 @@ export rowtable, columntable
 
 function __init__()
     @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" include("datavalues.jl")
-    @require IteratorInterfaceExtensions="82899510-4779-5014-852e-03e436cf321d" include_string(Tables, "IteratorInterfaceExtensions.getiterator(x::Tables.Table) = Tables.datavaluerows(x)")
+    @require QueryOperators="2aef5ad7-51ca-5a8f-8e88-e75cf067b44b" include("enumerable.jl")
 end
 
 # helper functions
@@ -39,7 +39,7 @@ So how does one go about satisfying these interface functions? It mainly depends
   * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)` (like a NamedTuple type)
 
 * `Tables.ColumnAccess()`:
-  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (like a NamedTuple of Vectors, for examples)
+  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (a NamedTuple of Vectors, for example, would satisfy the interface)
 
 The final question is how `MyTableType` can be a "sink" for any other table type:
 
@@ -78,53 +78,39 @@ AccessStyle(x) = RowAccess()
 function schema end
 schema(x) = eltype(x)
 
+include("namedtuples.jl")
+
 ## generic fallbacks; if a table provides Tables.rows or Tables.columns,
 ## provide the inverse interface function
 
-# Row iteration
+# generic row iteration of columns
 struct RowIterator{NT, S}
     source::S
 end
 
-Base.eltype(rows::RowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{<:RowIterator}) = Base.SizeUnknown()
+RowIterator(c::T) where {T <: ColumnTable} = RowIterator{schema(c), T}(c)
 
-function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, states=ntuple(x->(), length(names))) where {names, types, S}
+Base.eltype(rows::RowIterator{NT, S}) where {NT, S} = NT
+Base.length(x::RowIterator) = ntlength(x.source)
+
+function Base.iterate(rows::RowIterator{NamedTuple{names, types}, S}, st=1) where {names, types, S}
     if @generated
-        itrblock = Expr(:block)
-        for (i, key) in enumerate(names)
-            push!(itrblock.args, quote
-                $(Symbol("x_$key")) = getproperty(rows.source, $(Meta.QuoteNode(key)))
-                $(Symbol("val_$key")) = iterate($(Symbol("x_$key")), states[$i]...)
-                $(Symbol("val_$key")) === nothing && return nothing
-                $(Symbol("value_$key")), $(Symbol("state_$key")) = $(Symbol("val_$key"))
-            end)
-        end
-        vals = Tuple(Symbol("value_$key") for key in names)
-        states = Tuple(Symbol("state_$key") for key in names)
+        vals = Tuple(:(rows.source[$(Meta.QuoteNode(nm))][st]) for nm in names)
         q = quote
-            $itrblock
-            return ($(NamedTuple{names, types}))(($(vals...),)), ($(states...),)
+            st > length(rows) && return nothing
+            return NamedTuple{names, types}(($(vals...),)), st + 1
         end
         # @show q
         return q
     else
-        values = []
-        states = []
-        for (i, key) in enumerate(names)
-            x = getproperty(rows.source, key)
-            val = iterate(x, states[i]...)
-            val === nothing && return nothing
-            push!(values, val[1])
-            push!(states, val[2])
-        end
-        return NamedTuple{names, types}(Tuple(values)), Tuple(states)
+        st > length(rows) && return nothing
+        return NamedTuple{names, types}(Tuple(rows.source[nm][st] for nm in names)), st + 1
     end
 end
 
 function rows(x::T) where {T}
     if AccessStyle(T) === ColumnAccess()
-        return RowIterator{schema(x), T}(Tables.columns(x))
+        return RowIterator(columntable(Tables.columns(x)))
     else
         return x # assume x implicitly implements row interface
     end
@@ -162,7 +148,5 @@ function columns(x::T) where {T}
     sch = Tables.schema(x)
     return buildcolumns(sch, Tables.rows(x))
 end
-
-include("namedtuples.jl")
 
 end # module

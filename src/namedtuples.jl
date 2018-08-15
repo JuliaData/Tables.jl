@@ -10,17 +10,34 @@ end
 Base.eltype(rows::NamedTupleIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{<:NamedTupleIterator}) = Base.SizeUnknown()
 
-function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st=()) where {names, types, T}
+function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}) where {names, types, T}
     if @generated
         vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm))) for nm in names))
         return quote
-            x = iterate(rows.x, st...)
+            x = iterate(rows.x)
             x === nothing && return nothing
             row, st = x
             return ($(NamedTuple{names, types})(($(vals...),)), st)
         end
     else
-        x = iterate(rows.x, st...)
+        x = iterate(rows.x)
+        x === nothing && return nothing
+        row, st = x
+        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), st
+    end
+end
+
+function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st) where {names, types, T}
+    if @generated
+        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm))) for nm in names))
+        return quote
+            x = iterate(rows.x, st)
+            x === nothing && return nothing
+            row, st = x
+            return ($(NamedTuple{names, types})(($(vals...),)), st)
+        end
+    else
+        x = iterate(rows.x, st)
         x === nothing && return nothing
         row, st = x
         return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), st
@@ -34,6 +51,7 @@ end
 
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+ntlength(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 function schema(::NamedTuple{names, T}) where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
     if @generated
