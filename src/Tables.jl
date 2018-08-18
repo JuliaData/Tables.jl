@@ -110,16 +110,26 @@ function rows(x::T) where {T}
     end
 end
 
-function buildcolumns(::Type{NamedTuple{names, types}}, rows) where {names, types}
+function buildcolumns(::Type{NamedTuple{names, types}}, rows::R) where {names, types, R}
     if @generated
-        vals = Tuple(:(Vector{$typ}(undef, 0)) for typ in types.parameters)
         innerloop = Expr(:block)
-        for nm in names
-            push!(innerloop.args, :(push!(nt[$(Meta.QuoteNode(nm))], getproperty(row, $(Meta.QuoteNode(nm))))))
+        if false #Base.IteratorSize(R) == Base.HasLength()
+            pre = :(len = length(rows))
+            vals = Tuple(:(Vector{$typ}(undef, len)) for typ in types.parameters)
+            for nm in names
+                push!(innerloop.args, :(nt[$(Meta.QuoteNode(nm))][i] = getproperty(row, $(Meta.QuoteNode(nm)))))
+            end
+        else
+            pre = :()
+            vals = Tuple(:(Vector{$typ}(undef, 0)) for typ in types.parameters)
+            for nm in names
+                push!(innerloop.args, :(push!(nt[$(Meta.QuoteNode(nm))], getproperty(row, $(Meta.QuoteNode(nm))))))
+            end
         end
         q = quote
+            $pre
             nt = NamedTuple{names}(($(vals...),))
-            for row in rows
+            for (i, row) in enumerate(rows)
                 $innerloop
             end
             return nt
@@ -141,6 +151,42 @@ function columns(x::T) where {T}
     @assert AccessStyle(T) === RowAccess()
     sch = Tables.schema(x)
     return buildcolumns(sch, Tables.rows(x))
+end
+
+# helper functions
+function columnindextype(::Type{NamedTuple{names, types}}, name::Symbol) where {names, types}
+    if @generated
+        ifblock = Expr(:if, :(name === $(Meta.QuoteNode(names[1]))), (1, types.parameters[1]))
+        block = ifblock
+        for i = 2:length(names)
+            elseifblock = Expr(:elseif, :(name === $(Meta.QuoteNode(names[i]))), (i, types.parameters[i]))
+            push!(block.args, elseifblock)
+            block = elseifblock
+        end
+        return ifblock
+    else
+        i = 0
+        for (nm, T) in zip(names, types.parameters)
+            i += 1
+            nm === name && return (i, T)
+        end
+        return
+    end
+end
+
+@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row) where {names, types}
+    if @generated
+        block = Expr(:block)
+        for (i, nm) in enumerate(names)
+            push!(block.args, :(f($i, getproperty(row, $(Meta.QuoteNode(nm))))))
+        end
+        return block
+    else
+        for (i, nm) in enumerate(names)
+            f(i, getproperty(row, nm))
+        end
+        return
+    end
 end
 
 end # module
