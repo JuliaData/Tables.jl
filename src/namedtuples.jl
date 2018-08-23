@@ -7,46 +7,34 @@ schema(x::RowTable{T}) where {T} = T
 struct NamedTupleIterator{NT, T}
     x::T
 end
+NamedTupleIterator(::Type{NT}, x::T) where {NT <: NamedTuple, T} = NamedTupleIterator{NT, T}(x)
 Base.eltype(rows::NamedTupleIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{<:NamedTupleIterator}) = Base.SizeUnknown()
+Base.IteratorSize(::Type{NamedTupleIterator{NT, T}}) where {NT, T} = Base.IteratorSize(T)
+Base.length(nt::NamedTupleIterator) = length(nt.x)
 
-function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}) where {names, types, T}
+function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st=()) where {names, types, T}
     if @generated
         vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm)))) for nm in names)
         return quote
-            x = iterate(rows.x)
+            x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return ($(NamedTuple{names, types})(($(vals...),)), st)
+            return $(NamedTuple{names, types})(($(vals...),)), (st,)
         end
     else
-        x = iterate(rows.x)
+        x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), st
+        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), (st,)
     end
 end
 
-function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st) where {names, types, T}
-    if @generated
-        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm)))) for nm in names)
-        return quote
-            x = iterate(rows.x, st)
-            x === nothing && return nothing
-            row, st = x
-            return ($(NamedTuple{names, types})(($(vals...),)), st)
-        end
-    else
-        x = iterate(rows.x, st)
-        x === nothing && return nothing
-        row, st = x
-        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), st
-    end
-end
+namedtupleiterator(::Type{T}, sch, rows) where {T <: NamedTuple} = rows
+namedtupleiterator(T, sch, rows) = NamedTupleIterator(sch, rows)
 
 function rowtable(itr)
     r = rows(itr)
-    return collect(eltype(r) <: NamedTuple ? r : NamedTupleIterator{schema(itr), typeof(r)}(r))
+    return collect(namedtupleiterator(eltype(r), schema(itr), r))
 end
 
 # NamedTuple of Vectors
@@ -66,9 +54,12 @@ AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
 columns(x::ColumnTable) = x
 rows(x::ColumnTable) = RowIterator(x)
 
+getarray(x::AbstractArray) = x
+getarray(x) = collect(x)
+
 function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types}
     if @generated
-        vals = Tuple(:(collect(getproperty(cols, $(Meta.QuoteNode(nm))))) for nm in names)
+        vals = Tuple(:(getarray(getproperty(cols, $(Meta.QuoteNode(nm))))) for nm in names)
         return :(NamedTuple{names}(($(vals...),)))
     else
         return NamedTuple{names}(Tuple(collect(getproperty(cols, nm)) for nm in names))

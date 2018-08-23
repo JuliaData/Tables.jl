@@ -1,4 +1,4 @@
-using DataValues
+using .DataValues
 
 # DataValue-compatible row iteration for Data.Sources
 datavaluetype(::Type{T}) where {T <: DataValue} = T

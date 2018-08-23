@@ -39,9 +39,9 @@ version = "0.4.6"
 
 [[Documenter]]
 deps = ["Compat", "DocStringExtensions", "Logging", "REPL"]
-git-tree-sha1 = "ee89b637f11c3261f47b8628b1ee9cbcaf6dbc41"
+git-tree-sha1 = "7534ff3c50333a69ae0778d4d869e6f5c9ec022a"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "0.19.4"
+version = "0.19.6"
 
 [[InteractiveUtils]]
 deps = ["LinearAlgebra", "Markdown"]
@@ -49,9 +49,9 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[IterableTables]]
 deps = ["DataValues", "IteratorInterfaceExtensions", "Requires", "TableTraits", "TableTraitsUtils", "Test"]
-path = "/Users/jacobquinn/.julia/dev/IterableTables"
+git-tree-sha1 = "6390a469cf0c28d475fdd43c6496a8c8614ef530"
 uuid = "1c8ee90f-4401-5389-894e-7a04a3dc0f4d"
-version = "0.8.2+"
+version = "0.8.3"
 
 [[IteratorInterfaceExtensions]]
 deps = ["Test"]
@@ -83,10 +83,10 @@ deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[Missings]]
-deps = ["Compat"]
-git-tree-sha1 = "866fb034899be6055dcb6cb1a70fbda379bb0b55"
+deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
+git-tree-sha1 = "196528fa1df03df435025f52f9c1ff8356f94738"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "0.2.10"
+version = "0.3.0"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -106,15 +106,15 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[Query]]
 deps = ["DataValues", "Documenter", "IterableTables", "MacroTools", "NamedTuples", "QueryOperators", "Requires", "TableTraits"]
-path = "/Users/jacobquinn/.julia/dev/Query"
+git-tree-sha1 = "0c5a729579bc654f9074485647bc09d58f5233eb"
 uuid = "1a8c2f83-1ff3-5112-b086-8aa67b057ba1"
-version = "0.9.3+"
+version = "0.9.3"
 
 [[QueryOperators]]
-deps = ["DataStructures", "IteratorInterfaceExtensions", "NamedTuples", "TableShowUtils"]
-path = "/Users/jacobquinn/.julia/dev/QueryOperators"
+deps = ["DataStructures", "IteratorInterfaceExtensions", "TableShowUtils", "Test"]
+git-tree-sha1 = "16e3cd40089238b4f58ae89da38a5537b1b2a8fe"
 uuid = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
-version = "0.3.0+"
+version = "0.3.0"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
@@ -126,9 +126,9 @@ uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[Requires]]
 deps = ["Test"]
-path = "/Users/jacobquinn/.julia/dev/Requires"
+git-tree-sha1 = "f6fbf4ba64d295e146e49e021207993b6b48c7d1"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
-version = "0.5.2+"
+version = "0.5.2"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"

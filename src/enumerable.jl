@@ -1,3 +1,5 @@
+using .QueryOperators
+
 struct DataValueUnwrapper{NT, S}
     x::S
 end

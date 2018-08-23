@@ -7,6 +7,20 @@ export rowtable, columntable
 function __init__()
     @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" include("datavalues.jl")
     @require QueryOperators="2aef5ad7-51ca-5a8f-8e88-e75cf067b44b" include("enumerable.jl")
+    @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
+        using .CategoricalArrays
+        allocatecolumn(::Type{CategoricalString{R}}, rows) where {R} = CategoricalArray{String, 1, R}(undef, rows)
+        allocatecolumn(::Type{Union{CategoricalString{R}, Missing}}, rows) where {R} = 
+            CategoricalArray{Union{String, Missing}, 1, R}(undef, rows)
+        allocatecolumn(::Type{CategoricalValue{T, R}}, rows) where {T, R} =
+            CategoricalArray{T, 1, R}(undef, rows)
+        allocatecolumn(::Type{Union{Missing, CategoricalValue{T, R}}}, rows) where {T, R} =
+            CategoricalArray{Union{Missing, T}, 1, R}(undef, rows)
+    end
+    @require WeakRefStrings="ea10d353-3f73-51f8-a26c-33c1cb351aa5" begin
+        allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(rows)
+        allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} = StringVector{Union{Missing, String}}(rows)
+    end
 end
 
 # helper functions
@@ -89,68 +103,52 @@ struct ColumnsRow{T}
     row::Int
 end
 
-Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
+@inline Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 
-struct RowIterator{S}
-    source::S # a ColumnTable; NamedTuple of Vectors
+struct RowIterator{NT, S}
+    source::S # assumes we can call length(col) & getindex(col, row) on columns
 end
-Base.eltype(x::RowIterator{S}) where {S} = ColumnsRow{S}
-Base.length(x::RowIterator) = rowcount(x.source)
+RowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = RowIterator{NT, S}(x)
+Base.eltype(x::RowIterator{NT, S}) where {NT, S} = ColumnsRow{S}
+Base.length(x::RowIterator{NamedTuple{names, types}}) where {names, types} = length(getproperty(x.source, names[1]))
 
 function Base.iterate(rows::RowIterator, st=1)
-    st > rowcount(rows.source) && return nothing
+    st > length(rows) && return nothing
     return ColumnsRow(rows.source, st), st + 1
 end
 
 function rows(x::T) where {T}
     if AccessStyle(T) === ColumnAccess()
-        return RowIterator(columntable(Tables.columns(x)))
+        return RowIterator(schema(x), columns(x))
     else
         return x # assume x implicitly implements row interface
     end
 end
 
-function buildcolumns(::Type{NamedTuple{names, types}}, rows::R) where {names, types, R}
+allocatecolumn(T, len) = Vector{T}(undef, len)
+
+function allocatecolumns(::Type{NamedTuple{names, types}}, len) where {names, types}
     if @generated
-        innerloop = Expr(:block)
-        if false #Base.IteratorSize(R) == Base.HasLength()
-            pre = :(len = length(rows))
-            vals = Tuple(:(Vector{$typ}(undef, len)) for typ in types.parameters)
-            for nm in names
-                push!(innerloop.args, :(nt[$(Meta.QuoteNode(nm))][i] = getproperty(row, $(Meta.QuoteNode(nm)))))
-            end
-        else
-            pre = :()
-            vals = Tuple(:(Vector{$typ}(undef, 0)) for typ in types.parameters)
-            for nm in names
-                push!(innerloop.args, :(push!(nt[$(Meta.QuoteNode(nm))], getproperty(row, $(Meta.QuoteNode(nm))))))
-            end
-        end
-        q = quote
-            $pre
-            nt = NamedTuple{names}(($(vals...),))
-            for (i, row) in enumerate(rows)
-                $innerloop
-            end
-            return nt
-        end
-        # @show q
-        return q
+        vals = Tuple(:(allocatecolumn($typ, len)) for typ in types.parameters)
+        return :(NamedTuple{names}(($(vals...),)))
     else
-        nt = NamedTuple{names}(Tuple(Vector{typ}(undef, 0) for typ in T.parameters))
-        for row in rows
-            for key in keys(nt)
-                push!(nt[key], getproperty(row, key))
-            end
-        end
-        return nt
+        return NamedTuple{names}(Tuple(allocatecolumn(typ, len) for typ in types.parameters))
     end
 end
 
-function columns(x::T) where {T}
+@inline add!(i, val, ::Base.HasLength, nt, row) = setindex!(nt[i], val, row)
+@inline add!(i, val, T, nt, row) = push!(nt[i], val)
+
+@inline function columns(x::T) where {T}
     @assert AccessStyle(T) === RowAccess()
-    sch = Tables.schema(x)
-    return buildcolumns(sch, Tables.rows(x))
+    L = Base.IteratorSize(T)
+    len = L == Base.HasLength() ? length(x) : 0
+    sch = schema(x)
+    nt = allocatecolumns(sch, len)
+    for (i, row) in enumerate(rows(x))
+        unroll(add!, sch, row, L, nt, i)
+    end
+    return nt
 end
 
 # helper functions
@@ -163,6 +161,7 @@ function columnindextype(::Type{NamedTuple{names, types}}, name::Symbol) where {
             push!(block.args, elseifblock)
             block = elseifblock
         end
+        # @show ifblock
         return ifblock
     else
         i = 0
@@ -174,16 +173,17 @@ function columnindextype(::Type{NamedTuple{names, types}}, name::Symbol) where {
     end
 end
 
-@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row) where {names, types}
+@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row, args...) where {names, types}
     if @generated
         block = Expr(:block)
         for (i, nm) in enumerate(names)
-            push!(block.args, :(f($i, getproperty(row, $(Meta.QuoteNode(nm))))))
+            push!(block.args, :(f($i, getproperty(row, $(Meta.QuoteNode(nm))), args...)))
         end
+        # @show block
         return block
     else
         for (i, nm) in enumerate(names)
-            f(i, getproperty(row, nm))
+            f(i, getproperty(row, nm), args...)
         end
         return
     end
