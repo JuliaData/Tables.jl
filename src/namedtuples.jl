@@ -52,7 +52,7 @@ end
 
 AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
 columns(x::ColumnTable) = x
-rows(x::ColumnTable) = RowIterator(x)
+rows(x::ColumnTable) = RowIterator(schema(x), x)
 
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
