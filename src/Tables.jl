@@ -18,6 +18,7 @@ function __init__()
             CategoricalArray{Union{Missing, T}, 1, R}(undef, rows)
     end
     @require WeakRefStrings="ea10d353-3f73-51f8-a26c-33c1cb351aa5" begin
+        using .WeakRefStrings
         allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(rows)
         allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} = StringVector{Union{Missing, String}}(rows)
     end
@@ -127,7 +128,7 @@ end
 
 allocatecolumn(T, len) = Vector{T}(undef, len)
 
-function allocatecolumns(::Type{NamedTuple{names, types}}, len) where {names, types}
+@inline function allocatecolumns(::Type{NamedTuple{names, types}}, len) where {names, types}
     if @generated
         vals = Tuple(:(allocatecolumn($typ, len)) for typ in types.parameters)
         return :(NamedTuple{names}(($(vals...),)))
@@ -136,8 +137,8 @@ function allocatecolumns(::Type{NamedTuple{names, types}}, len) where {names, ty
     end
 end
 
-@inline add!(i, val, ::Base.HasLength, nt, row) = setindex!(nt[i], val, row)
-@inline add!(i, val, T, nt, row) = push!(nt[i], val)
+@inline add!(val, col::Int, nm::Symbol, ::Base.HasLength, nt, row) = setindex!(nt[col], val, row)
+@inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
 @inline function columns(x::T) where {T}
     @assert AccessStyle(T) === RowAccess()
@@ -152,38 +153,81 @@ end
 end
 
 # helper functions
-function columnindextype(::Type{NamedTuple{names, types}}, name::Symbol) where {names, types}
+function runlength(types)
+    rle = Tuple{Type, Int}[]
+    T = first(types)
+    prevT = T
+    len = 1
+    for i = 2:length(types)
+        @inbounds T = types[i]
+        if T === prevT
+            len += 1
+        else
+            push!(rle, (prevT, len))
+            prevT = T
+            len = 1
+        end
+    end
+    push!(rle, (T, len))
+    return rle
+end
+
+Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm)
+
+@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row, args...) where {names, types}
     if @generated
-        ifblock = Expr(:if, :(name === $(Meta.QuoteNode(names[1]))), (1, types.parameters[1]))
+        if length(names) < 100
+            return Expr(:block, Any[:(f(getproperty(row, $T, $i, $(Meta.QuoteNode(nm))), $i, $(Meta.QuoteNode(nm)), args...)) for (i, (nm, T)) in enumerate(zip(names, types.parameters))]...)
+        else
+            rle = runlength(types.parameters)
+            if length(rle) < 100
+                block = Expr(:block)
+                i = 1
+                for (T, len) in rle
+                    push!(block.args, quote
+                        for j = 0:$(len-1)
+                            f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
+                        end
+                    end)
+                    i += len
+                end
+                @show block
+                return block
+            else
+                return quote
+                    for (i, (nm, T)) in enumerate(zip(names, types.parameters))
+                        f(getproperty(row, T, i, nm), i, nm, args...)
+                    end
+                    return
+                end
+            end
+        end
+    else
+        error("no way")
+        for (i, (nm, T)) in enumerate(zip(names, types.parameters))
+            f(getproperty(row, T, i, nm), i, nm, args...)
+        end
+        return
+    end
+end
+
+function columnindex(::Type{NamedTuple{names, types}}, name::Symbol) where {names, types}
+    if @generated
+        ifblock = Expr(:if, :(name === $(Meta.QuoteNode(names[1]))), 1)
         block = ifblock
         for i = 2:length(names)
-            elseifblock = Expr(:elseif, :(name === $(Meta.QuoteNode(names[i]))), (i, types.parameters[i]))
+            elseifblock = Expr(:elseif, :(name === $(Meta.QuoteNode(names[i]))), i)
             push!(block.args, elseifblock)
             block = elseifblock
         end
+        push!(block.args, 0)
         # @show ifblock
         return ifblock
     else
         i = 0
         for (nm, T) in zip(names, types.parameters)
             i += 1
-            nm === name && return (i, T)
-        end
-        return
-    end
-end
-
-@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row, args...) where {names, types}
-    if @generated
-        block = Expr(:block)
-        for (i, nm) in enumerate(names)
-            push!(block.args, :(f($i, getproperty(row, $(Meta.QuoteNode(nm))), args...)))
-        end
-        # @show block
-        return block
-    else
-        for (i, nm) in enumerate(names)
-            f(i, getproperty(row, nm), args...)
+            nm === name && return i
         end
         return
     end
