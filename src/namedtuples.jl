@@ -57,6 +57,7 @@ rows(x::ColumnTable) = RowIterator(schema(x), x)
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
+columntable(::Type{NamedTuple{names, types}}, x::T) where {names, types, T <: ColumnTable} = x
 function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types}
     if @generated
         vals = Tuple(:(getarray(getproperty(cols, $(Meta.QuoteNode(nm))))) for nm in names)
