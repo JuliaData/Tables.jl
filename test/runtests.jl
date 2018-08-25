@@ -21,7 +21,7 @@ using Test, Tables
     NT = NamedTuple{Tuple(Symbol("a$i") for i = 1:20), Tuple{vcat(fill(Int, 10), fill(String, 10))...}}
     @test Tables.names(NT) === Tuple(Symbol("a$i") for i = 1:20)
     @test Tables.types(NT) === Tuple(vcat(fill(Int, 10), fill(String, 10)))
-    @test Tables.runlength(NT) == [(Int64, 10), (String, 10)]
+    @test Tables.runlength(NT) == [(Int, 10), (String, 10)]
     @test Tables.columnindex(NT, :a20) == 20
     @test Tables.columnindex(NT, :i) == 0
     @test Tables.columntype(NT, :a20) == String
@@ -143,5 +143,5 @@ end
     @test gc == (gr |> genericcolumntable)
     @test gr == (gc |> genericrowtable)
     @test gr == (gr |> genericrowtable)
-    
+
 end
