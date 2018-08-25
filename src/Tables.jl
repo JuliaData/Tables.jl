@@ -24,11 +24,9 @@ function __init__()
     end
 end
 
-# helper functions
-names(::Type{NamedTuple{nms, typs}}) where {nms, typs} = nms
-types(::Type{NamedTuple{nms, typs}}) where {nms, typs} = Tuple(typs.parameters)
+include("utils.jl")
 
-"Abstract row type with a simple required interface: row values are accessible via `getproperty(row, field)`; for example, a NamedTuple like `nt = (a=1, b=2, c=3)` can access it's value for `a` like `nt.a` which turns into a call to the function `getproperty(nt, :a)`"
+"Abstract row type with a simple required interface: row values are accessible via `getproperty(row, field)`; for example, a NamedTuple like `nt = (a=1, b=2, c=3)` can access its value for `a` like `nt.a` which turns into a call to the function `getproperty(nt, :a)`"
 abstract type Row end
 
 """
@@ -36,8 +34,8 @@ The Tables.jl package provides four useful interface functions for working with 
 
 ```julia
     Tables.schema(table) => NamedTuple{names, types}
-    Tables.AccessStyle(table_type) => Tables.RowAccess() | Tables.ColumnAccess()
-    Tables.rows(table) => iterator with values accessible vai getproperty(row, columnname)
+    Tables.AccessStyle(table_type) => Tables.RowAccess() || Tables.ColumnAccess()
+    Tables.rows(table) => iterator with values accessible via getproperty(row, columnname)
     Tables.columns(table) => Collection of iterators, with each column accessible via getproperty(x, columnname)
 ```
 
@@ -127,6 +125,12 @@ function rows(x::T) where {T}
     end
 end
 
+# build columns from rows
+"""
+    Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
+    
+    Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
+"""
 allocatecolumn(T, len) = Vector{T}(undef, len)
 
 @inline function allocatecolumns(::Type{NT}, len) where {NT <: NamedTuple{names}} where {names}
@@ -138,6 +142,7 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
     end
 end
 
+# add! will push! a value or setindex! a value depending on if the row-iterator HasLength or not
 @inline add!(val, col::Int, nm::Symbol, ::Base.HasLength, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
@@ -152,83 +157,6 @@ end
         unroll(add!, sch, row, L, nt, i)
     end
     return nt
-end
-
-# helper functions
-Base.@pure function runlength(::Type{NT}) where {NT <: NamedTuple}
-    rle = Tuple{Type, Int}[]
-    T = fieldtype(NT, 1)
-    prevT = T
-    len = 1
-    for i = 2:fieldcount(NT)
-        @inbounds T = fieldtype(NT, i)
-        if T === prevT
-            len += 1
-        else
-            push!(rle, (prevT, len))
-            prevT = T
-            len = 1
-        end
-    end
-    push!(rle, (T, len))
-    return rle
-end
-
-Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm)
-
-@inline function unroll(f::Base.Callable, ::Type{NamedTuple{names, types}}, row, args...) where {names, types}
-    if @generated
-        if length(names) < 100
-            return Expr(:block, Any[:(f(getproperty(row, $T, $i, $(Meta.QuoteNode(nm))), $i, $(Meta.QuoteNode(nm)), args...)) for (i, (nm, T)) in enumerate(zip(names, types.parameters))]...)
-        else
-            rle = runlength(NamedTuple{names, types})
-            if length(rle) < 100
-                block = Expr(:block)
-                i = 1
-                for (T, len) in rle
-                    push!(block.args, quote
-                        for j = 0:$(len-1)
-                            f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
-                        end
-                    end)
-                    i += len
-                end
-                # @show block
-                return block
-            else
-                return quote
-                    for (i, (nm, T)) in enumerate(zip(names, types.parameters))
-                        f(getproperty(row, T, i, nm), i, nm, args...)
-                    end
-                    return
-                end
-            end
-        end
-    else
-        # error("no way")
-        for (i, (nm, T)) in enumerate(zip(names, types.parameters))
-            f(getproperty(row, T, i, nm), i, nm, args...)
-        end
-        return
-    end
-end
-
-Base.@pure function columnindex(::Type{NamedTuple{names, T}}, name::Symbol) where {names, T}
-    i = 1
-    for nm in names
-        nm === name && return i
-        i += 1
-    end
-    return 0
-end
-
-Base.@pure function columntype(::Type{NT}, name::Symbol) where {NT <: NamedTuple{names}} where {names}
-    i = 1
-    for nm in names
-        nm === name && return fieldtype(NT, i)
-        i += 1
-    end
-    return fieldtype(NT, 1)
 end
 
 end # module

@@ -4,8 +4,8 @@ The Tables.jl package provides four useful interface functions for working with 
 
 ```julia
     Tables.schema(table) => NamedTuple{names, types}
-    Tables.AccessStyle(table_type) => Tables.RowAccess() | Tables.ColumnAccess()
-    Tables.rows(table) => iterator with values accessible vai getproperty(row, columnname)
+    Tables.AccessStyle(table_type) => Tables.RowAccess() || Tables.ColumnAccess()
+    Tables.rows(table) => iterator with values accessible via getproperty(row, columnname)
     Tables.columns(table) => Collection of iterators, with each column accessible via getproperty(x, columnname)
 ```
 
@@ -22,7 +22,7 @@ So how does one go about satisfying these interface functions? It mainly depends
   * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)` (like a NamedTuple type)
 
 * `Tables.ColumnAccess()`:
-  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (like a NamedTuple of Vectors, for examples)
+  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (a NamedTuple of Vectors, for example, would satisfy the interface)
 
 The final question is how `MyTableType` can be a "sink" for any other table type:
 
