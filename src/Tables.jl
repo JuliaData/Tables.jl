@@ -104,7 +104,8 @@ struct ColumnsRow{T}
     row::Int
 end
 
-@inline Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
+Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
+Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 
 struct RowIterator{NT, S}
     source::S # assumes we can call length(col) & getindex(col, row) on columns
@@ -128,12 +129,12 @@ end
 
 allocatecolumn(T, len) = Vector{T}(undef, len)
 
-@inline function allocatecolumns(::Type{NamedTuple{names, types}}, len) where {names, types}
+@inline function allocatecolumns(::Type{NT}, len) where {NT <: NamedTuple{names}} where {names}
     if @generated
-        vals = Tuple(:(allocatecolumn($typ, len)) for typ in types.parameters)
+        vals = Tuple(:(allocatecolumn($(fieldtype(NT, i)), len)) for i = 1:fieldcount(NT))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(allocatecolumn(typ, len) for typ in types.parameters))
+        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(NT, i), len) for i = 1:fieldcount(NT)))
     end
 end
 
@@ -142,24 +143,25 @@ end
 
 @inline function columns(x::T) where {T}
     @assert AccessStyle(T) === RowAccess()
-    L = Base.IteratorSize(T)
-    len = L == Base.HasLength() ? length(x) : 0
     sch = schema(x)
+    rowitr = rows(x)
+    L = Base.IteratorSize(typeof(rowitr))
+    len = L == Base.HasLength() ? length(rowitr) : 0
     nt = allocatecolumns(sch, len)
-    for (i, row) in enumerate(rows(x))
+    for (i, row) in enumerate(rowitr)
         unroll(add!, sch, row, L, nt, i)
     end
     return nt
 end
 
 # helper functions
-function runlength(types)
+Base.@pure function runlength(::Type{NT}) where {NT <: NamedTuple}
     rle = Tuple{Type, Int}[]
-    T = first(types)
+    T = fieldtype(NT, 1)
     prevT = T
     len = 1
-    for i = 2:length(types)
-        @inbounds T = types[i]
+    for i = 2:fieldcount(NT)
+        @inbounds T = fieldtype(NT, i)
         if T === prevT
             len += 1
         else
@@ -179,7 +181,7 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
         if length(names) < 100
             return Expr(:block, Any[:(f(getproperty(row, $T, $i, $(Meta.QuoteNode(nm))), $i, $(Meta.QuoteNode(nm)), args...)) for (i, (nm, T)) in enumerate(zip(names, types.parameters))]...)
         else
-            rle = runlength(types.parameters)
+            rle = runlength(NamedTuple{names, types})
             if length(rle) < 100
                 block = Expr(:block)
                 i = 1
@@ -191,7 +193,7 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
                     end)
                     i += len
                 end
-                @show block
+                # @show block
                 return block
             else
                 return quote
@@ -203,7 +205,7 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
             end
         end
     else
-        error("no way")
+        # error("no way")
         for (i, (nm, T)) in enumerate(zip(names, types.parameters))
             f(getproperty(row, T, i, nm), i, nm, args...)
         end
@@ -211,26 +213,22 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
     end
 end
 
-function columnindex(::Type{NamedTuple{names, types}}, name::Symbol) where {names, types}
-    if @generated
-        ifblock = Expr(:if, :(name === $(Meta.QuoteNode(names[1]))), 1)
-        block = ifblock
-        for i = 2:length(names)
-            elseifblock = Expr(:elseif, :(name === $(Meta.QuoteNode(names[i]))), i)
-            push!(block.args, elseifblock)
-            block = elseifblock
-        end
-        push!(block.args, 0)
-        # @show ifblock
-        return ifblock
-    else
-        i = 0
-        for (nm, T) in zip(names, types.parameters)
-            i += 1
-            nm === name && return i
-        end
-        return
+Base.@pure function columnindex(::Type{NamedTuple{names, T}}, name::Symbol) where {names, T}
+    i = 1
+    for nm in names
+        nm === name && return i
+        i += 1
     end
+    return 0
+end
+
+Base.@pure function columntype(::Type{NT}, name::Symbol) where {NT <: NamedTuple{names}} where {names}
+    i = 1
+    for nm in names
+        nm === name && return fieldtype(NT, i)
+        i += 1
+    end
+    return fieldtype(NT, 1)
 end
 
 end # module
