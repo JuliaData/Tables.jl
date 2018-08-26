@@ -16,14 +16,15 @@ end
 # Should maybe make this return a custom DataValueRow type to allow lazier
 # DataValue wrapping; but need to make sure Query/QueryOperators support first
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{<:DataValueRowIterator}) = Base.SizeUnknown()
+Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
+Base.length(rows::DataValueRowIterator) = length(rows.x)
 
 "Returns a DataValue-based NamedTuple-iterator"
-DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple} = DataValueRowIterator{datavaluetype(NT), S}(x)
+DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = DataValueRowIterator{datavaluetype(NT), S}(x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
-        vals = Tuple(:(($(fieldtype(NT, i)))(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = fieldcount(NT))
+        vals = Tuple(:(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i])))) for i = 1:fieldcount(NT))
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -36,7 +37,7 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(fieldtype(NT, i)(getproperty(row, fieldtype(NT, i), i, names[i])) for i = 1:fielcount(NT)), (st,)
+        return NT(Tuple(getproperty(row, fieldtype(NT, i), i, names[i]) for i = 1:fieldcount(NT))), (st,)
     end
 end
 

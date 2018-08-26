@@ -20,13 +20,13 @@ function Base.iterate(rows::NamedTupleIterator{NT}, st=()) where {NT <: NamedTup
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return $(NamedTuple{names, types})(($(vals...),)), (st,)
+            return $NT(($(vals...),)), (st,)
         end
     else
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, types}(Tuple(getproperty(row, fieldtype(NT, i), i, nm) for i = 1:fieldcount(NT))), (st,)
+        return NT(Tuple(getproperty(row, fieldtype(NT, i), i, nm) for i = 1:fieldcount(NT))), (st,)
     end
 end
 
@@ -56,7 +56,7 @@ rows(x::ColumnTable) = RowIterator(schema(x), x)
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
-columntable(::Type{NamedTuple{names, types}}, x::T) where {names, types, T <: ColumnTable} = x
+columntable(::Type{NT}, x::T) where {NT <: NamedTuple{names}, T <: ColumnTable} where {names} = x
 function columntable(::Type{NT}, cols) where {NT <: NamedTuple{names}} where {names}
     if @generated
         vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))

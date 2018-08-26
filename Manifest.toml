@@ -16,8 +16,10 @@ version = "0.11.0"
 [[DataValues]]
 deps = ["Dates", "InteractiveUtils", "LinearAlgebra", "Random", "Test"]
 git-tree-sha1 = "4fedccda7e5111354c7dcc832c7da83ff7258765"
+repo-rev = "master"
+repo-url = "https://github.com/queryverse/DataValues.jl.git"
 uuid = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
-version = "0.4.5"
+version = "0.4.5+"
 
 [[Dates]]
 deps = ["Printf"]
@@ -91,11 +93,6 @@ version = "0.3.0"
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
-[[NamedTuples]]
-git-tree-sha1 = "6374851ad4b15f2a20ac20637d38c550531fa684"
-uuid = "73a701b4-84e1-5df0-88ff-1968ee2ee8dc"
-version = "4.0.2"
-
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
@@ -105,16 +102,20 @@ deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[Query]]
-deps = ["DataValues", "Documenter", "IterableTables", "MacroTools", "NamedTuples", "QueryOperators", "Requires", "TableTraits"]
-git-tree-sha1 = "0c5a729579bc654f9074485647bc09d58f5233eb"
+deps = ["DataValues", "Documenter", "IterableTables", "MacroTools", "QueryOperators", "Statistics", "TableTraits", "Test"]
+git-tree-sha1 = "65b043df7df6f511cc03596558995e5595b34bff"
+repo-rev = "julia-0.7"
+repo-url = "https://github.com/queryverse/Query.jl.git"
 uuid = "1a8c2f83-1ff3-5112-b086-8aa67b057ba1"
-version = "0.9.3"
+version = "0.9.3+"
 
 [[QueryOperators]]
 deps = ["DataStructures", "IteratorInterfaceExtensions", "TableShowUtils", "Test"]
 git-tree-sha1 = "16e3cd40089238b4f58ae89da38a5537b1b2a8fe"
+repo-rev = "master"
+repo-url = "https://github.com/queryverse/QueryOperators.jl.git"
 uuid = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
-version = "0.3.0"
+version = "0.3.0+"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]

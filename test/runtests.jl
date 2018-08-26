@@ -143,5 +143,12 @@ end
     @test gc == (gr |> genericcolumntable)
     @test gr == (gc |> genericrowtable)
     @test gr == (gr |> genericrowtable)
+end
 
+@static if :Query in Symbol.(Base.loaded_modules_array())
+
+    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+    mt = rt |> @map({_.a, _.c})
+    @inferred (mt |> columntable)
+    @inferred (mt |> rowtable)
 end

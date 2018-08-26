@@ -4,6 +4,7 @@ authors = ["quinnj <quinn.jacobd@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
 IterableTables = "1c8ee90f-4401-5389-894e-7a04a3dc0f4d"
 IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
 Query = "1a8c2f83-1ff3-5112-b086-8aa67b057ba1"

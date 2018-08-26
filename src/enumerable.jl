@@ -24,9 +24,10 @@ end
 
 Base.eltype(rows::DataValueUnwrapper) = DataValueUnwrapRow{eltype(rows.x)}
 Base.IteratorSize(::Type{DataValueUnwrapper{NT, S}}) where {NT, S} = Base.IteratorSize(S)
+Base.length(rows::DataValueUnwrapper) = length(rows.x)
 
-Tables.schema(e::QueryOperators.Enumerable) = nondatavaluetype(eltype(e))
-Tables.rows(e::E) where {E <: QueryOperators.Enumerable} = DataValueUnwrapper{schema(e), E}(e)
+schema(e::QueryOperators.Enumerable) = nondatavaluetype(eltype(e))
+rows(e::E) where {E <: QueryOperators.Enumerable} = DataValueUnwrapper{schema(e), E}(e)
 
 function Base.iterate(rows::DataValueUnwrapper{NT}, st=()) where {NT <: NamedTuple{names}} where {names}
     x = iterate(rows.x, st...)
@@ -36,8 +37,8 @@ function Base.iterate(rows::DataValueUnwrapper{NT}, st=()) where {NT <: NamedTup
 end
 
 using IteratorInterfaceExtensions
-IteratorInterfaceExtensions.getiterator(x::Tables.Table) = Tables.datavaluerows(x)
-IteratorInterfaceExtensions.isiterable(x::Tables.Table) = true
 
-IteratorInterfaceExtensions.getiterator(x::Tables.ColumnTable) = Tables.datavaluerows(x)
-IteratorInterfaceExtensions.isiterable(x::Tables.ColumnTable) = true
+IteratorInterfaceExtensions.getiterator(x::RowTable) = datavaluerows(x)
+IteratorInterfaceExtensions.isiterable(x::RowTable) = true
+IteratorInterfaceExtensions.getiterator(x::ColumnTable) = datavaluerows(x)
+IteratorInterfaceExtensions.isiterable(x::ColumnTable) = true
