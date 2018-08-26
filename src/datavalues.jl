@@ -4,58 +4,39 @@ using .DataValues
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{T}) where {T} = DataValue{T}
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
-
-nondatavaluetype(::Type{DataValue{T}}) where {T} = Union{T, Missing}
-nondatavaluetype(::Type{T}) where {T} = T
+Base.@pure function datavaluetype(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
+    TT = Tuple{Any[ datavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
+    return NamedTuple{names, TT}
+end
 
 struct DataValueRowIterator{NT, S}
     x::S
 end
 
+# Should maybe make this return a custom DataValueRow type to allow lazier
+# DataValue wrapping; but need to make sure Query/QueryOperators support first
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{<:DataValueRowIterator}) = Base.SizeUnknown()
 
 "Returns a DataValue-based NamedTuple-iterator"
-function DataValueRowIterator(sch::Type{NamedTuple{names, T}}, x::S) where {names, T, S}
-    NT = NamedTuple{names, Tuple{map(datavaluetype, types(sch))...}}
-    return DataValueRowIterator{NT, S}(x)
-end
+DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple} = DataValueRowIterator{datavaluetype(NT), S}(x)
 
-function Base.iterate(rows::DataValueRowIterator{NamedTuple{names, types}, S}) where {names, types, S}
+function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
-        vals = Tuple(:(($T)(getproperty(row, $(Meta.QuoteNode(nm))))) for (nm, T) in zip(names, types.parameters))
+        vals = Tuple(:(($(fieldtype(NT, i)))(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = fieldcount(NT))
         q = quote
-            x = iterate(rows.x)
+            x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return ($(NamedTuple{names, types})(($(vals...),)), st)
+            return $NT(($(vals...),)), (st,)
         end
         # @show q
         return q
     else
-        x = iterate(rows.x)
+        x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, types}(Tuple(DataValue{T}(getproperty(row, nm)) for (nm, T) in zip(names, types.parameters))), st
-    end
-end
-
-function Base.iterate(rows::DataValueRowIterator{NamedTuple{names, types}, S}, st) where {names, types, S}
-    if @generated
-        vals = Tuple(:(($T)(getproperty(row, $(Meta.QuoteNode(nm))))) for (nm, T) in zip(names, types.parameters))
-        q = quote
-            x = iterate(rows.x, st)
-            x === nothing && return nothing
-            row, st = x
-            return ($(NamedTuple{names, types})(($(vals...),)), st)
-        end
-        # @show q
-        return q
-    else
-        x = iterate(rows.x, st)
-        x === nothing && return nothing
-        row, st = x
-        return NamedTuple{names, types}(Tuple(DataValue{T}(getproperty(row, nm)) for (nm, T) in zip(names, types.parameters))), st
+        return NT(Tuple(fieldtype(NT, i)(getproperty(row, fieldtype(NT, i), i, names[i])) for i = 1:fielcount(NT)), (st,)
     end
 end
 
