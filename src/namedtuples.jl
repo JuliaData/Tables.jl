@@ -13,9 +13,9 @@ Base.IteratorSize(::Type{NamedTupleIterator{NT, T}}) where {NT, T} = Base.Iterat
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
-function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st=()) where {names, types, T}
+function Base.iterate(rows::NamedTupleIterator{NT}, st=()) where {NT <: NamedTuple{names}} where {names}
     if @generated
-        vals = Tuple(:(getproperty(row, $(Meta.QuoteNode(nm)))) for nm in names)
+        vals = Tuple(:(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i])))) for i = 1:fieldcount(NT))
         return quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -26,7 +26,7 @@ function Base.iterate(rows::NamedTupleIterator{NamedTuple{names, types}, T}, st=
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, types}(Tuple(getproperty(row, nm) for nm in names)), (st,)
+        return NamedTuple{names, types}(Tuple(getproperty(row, fieldtype(NT, i), i, nm) for i = 1:fieldcount(NT))), (st,)
     end
 end
 
@@ -57,12 +57,12 @@ getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
 columntable(::Type{NamedTuple{names, types}}, x::T) where {names, types, T <: ColumnTable} = x
-function columntable(::Type{NamedTuple{names, types}}, cols) where {names, types}
+function columntable(::Type{NT}, cols) where {NT <: NamedTuple{names}} where {names}
     if @generated
-        vals = Tuple(:(getarray(getproperty(cols, $(Meta.QuoteNode(nm))))) for nm in names)
+        vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(collect(getproperty(cols, nm)) for nm in names))
+        return NamedTuple{names}(Tuple(collect(getproperty(cols, fieldtype(NT, i), i, nm)) for i = 1:fieldcount(NT)))
     end
 end
 
