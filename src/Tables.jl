@@ -104,6 +104,7 @@ end
 
 Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
+Base.propertynames(c::ColumnsRow) = propertynames(c.columns)
 
 struct RowIterator{NT, S}
     source::S # assumes we can call length(col) & getindex(col, row) on columns
