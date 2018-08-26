@@ -20,7 +20,7 @@ Let's clarify the definitions of some of the terms that were just used:
 * `Tables.rows(src)` returns a `Row` iterator, where `Row` is any object that supports value access via `getproperty(row, nm::Symbol)`. For example, if I have a NamedTuple like `row = (a=1, b=2, c=3)`, its values can be accessed like `row.a`, which is desugared to a call to `getproperty(row, :a)`. Thus a NamedTuple implicitly satisfies the `Row` interface. A `Row` should support `getproperty(row, name)` for any column name returned in a table's `Tables.schema(src)`. This allows an end-user access pattern like:
 
 ```julia
-sch = Table.schema(src)
+sch = Tables.schema(src)
 names = Tables.names(sch)
 for row in Tables.rows(src)
     for nm in names
