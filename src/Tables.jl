@@ -143,7 +143,7 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
     end
 end
 
-# add! will push! a value or setindex! a value depending on if the row-iterator HasLength or not
+# add! will push! or setindex! a value depending on if the row-iterator HasLength or not
 @inline add!(val, col::Int, nm::Symbol, ::Base.HasLength, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
