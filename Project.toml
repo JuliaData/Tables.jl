@@ -1,13 +1,8 @@
 name = "Tables"
-uuid = "f31cc48a-97c4-11e8-115d-f1beebab189a"
+uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 authors = ["quinnj <quinn.jacobd@gmail.com>"]
 version = "0.1.0"
 
 [deps]
-DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
-IterableTables = "1c8ee90f-4401-5389-894e-7a04a3dc0f4d"
-IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
-Query = "1a8c2f83-1ff3-5112-b086-8aa67b057ba1"
-QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
