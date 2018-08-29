@@ -101,6 +101,7 @@ end
 Base.eltype(g::GenericRowTable) = GenericRow
 Base.length(g::GenericRowTable) = length(g.data)
 Base.size(g::GenericRowTable) = (length(g.data),)
+Tables.AccessStyle(::Type{GenericRowTable}) = Tables.RowAccess()
 Tables.schema(x::GenericRowTable) = NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}
 
 function Base.iterate(g::GenericRowTable, st=1)

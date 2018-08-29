@@ -1,8 +1,10 @@
 # Vector of NamedTuples
 const RowTable{T} = Vector{T} where {T <: NamedTuple}
 
-rows(x::RowTable) = x
+# interface implementation
+AccessStyle(::Type{T}) where {T <: RowTable} = RowAccess()
 schema(x::RowTable{T}) where {T} = T
+rows(x::RowTable) = x
 
 struct NamedTupleIterator{NT, T}
     x::T
@@ -42,6 +44,9 @@ end
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
 rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
+# interface implementation
+AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
+
 _eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
 schema(ct::T) where {T <: ColumnTable} = schema(T)
 Base.@pure function schema(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
@@ -49,7 +54,6 @@ Base.@pure function schema(::Type{NT}) where {NT <: NamedTuple{names, T}} where 
     return NamedTuple{names, TT}
 end
 
-AccessStyle(::Type{<:ColumnTable}) = ColumnAccess()
 columns(x::ColumnTable) = x
 rows(x::ColumnTable) = RowIterator(schema(x), x)
 
