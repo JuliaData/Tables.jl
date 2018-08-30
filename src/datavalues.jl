@@ -1,6 +1,16 @@
 using .DataValues
 
 # DataValue-compatible row iteration for Data.Sources
+nondatavaluetype(::Type{DataValue{T}}) where {T} = Union{T, Missing}
+nondatavaluetype(::Type{T}) where {T} = T
+Base.@pure function nondatavaluetype(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
+    TT = Tuple{Any[ nondatavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
+    return NamedTuple{names, TT}
+end
+
+unwrap(x) = x
+unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
+
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{T}) where {T} = DataValue{T}
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}

@@ -22,6 +22,13 @@ function __init__()
         allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(rows)
         allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} = StringVector{Union{Missing, String}}(rows)
     end
+    @require IteratorInterfaceExtensions="82899510-4779-5014-852e-03e436cf321d" begin
+        using .IteratorInterfaceExtensions
+        IteratorInterfaceExtensions.getiterator(x::RowTable) = datavaluerows(x)
+        IteratorInterfaceExtensions.isiterable(x::RowTable) = true
+        IteratorInterfaceExtensions.getiterator(x::ColumnTable) = datavaluerows(x)
+        IteratorInterfaceExtensions.isiterable(x::ColumnTable) = true
+    end
 end
 
 include("utils.jl")
@@ -89,11 +96,11 @@ struct ColumnAccess <: AccessStyle end
 "Tables.schema(s) => NamedTuple{names, types}"
 function schema end
 
-function istable(x::T) where {T}
-    hasmethod(AccessStyle, Tuple{T}) &&
-    hasmethod(schema, Tuple{T}) &&
-    AccessStyle(T) === RowAccess() ? hasmethod(rows, Tuple{T}) :
-    AccessStyle(T) === ColumnAccess() ? hasmethod(columns, Tuple{T}) : false
+function istable(::Type{T}) where {T}
+    hasmethod(Tables.AccessStyle, Tuple{T}) &&
+    hasmethod(Tables.schema, Tuple{T}) &&
+    (Tables.AccessStyle(T) === Tables.RowAccess() ? hasmethod(Tables.rows, Tuple{T}) :
+    Tables.AccessStyle(T) === Tables.ColumnAccess() ? hasmethod(Tables.columns, Tuple{T}) : false)
 end
 
 include("namedtuples.jl")
@@ -154,17 +161,19 @@ end
 @inline add!(val, col::Int, nm::Symbol, ::Base.HasLength, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
+@inline function buildcolumns(sch, rowitr::T) where {T}
+    L = Base.IteratorSize(T)
+    len = L == Base.HasLength() ? length(rowitr) : 0
+    nt = allocatecolumns(sch, len)
+    for (i, row) in enumerate(rowitr)
+        unroll(add!, sch, row, L, nt, i)
+    end
+    return nt
+end
+
 @inline function columns(x::T) where {T}
     if AccessStyle(T) === RowAccess()
-        sch = schema(x)
-        rowitr = rows(x)
-        L = Base.IteratorSize(typeof(rowitr))
-        len = L == Base.HasLength() ? length(rowitr) : 0
-        nt = allocatecolumns(sch, len)
-        for (i, row) in enumerate(rowitr)
-            unroll(add!, sch, row, L, nt, i)
-        end
-        return nt
+        return buildcolumns(schema(x), rows(x))
     elseif AccessStyle(T) === ColumnAccess()
         return x
     else
