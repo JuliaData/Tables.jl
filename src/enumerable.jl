@@ -26,6 +26,7 @@ Base.eltype(rows::DataValueUnwrapper) = DataValueUnwrapRow{eltype(rows.x)}
 Base.IteratorSize(::Type{DataValueUnwrapper{NT, S}}) where {NT, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueUnwrapper) = length(rows.x)
 
+AccessStyle(::Type{E}) where {E <: QueryOperators.Enumerable} = RowAccess()
 schema(e::QueryOperators.Enumerable) = nondatavaluetype(eltype(e))
 rows(e::E) where {E <: QueryOperators.Enumerable} = DataValueUnwrapper{schema(e), E}(e)
 

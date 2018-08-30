@@ -85,11 +85,16 @@ abstract type Table end
 abstract type AccessStyle end
 struct RowAccess <: AccessStyle end
 struct ColumnAccess <: AccessStyle end
-AccessStyle(x) = RowAccess()
 
 "Tables.schema(s) => NamedTuple{names, types}"
 function schema end
-schema(x) = eltype(x)
+
+function istable(x::T) where {T}
+    hasmethod(AccessStyle, Tuple{T}) &&
+    hasmethod(schema, Tuple{T}) &&
+    AccessStyle(T) === RowAccess() ? hasmethod(rows, Tuple{T}) :
+    AccessStyle(T) === ColumnAccess() ? hasmethod(columns, Tuple{T}) : false
+end
 
 include("namedtuples.jl")
 
@@ -121,8 +126,10 @@ end
 function rows(x::T) where {T}
     if AccessStyle(T) === ColumnAccess()
         return RowIterator(schema(x), columns(x))
+    elseif AccessStyle(T) === RowAccess()
+        return x
     else
-        return x # assume x implicitly implements row interface
+        throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
     end
 end
 
@@ -148,16 +155,21 @@ end
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
 @inline function columns(x::T) where {T}
-    @assert AccessStyle(T) === RowAccess()
-    sch = schema(x)
-    rowitr = rows(x)
-    L = Base.IteratorSize(typeof(rowitr))
-    len = L == Base.HasLength() ? length(rowitr) : 0
-    nt = allocatecolumns(sch, len)
-    for (i, row) in enumerate(rowitr)
-        unroll(add!, sch, row, L, nt, i)
+    if AccessStyle(T) === RowAccess()
+        sch = schema(x)
+        rowitr = rows(x)
+        L = Base.IteratorSize(typeof(rowitr))
+        len = L == Base.HasLength() ? length(rowitr) : 0
+        nt = allocatecolumns(sch, len)
+        for (i, row) in enumerate(rowitr)
+            unroll(add!, sch, row, L, nt, i)
+        end
+        return nt
+    elseif AccessStyle(T) === ColumnAccess()
+        return x
+    else
+        throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
     end
-    return nt
 end
 
 end # module
