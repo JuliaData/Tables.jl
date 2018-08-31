@@ -83,6 +83,10 @@ Base.getproperty(d::DictRow, nm::Symbol) = getfield(d, 1)[nm]
     @test columntable(rt) == nt
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
+
+    @test Tables.buildcolumns(missing, rt) == nt
+    rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
+    @test Tables.buildcolumns(missing, rt) == (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 end
 
 import Base: ==

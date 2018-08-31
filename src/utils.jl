@@ -78,7 +78,7 @@ end
     if @generated
         if fieldcount(names) < 100
             b = Expr(:block, Any[:(@inbounds f(getproperty(row, names[$i]), $i, names[$i], args...)) for i = 1:fieldcount(names)]...)
-            @show b
+            # @show b
             return b
         else
             return quote
