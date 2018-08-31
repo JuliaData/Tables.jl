@@ -157,13 +157,15 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
     end
 end
 
+haslength(T) = T === Base.HasLength() || T === Base.HasShape{1}()
+
 # add! will push! or setindex! a value depending on if the row-iterator HasLength or not
-@inline add!(val, col::Int, nm::Symbol, ::Base.HasLength, nt, row) = setindex!(nt[col], val, row)
+@inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape{1}}, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
 @inline function buildcolumns(sch, rowitr::T) where {T}
     L = Base.IteratorSize(T)
-    len = L == Base.HasLength() ? length(rowitr) : 0
+    len = haslength(L) ? length(rowitr) : 0
     nt = allocatecolumns(sch, len)
     for (i, row) in enumerate(rowitr)
         unroll(add!, sch, row, L, nt, i)
@@ -171,7 +173,28 @@ end
     return nt
 end
 
-function push_or_widen!(dest::AbstractVector{T}, val::S) where {T, S}
+function add_or_widen!(val::T, col::Int, nm::Symbol, L, columns, row, allocate, len) where {T}
+    if !allocate
+        @inbounds columns[col] = add_or_widen!(columns[col], val, L, row)
+    else
+        @inbounds columns[col] = add_or_widen!(allocatecolumn(T, len), val, L, row)
+    end
+    return
+end
+
+function add_or_widen!(dest::AbstractVector{T}, val::S, ::Union{Base.HasLength, Base.HasShape{1}}, row) where {T, S}
+    if S === T || val isa T
+        @inbounds dest[row] = val
+        return dest
+    else
+        new = allocatecolumn(Base.promote_typejoin(T, S), length(dest))
+        copyto!(new, 1, dest, 1, row - 1)
+        @inbounds new[row] = val
+        return new
+    end
+end
+
+function add_or_widen!(dest::AbstractVector{T}, val::S, ::Base.SizeUnknown, row) where {T, S}
     if S === T || val isa T
         push!(dest, val)
         return dest
@@ -187,20 +210,20 @@ end
 function buildcolumns(::Missing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
-    row, st = state
+    row::eltype(rowitr), st = state
     names = propertynames(row)
-    values = [getproperty(row, nm) for nm in names]
     cols = length(names)
-    columns = [allocatecolumn(typeof(val), 0) for val in values]
-    foreach(col->push!(columns[col], values[col]), 1:cols)
+    L = Base.IteratorSize(T)
+    len = haslength(L) ? length(rowitr) : 0
+    columns = Vector{AbstractVector}(undef, cols)
+    unroll(add_or_widen!, names, row, L, columns, 1, true, len)
+    rownbr = 2
     while true
         state = iterate(rowitr, st)
         state === nothing && break
         row, st = state
-        for col = 1:cols
-            val = getproperty(row, names[col])
-            columns[col] = push_or_widen!(columns[col], val)
-        end
+        unroll(add_or_widen!, names, row, L, columns, rownbr, false, len)
+        rownbr += 1
     end
     return NamedTuple{names}(Tuple(columns))
 end

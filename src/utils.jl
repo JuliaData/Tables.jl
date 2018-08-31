@@ -74,6 +74,29 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
     end
 end
 
+@inline function unroll(f::Base.Callable, names::Tuple{Vararg{Symbol}}, row, args...)
+    if @generated
+        if fieldcount(names) < 100
+            b = Expr(:block, Any[:(@inbounds f(getproperty(row, names[$i]), $i, names[$i], args...)) for i = 1:fieldcount(names)]...)
+            @show b
+            return b
+        else
+            return quote
+                for (i, nm) in enumerate(names)
+                    f(getproperty(row, nm), i, nm, args...)
+                end
+                return
+            end
+        end
+    else
+        for (i, nm) in enumerate(names)
+            f(getproperty(row, nm), i, nm, args...)
+        end
+        return
+    end
+end
+
+
 "given a NamedTuple type and a Symbol `name`, compute the index (1-based) of the name in the NamedTuple's names"
 Base.@pure function columnindex(::Type{NT}, name::Symbol) where {NT <: NamedTuple{names}} where {names}
     i = 1
