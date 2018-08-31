@@ -171,6 +171,40 @@ end
     return nt
 end
 
+function push_or_widen!(dest::AbstractVector{T}, val::S) where {T, S}
+    if S === T || val isa T
+        push!(dest, val)
+        return dest
+    else
+        new = allocatecolumn(Base.promote_typejoin(T, S), length(dest))
+        copyto!(new, dest)
+        push!(new, el)
+        return new
+    end
+end
+
+# when Tables.schema(x) === missing
+function buildcolumns(::Missing, rowitr::T) where {T}
+    state = iterate(rowitr)
+    state === nothing && return NamedTuple()
+    row, st = state
+    names = propertynames(row)
+    values = [getproperty(row, nm) for nm in names]
+    cols = length(names)
+    columns = [allocatecolumn(typeof(val), 0) for val in values]
+    foreach(col->push!(columns[col], values[col]), 1:cols)
+    while true
+        state = iterate(rowitr, st)
+        state === nothing && break
+        row, st = state
+        for col = 1:cols
+            val = getproperty(row, names[col])
+            columns[col] = push_or_widen!(columns[col], val)
+        end
+    end
+    return NamedTuple{names}(Tuple(columns))
+end
+
 @inline function columns(x::T) where {T}
     if AccessStyle(T) === RowAccess()
         return buildcolumns(schema(x), rows(x))
