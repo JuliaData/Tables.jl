@@ -128,6 +128,7 @@ Tables.schema(g::GenericColumnTable) = NamedTuple{Tuple(keys(getfield(g, 1))), T
 Tables.AccessStyle(::Type{GenericColumnTable}) = Tables.ColumnAccess()
 Tables.columns(x::GenericColumnTable) = x
 Base.getproperty(g::GenericColumnTable, nm::Symbol) = getfield(g, 2)[getfield(g, 1)[nm]]
+Base.propertynames(g::GenericColumnTable) = Tuple(keys(getfield(g, 1)))
 
 function genericcolumntable(x)
     sch = Tables.schema(x)

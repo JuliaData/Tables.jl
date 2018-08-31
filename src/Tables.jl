@@ -121,9 +121,9 @@ Base.propertynames(c::ColumnsRow) = propertynames(c.columns)
 struct RowIterator{NT, S}
     source::S # assumes we can call length(col) & getindex(col, row) on columns
 end
-RowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = RowIterator{NT, S}(x)
+RowIterator(::Type{NT}, x::S) where {NT, S} = RowIterator{NT, S}(x)
 Base.eltype(x::RowIterator{NT, S}) where {NT, S} = ColumnsRow{S}
-Base.length(x::RowIterator{NamedTuple{names, types}}) where {names, types} = length(getproperty(x.source, names[1]))
+Base.length(x::RowIterator) = length(getproperty(x.source, propertynames(x.source)[1]))
 
 function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
