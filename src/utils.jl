@@ -1,26 +1,26 @@
 "get the names of a NamedTuple type"
 names(::Type{NamedTuple{nms, typs}}) where {nms, typs} = nms
 "get the types of a NamedTuple type, returned as a Tuple"
-Base.@pure types(::Type{NT}) where {NT <: NamedTuple} = Tuple(fieldtype(NT, i) for i = 1:fieldcount(NT))
+Base.@pure types(::Type{NT}) where {NT <: NamedTuple} = Tuple{Any[fieldtype(NT, i) for i = 1:fieldcount(NT)]...}
 
-"helper function to calculate a run-length encoding of the types of a NamedTuple type"
-Base.@pure function runlength(::Type{NT}) where {NT <: NamedTuple}
+"helper function to calculate a run-length encoding of a tuple type"
+Base.@pure function runlength(::Type{T}) where {T <: Tuple}
     rle = Tuple{Type, Int}[]
-    fieldcount(NT) == 0 && return rle
-    T = fieldtype(NT, 1)
-    prevT = T
+    fieldcount(T) == 0 && return rle
+    curT = fieldtype(T, 1)
+    prevT = curT
     len = 1
-    for i = 2:fieldcount(NT)
-        @inbounds T = fieldtype(NT, i)
-        if T === prevT
+    for i = 2:fieldcount(T)
+        @inbounds curT = fieldtype(T, i)
+        if curT === prevT
             len += 1
         else
             push!(rle, (prevT, len))
-            prevT = T
+            prevT = curT
             len = 1
         end
     end
-    push!(rle, (T, len))
+    push!(rle, (curT, len))
     return rle
 end
 
@@ -28,22 +28,22 @@ end
 Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm)
 
 """
-    Tables.unroll(f, schema, row, args...)
+    Tables.eachcolumn(f, names, types, row, args...)
 
-    Takes a function `f`, a NamedTuple type `schema`, a `row` type (that satisfies the Row interface), and any other `args...`;
-    it generates calls to get the value for each column in the row and then calls `f(val, T, col, name)`, where `f` is the
-    user-provided function, `val` is a row's column value, `T` is the column's element type, `col` is the column index as
-    an `Int`, and `name` is the row's column name.
-
-    This is useful for sinks iterating rows who wish to provide a type-stable mechanism for their "inner loops". Typically,
-    such inner loops suffer from dynamic dispath due to the varying types of columns.
+    Takes a function `f`, column names `names`, column types `types`, a `row` type (that satisfies the Row interface), and any other `args...`;
+    it generates calls to get the value for each column in the row (`getproperty(row, nm)`) and then calls `f(val, col, name)`, where `f` is the
+    user-provided function, `val` is a row's column value, `col` is the column index as an `Int`, and `name` is the row's column name.
 """
-@inline function unroll(f::Base.Callable, ::Type{NT}, row, args...) where {NT <: NamedTuple{names}} where {names}
+@inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
     if @generated
-        if fieldcount(NT) < 100
-            return Expr(:block, Any[:(f(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:fieldcount(NT)]...)
-        else
-            rle = runlength(NT)
+        if length(names) < 100
+            if types === nothing
+                b = Expr(:block, Any[:(f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:length(names)]...)
+            else
+                b = Expr(:block, Any[:(f(getproperty(row, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:fieldcount(types)]...)
+            end
+        elseif types !== nothing
+            rle = runlength(types)
             if length(rle) < 100
                 block = Expr(:block)
                 i = 1
@@ -55,50 +55,55 @@ Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm
                     end)
                     i += len
                 end
-                # @show block
-                return block
+                b = block
             else
-                return quote
+                b = quote
                     for (i, nm) in enumerate(names)
-                        f(getproperty(row, fieldtype(NT, i), i, nm), i, nm, args...)
+                        f(getproperty(row, fieldtype(types, i), i, nm), i, nm, args...)
                     end
                     return
                 end
             end
-        end
-    else
-        for (i, nm) in enumerate(names)
-            f(getproperty(row, fieldtype(NT, i), i, nm), i, nm, args...)
-        end
-        return
-    end
-end
-
-@inline function unroll(f::Base.Callable, names::Tuple{Vararg{Symbol}}, row, args...)
-    if @generated
-        if fieldcount(names) < 100
-            b = Expr(:block, Any[:(@inbounds f(getproperty(row, names[$i]), $i, names[$i], args...)) for i = 1:fieldcount(names)]...)
-            # @show b
-            return b
         else
-            return quote
+            b = quote
                 for (i, nm) in enumerate(names)
                     f(getproperty(row, nm), i, nm, args...)
                 end
                 return
             end
         end
+        # println(b)
+        return b
     else
-        for (i, nm) in enumerate(names)
-            f(getproperty(row, nm), i, nm, args...)
+        if types === nothing
+            for (i, nm) in enumerate(names)
+                f(getproperty(row, nm), i, nm, args...)
+            end
+        else
+            for (i, nm) in enumerate(names)
+                f(getproperty(row, fieldtype(types, i), i, nm), i, nm, args...)
+            end
         end
         return
     end
 end
 
+struct EachColumn{T}
+    source::T
+end
 
-"given a NamedTuple type and a Symbol `name`, compute the index (1-based) of the name in the NamedTuple's names"
-Base.@pure function columnindex(::Type{NT}, name::Symbol) where {NT <: NamedTuple{names}} where {names}
+Base.length(e::EachColumn) = length(propertynames(e.source))
+Base.IteratorEltype(::Type{<:EachColumn}) = Base.EltypeUnknown()
+
+function Base.iterate(e::EachColumn, (idx, props)=(1, propertynames(e.source)))
+    idx > length(props) && return nothing
+    return getproperty(e.source, props[idx]), (idx + 1, props)
+end
+
+eachcolumn(c) = EachColumn(c)
+
+"given names and a Symbol `name`, compute the index (1-based) of the name in names"
+Base.@pure function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
     i = 1
     for nm in names
         nm === name && return i
@@ -107,11 +112,11 @@ Base.@pure function columnindex(::Type{NT}, name::Symbol) where {NT <: NamedTupl
     return 0
 end
 
-"given a NamedTuple type and a Symbol `name`, compute the type of the name in the NamedTuple's types"
-Base.@pure function columntype(::Type{NT}, name::Symbol) where {NT <: NamedTuple{names}} where {names}
+"given tuple type and a Symbol `name`, compute the type of the name in the tuples types"
+Base.@pure function columntype(names, ::Type{T}, name::Symbol) where {T <: Tuple}
     i = 1
     for nm in names
-        nm === name && return fieldtype(NT, i)
+        nm === name && return fieldtype(T, i)
         i += 1
     end
     return Union{}

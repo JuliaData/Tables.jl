@@ -4,89 +4,81 @@ using Test, Tables
 
     NT = NamedTuple{(), Tuple{}}
     @test Tables.names(NT) === ()
-    @test Tables.types(NT) === ()
-    @test isempty(Tables.runlength(NT))
-    @test Tables.columnindex(NT, :i) == 0
-    @test Tables.columntype(NT, :i) == Union{}
+    @test Tables.types(NT) === Tuple{}
+    @test isempty(Tables.runlength(Tables.types(NT)))
+    @test Tables.columnindex(Tables.names(NT), :i) == 0
+    @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
 
     NT = NamedTuple{(:a, :b, :c), NTuple{3, Int64}}
     @test Tables.names(NT) === (:a, :b, :c)
-    @test Tables.types(NT) === (Int64, Int64, Int64)
-    @test Tables.runlength(NT) == [(Int64, 3)]
-    @test Tables.columnindex(NT, :a) == 1
-    @test Tables.columnindex(NT, :i) == 0
-    @test Tables.columntype(NT, :a) == Int64
-    @test Tables.columntype(NT, :i) == Union{}
+    @test Tables.types(NT) === Tuple{Int64, Int64, Int64}
+    @test Tables.runlength(Tables.types(NT)) == [(Int64, 3)]
+    @test Tables.columnindex(Tables.names(NT), :a) == 1
+    @test Tables.columnindex(Tables.names(NT), :i) == 0
+    @test Tables.columntype(Tables.names(NT), Tables.types(NT), :a) == Int64
+    @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
 
     NT = NamedTuple{Tuple(Symbol("a$i") for i = 1:20), Tuple{vcat(fill(Int, 10), fill(String, 10))...}}
     @test Tables.names(NT) === Tuple(Symbol("a$i") for i = 1:20)
-    @test Tables.types(NT) === Tuple(vcat(fill(Int, 10), fill(String, 10)))
-    @test Tables.runlength(NT) == [(Int, 10), (String, 10)]
-    @test Tables.columnindex(NT, :a20) == 20
-    @test Tables.columnindex(NT, :i) == 0
-    @test Tables.columntype(NT, :a20) == String
-    @test Tables.columntype(NT, :i) == Union{}
+    @test Tables.types(NT) === Tuple{vcat(fill(Int, 10), fill(String, 10))...}
+    @test Tables.runlength(Tables.types(NT)) == [(Int, 10), (String, 10)]
+    @test Tables.columnindex(Tables.names(NT), :a20) == 20
+    @test Tables.columnindex(Tables.names(NT), :i) == 0
+    @test Tables.columntype(Tables.names(NT), Tables.types(NT), :a20) == String
+    @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
 
     nt = (a=1, b=2, c=3)
     @test getproperty(nt, Int, 1, :a) === 1
 
+    NT = typeof(nt)
     output = [0, 0, 0]
-    Tables.unroll(typeof(nt), nt, output) do val, col, nm, out
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
         out[col] = val
     end
     @test output == [1, 2, 3]
 
     nt = NamedTuple{Tuple(Symbol("a$i") for i = 1:101)}(Tuple(i for i = 1:101))
-    @test Tables.runlength(typeof(nt)) == [(Int, 101)]
+    NT =typeof(nt)
+    @test Tables.runlength(Tables.types(NT)) == [(Int, 101)]
     output = zeros(Int, 101)
-    Tables.unroll(typeof(nt), nt, output) do val, col, nm, out
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
         out[col] = val
     end
     @test output == [i for i = 1:101]
 
     nt = NamedTuple{Tuple(Symbol("a$i") for i = 1:101)}(Tuple(i % 2 == 0 ? i : "$i" for i = 1:101))
-    @test Tables.runlength(typeof(nt)) == [i % 2 == 0 ? (Int, 1) : (String, 1) for i = 1:101]
+    NT = typeof(nt)
+    @test Tables.runlength(Tables.types(NT)) == [i % 2 == 0 ? (Int, 1) : (String, 1) for i = 1:101]
     output = Vector{Any}(undef, 101)
-    Tables.unroll(typeof(nt), nt, output) do val, col, nm, out
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
         out[col] = val
     end
     @test output == [i % 2 == 0 ? i : "$i" for i = 1:101]
 
 end
 
-struct DictRow
-    dict::Dict{Symbol, Int}
-end
-Base.getproperty(d::DictRow, nm::Symbol) = getfield(d, 1)[nm]
-
 @testset "namedtuples.jl" begin
 
     nt = (a=1, b=2, c=3)
     rt = [nt, nt, nt]
     @test Tables.rows(rt) === rt
-    @test Tables.schema(rt) == typeof(nt)
-    @test Tables.namedtupleiterator(eltype(rt), Tables.schema(rt), rt) === rt
+    @test Tables.schema(rt).names == Tables.names(typeof(nt))
+    @test Tables.namedtupleiterator(eltype(rt), rt) === rt
 
-    dt = [DictRow(Dict(pairs(nt))) for nt in rt]
-    ntitr = Tables.namedtupleiterator(eltype(dt), Tables.schema(rt), dt)
-    @test eltype(ntitr) == typeof(nt)
-    @test length(ntitr) == 3
-    @test collect(ntitr) == rt
-    
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
     @test Tables.rowcount(nt) == 3
-    @test Tables.schema(nt) == NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}
-    @test Tables.AccessStyle(typeof(nt)) == Tables.ColumnAccess()
+    @test Tables.schema(nt) == Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
+    @test Tables.columnaccess(typeof(nt))
     @test Tables.columns(nt) === nt
     @test rowtable(nt) == rt
     @test columntable(rt) == nt
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
 
-    @test Tables.buildcolumns(missing, rt) == nt
+    @test Tables.buildcolumns(Tables.Schema((:a, :b, :c), nothing), rt) == nt
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
-    @test Tables.buildcolumns(missing, rt) == (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
+    @test isequal(Tables.buildcolumns(Tables.Schema((:a, :b, :c), nothing), rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
 end
 
 import Base: ==
@@ -105,8 +97,9 @@ end
 Base.eltype(g::GenericRowTable) = GenericRow
 Base.length(g::GenericRowTable) = length(g.data)
 Base.size(g::GenericRowTable) = (length(g.data),)
-Tables.AccessStyle(::Type{GenericRowTable}) = Tables.RowAccess()
-Tables.schema(x::GenericRowTable) = NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}
+Tables.rowaccess(::Type{GenericRowTable}) = true
+Tables.rows(x::GenericRowTable) = x
+Tables.schema(x::GenericRowTable) = Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
 
 function Base.iterate(g::GenericRowTable, st=1)
     st > length(g.data) && return nothing
@@ -115,7 +108,7 @@ end
 
 genericrowtable(x) = GenericRowTable(collect(map(x->GenericRow(x.a, x.b, x.c), Tables.rows(x))))
 
-struct GenericColumn{T}
+struct GenericColumn{T} <: AbstractVector{T}
     data::Vector{T}
 end
 Base.eltype(g::GenericColumn{T}) where {T} = T
@@ -128,17 +121,17 @@ struct GenericColumnTable
     data::Vector{GenericColumn}
 end
 
-Tables.schema(g::GenericColumnTable) = NamedTuple{Tuple(keys(getfield(g, 1))), Tuple{(eltype(x) for x in getfield(g, 2))...}}
-Tables.AccessStyle(::Type{GenericColumnTable}) = Tables.ColumnAccess()
+Tables.columnaccess(::Type{GenericColumnTable}) = true
 Tables.columns(x::GenericColumnTable) = x
+Tables.schema(g::GenericColumnTable) = Tables.Schema(Tuple(keys(getfield(g, 1))), Tuple{(eltype(x) for x in getfield(g, 2))...})
 Base.getproperty(g::GenericColumnTable, nm::Symbol) = getfield(g, 2)[getfield(g, 1)[nm]]
 Base.propertynames(g::GenericColumnTable) = Tuple(keys(getfield(g, 1)))
 
 function genericcolumntable(x)
-    sch = Tables.schema(x)
     cols = Tables.columns(x)
-    data = [GenericColumn(getproperty(cols, nm)) for nm in Tables.names(sch)]
-    return GenericColumnTable(Dict(nm=>i for (i, nm) in enumerate(Tables.names(sch))), data)
+    sch = Tables.schema(x)
+    data = [GenericColumn(getproperty(cols, nm)) for nm in sch.names]
+    return GenericColumnTable(Dict(nm=>i for (i, nm) in enumerate(sch.names)), data)
 end
 ==(a::GenericColumnTable, b::GenericColumnTable) = getfield(a, 1) == getfield(b, 1) && getfield(a, 2) == getfield(b, 2)
 

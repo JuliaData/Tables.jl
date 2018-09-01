@@ -31,86 +31,156 @@ function __init__()
     end
 end
 
-include("utils.jl")
-
 "Abstract row type with a simple required interface: row values are accessible via `getproperty(row, field)`; for example, a NamedTuple like `nt = (a=1, b=2, c=3)` can access its value for `a` like `nt.a` which turns into a call to the function `getproperty(nt, :a)`"
 abstract type Row end
 
 """
-The Tables.jl package provides four useful interface functions for working with tabular data in a variety of formats.
+The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data through predictable access patterns.
 
 ```julia
-    Tables.schema(table) => NamedTuple{names, types}
-    Tables.AccessStyle(table_type) => Tables.RowAccess() || Tables.ColumnAccess()
-    Tables.rows(table) => iterator with values accessible via getproperty(row, columnname)
-    Tables.columns(table) => Collection of iterators, with each column accessible via getproperty(x, columnname)
+    Tables.rows(table) => Rows
+    Tables.columns(table) => Columns
 ```
+Where `Rows` and `Columns` are the duals of each other:
+* `Rows` is an iterator of property-accessible objects (any type that supports `propertynames(row)` and `getproperty(row, nm::Symbol`)
+* `Columns` is a property-accessible object of iterators (i.e. each column is an iterator)
 
-Essentially, for any table type that implements the interface requirements, one can get access to:
-    1. the schema of a table, returned as a NamedTuple _type_, with parameters of `names` which are the column names, and `types` which is a `Tuple{...}` type of types
-    2. rows of the table via a Row-iterator
-    3. the columns of the table via a collection of iterators, where the individual column iterators are accessible via getproperty(table, columnname)
+In addition to these `Rows` and `Columns` objects, it's useful to be able to query properties of these objects:
+* `Tables.schema(rows_or_columns)`: returns a `Tables.Schema` object
+  * column names can be accessed as a tuple of Symbols like `sch.names`
+  * column types can be accessed as a tuple of types like `sch.types`, though note that `sch.types` may return `nothing`, indicating column types are not computable or otherwise unknown
 
-So how does one go about satisfying these interface functions? It mainly depends on the `Tables.AccessStyle(T)` of your table:
+A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
+This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly).
 
-* `Tables.schema(x)`: given an _instance_ of a table type, generate a `NamedTuple` type, with a tuple of symbols for column names (e.g. `(:a, :b, :c)`), and a tuple type of types as the 2nd parameter (e.g. `Tuple{Int, Float64, String}`); like `NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}`
+With these simple definitions, powerful workflows are enabled:
+* A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
+* A tabular file format can have automatic integration with in-memory structures and translation to other file formats
 
-* `Tables.RowAccess()`:
-  * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)` (like a NamedTuple type)
+So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've alrady defined and the natural access patterns of your table:
 
-* `Tables.ColumnAccess()`:
-  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (a NamedTuple of Vectors, for example, would satisfy the interface)
+To support `Rows`:
+* Define `Tables.rowaccess(::Type{MyTable}) = true`: this signals to other types that `MyTable` supports valid `Row`-iteration
+* Define `Tables.rows(x::MyTable)`: return a `Row`-iterator object (perhaps the table itself if already defined)
 
-The final question is how `MyTableType` can be a "sink" for any other table type:
+To support `Columns`:
+* Define `Tables.columnaccess(::Type{MyTable}) = true`: this signals to other types that `MyTable` supports returning a valid `Columns` object
+* Define `Tables.columns(x::MyTable)`: return a `Columns`, property-accessible object (perhaps the table itself if it naturally supports property-access to columns)
 
-* Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTableType`
+In addition, it can be helpful to define the following:
+* `Tables.istable(::Type{MyTable}) = true`: there are runtime checks to see if an object implements the interface, but this can provide an explicit affirmation
+* `Tables.schema(rows_or_columns)`: allow users to get the column names & types of `MyTable`'s `Rows` or `Columns` objects as a tuple of Symbols and tuple of types; by default, it will call `propertynames` on the first row or `Columns` object directly for names; column types will be `nothing` by default
 
-For example, if `MyTableType` is a row-oriented format, I might define my "sink" function like:
+The final question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
+
+* Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTable`
+
+For example, if `MyTable` is a row-oriented format, I might define my "sink" function like:
 ```julia
-function MyTableType(x)
-    mytbl = MyTableType(Tables.schema(x)) # custom constructor that creates an "empty" MyTableType w/ the right schema
-    for row in Tables.rows(x)
-        append!(mytbl, row)
+function MyTable(x)
+    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
+    rows = Tables.rows(x)
+    sch = Tables.schema(rows)
+    names = sch.names
+    types = sch.types
+    # custom constructor that creates an "empty" MyTable according to given column names & types
+    # note that the "unknown" schema case should be considered, i.e. when `sch.types => nothing`
+    mytbl = MyTable(names, types)
+    for row in rows
+        # a convenience function provided in Tables.jl for "unrolling" access to each column/property of a `Row`
+        # it works by applying a provided function to each value; see `?Tables.eachcolumn` for more details
+        Tables.eachcolumn(sch, row, mytbl) do val, col, name, mytbl
+            push!(mytbl[col], val)
+        end
     end
     return mytbl
 end
 ```
 
-Alternatively, if `MyTableType` is column-oriented, perhaps my definition would be more like:
-
+Alternatively, if `MyTable` is column-oriented, perhaps my definition would be more like:
 ```julia
-function MyTableType(x)
+function MyTable(x)
+    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
     cols = Tables.columns(x)
-    return MyTableType(collect(map(String, keys(cols))), [col for col in cols])
+    # here we use Tables.eachcolumn to iterate over each column in a `Columns` object
+    return MyTable(collect(Tables.names(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
 end
 ```
 
-Obviously every table type is different, but via a combination of `Tables.schema`, `Tables.rows`, and `Tables.columns`, each table type should be able to construct an instance of itself.
+Obviously every table type is different, but via a combination of `Tables.rows` and `Tables.columns` each table type should be able to construct an instance of itself.
 """
 abstract type Table end
 
-abstract type AccessStyle end
-struct RowAccess <: AccessStyle end
-struct ColumnAccess <: AccessStyle end
-
-"Tables.schema(s) => NamedTuple{names, types}"
-function schema end
+# default definitions
+rowaccess(x) = false
+columnaccess(x) = false
 
 function istable(::Type{T}) where {T}
-    hasmethod(Tables.AccessStyle, Tuple{T}) &&
-    hasmethod(Tables.schema, Tuple{T}) &&
-    (Tables.AccessStyle(T) === Tables.RowAccess() ? hasmethod(Tables.rows, Tuple{T}) :
-    Tables.AccessStyle(T) === Tables.ColumnAccess() ? hasmethod(Tables.columns, Tuple{T}) : false)
+    if hasmethod(Tables.rowaccess, Tuple{T})
+        return hasmethod(Tables.rows, Tuple{T})
+    elseif hasmethod(Tables.columnaccess, Tuple{T})
+        return hasmethod(Tables.columns, Tuple{T})
+    end
+    return false
 end
 
+# Schema implementation
+"""
+    Tables.Schema(names, types)
+
+Create a `Tables.Schema` object that holds the column names and types for a tabular data object.
+`Tables.Schema` is dual-purposed: provide an easy interface for users to query these properties,
+as well as provide a convenient "structural" type for code generation. 
+
+To access the names, one can simply call `sch.names` to return the tuple of Symbols.
+To access column types, one can similarly call `sch.types`, which will return either a tuple of types (like `(Int64, Float64, String)`)
+or `nothing` if the column types are not computable or otherwise unknown.
+
+The actual type definition is
+```julia
+struct Schema{names, types} end
+```
+Where `names` is a tuple of Symbols, and `types` is a tuple _type_ of types (like `Tuple{Int64, Float64, String}`).
+Encoding the names & types as type parameters allows convenient use of the type in generated functions
+and other optimization use-cases.
+"""
+struct Schema{names, types} end
+Schema(names::Tuple{Vararg{Symbol}}, types::Type{T}) where {T <: Tuple} = Schema{names, T}()
+Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, types}()
+Schema(names::Tuple{Vararg{Symbol}}, ::Nothing) = Schema{names, nothing}()
+Schema(names, ::Nothing) = Schema{Tuple(map(Symbol, names)), nothing}()
+Schema(names, types) = Schema{Tuple(map(Symbol, names)), Tuple{types...}}()
+
+function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names, types}
+    if field === :names
+        return names
+    elseif field === :types
+        return types === nothing ? nothing : Tuple(fieldtype(types, i) for i = 1:fieldcount(types))
+    else
+        throw(ArgumentError("unsupported property for Tables.Schema"))
+    end
+end
+
+function schema(x::T) where {T}
+    if rowaccess(T)
+        return Schema(propertynames(first(x)), nothing)
+    elseif columnaccess(T)
+        return Schema(propertynames(x), nothing)
+    end
+    return Schema((), nothing)
+end
+
+include("utils.jl")
+# reference implementations: Vector of NamedTuples and NamedTuple of Vectors
 include("namedtuples.jl")
 
-## generic fallbacks; if a table provides Tables.rows or Tables.columns,
-## provide the inverse interface function
+## generic `Tables.rows` and `Tables.columns` fallbacks
+## if a table provides Tables.rows or Tables.columns,
+## we'll provide a default implementation of the dual
 
 # generic row iteration of columns
 struct ColumnsRow{T}
-    columns::T # a ColumnTable; NamedTuple of Vectors
+    columns::T # a `Columns` object
     row::Int
 end
 
@@ -118,23 +188,21 @@ Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = get
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(c.columns)
 
-struct RowIterator{NT, S}
-    source::S # assumes we can call length(col) & getindex(col, row) on columns
+struct RowIterator{T}
+    columns::T
 end
-RowIterator(::Type{NT}, x::S) where {NT, S} = RowIterator{NT, S}(x)
-Base.eltype(x::RowIterator{NT, S}) where {NT, S} = ColumnsRow{S}
-Base.length(x::RowIterator) = length(getproperty(x.source, propertynames(x.source)[1]))
+Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
+Base.length(x::RowIterator) = length(getproperty(x.columns, propertynames(x.columns)[1]))
+schema(x::RowIterator) = schema(x.columns)
 
 function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
-    return ColumnsRow(rows.source, st), st + 1
+    return ColumnsRow(rows.columns, st), st + 1
 end
 
 function rows(x::T) where {T}
-    if AccessStyle(T) === ColumnAccess()
-        return RowIterator(schema(x), columns(x))
-    elseif AccessStyle(T) === RowAccess()
-        return x
+    if columnaccess(T)
+        return RowIterator(columns(x))
     else
         throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
     end
@@ -148,12 +216,12 @@ end
 """
 allocatecolumn(T, len) = Vector{T}(undef, len)
 
-@inline function allocatecolumns(::Type{NT}, len) where {NT <: NamedTuple{names}} where {names}
+@inline function allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
-        vals = Tuple(:(allocatecolumn($(fieldtype(NT, i)), len)) for i = 1:fieldcount(NT))
+        vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(NT, i), len) for i = 1:fieldcount(NT)))
+        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
 end
 
@@ -163,17 +231,17 @@ haslength(T) = T === Base.HasLength() || T === Base.HasShape{1}()
 @inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape{1}}, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
-@inline function buildcolumns(sch, rowitr::T) where {T}
+@inline function buildcolumns(schema, rowitr::T) where {T}
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
-    nt = allocatecolumns(sch, len)
+    nt = allocatecolumns(schema, len)
     for (i, row) in enumerate(rowitr)
-        unroll(add!, sch, row, L, nt, i)
+        eachcolumn(add!, schema, row, L, nt, i)
     end
     return nt
 end
 
-function add_or_widen!(val::T, col::Int, nm::Symbol, L, columns, row, allocate, len) where {T}
+@inline function add_or_widen!(val::T, col::Int, nm::Symbol, L, columns, row, allocate, len) where {T}
     if !allocate
         @inbounds columns[col] = add_or_widen!(columns[col], val, L, row)
     else
@@ -182,7 +250,7 @@ function add_or_widen!(val::T, col::Int, nm::Symbol, L, columns, row, allocate, 
     return
 end
 
-function add_or_widen!(dest::AbstractVector{T}, val::S, ::Union{Base.HasLength, Base.HasShape{1}}, row) where {T, S}
+@inline function add_or_widen!(dest::AbstractVector{T}, val::S, ::Union{Base.HasLength, Base.HasShape{1}}, row) where {T, S}
     if S === T || val isa T
         @inbounds dest[row] = val
         return dest
@@ -194,7 +262,7 @@ function add_or_widen!(dest::AbstractVector{T}, val::S, ::Union{Base.HasLength, 
     end
 end
 
-function add_or_widen!(dest::AbstractVector{T}, val::S, ::Base.SizeUnknown, row) where {T, S}
+@inline function add_or_widen!(dest::AbstractVector{T}, val::S, ::Base.SizeUnknown, row) where {T, S}
     if S === T || val isa T
         push!(dest, val)
         return dest
@@ -206,33 +274,31 @@ function add_or_widen!(dest::AbstractVector{T}, val::S, ::Base.SizeUnknown, row)
     end
 end
 
-# when Tables.schema(x) === missing
-function buildcolumns(::Missing, rowitr::T) where {T}
+# when Tables.types(x) === nothing
+function buildcolumns(sch::Schema{names, nothing}, rowitr::T) where {names, T}
     state = iterate(rowitr)
-    state === nothing && return NamedTuple()
+    state === nothing && return NamedTuple{names}(Tuple(Missing[] for _ in names))
     row::eltype(rowitr), st = state
-    names = propertynames(row)
     cols = length(names)
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
     columns = Vector{AbstractVector}(undef, cols)
-    unroll(add_or_widen!, names, row, L, columns, 1, true, len)
+    eachcolumn(add_or_widen!, sch, row, L, columns, 1, true, len)
     rownbr = 2
     while true
         state = iterate(rowitr, st)
         state === nothing && break
         row, st = state
-        unroll(add_or_widen!, names, row, L, columns, rownbr, false, len)
+        eachcolumn(add_or_widen!, sch, row, L, columns, rownbr, false, len)
         rownbr += 1
     end
     return NamedTuple{names}(Tuple(columns))
 end
 
 @inline function columns(x::T) where {T}
-    if AccessStyle(T) === RowAccess()
-        return buildcolumns(schema(x), rows(x))
-    elseif AccessStyle(T) === ColumnAccess()
-        return x
+    if rowaccess(T)
+        r = rows(x)
+        return buildcolumns(schema(r), r)
     else
         throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
     end
