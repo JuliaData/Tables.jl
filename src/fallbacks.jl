@@ -65,28 +65,25 @@ haslength(x) = x === Base.HasLength() || x === Base.HasShape{1}()
     return nt
 end
 
-@inline function add_or_widen!(val::T, col::Int, nm::Symbol, L, columns, row, allocate, len) where {T}
-    if !allocate
-        @inbounds columns[col] = add_or_widen!(columns[col], val, L, row)
-    else
-        @inbounds columns[col] = add_or_widen!(allocatecolumn(T, len), val, L, row)
-    end
-    return
-end
-
 @inline add!(dest::AbstractVector, val, ::Union{Base.HasLength, Base.HasShape{1}}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractVector, val, T, row) = push!(dest, val)
 
-@inline function add_or_widen!(dest::AbstractVector{T}, val::S, L, row) where {T, S}
+@inline function add_or_widen!(dest::AbstractVector{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
     if S === T || val isa T
         add!(dest, val, L, row)
         return dest
     else
-        new = allocatecolumn(Base.promote_typejoin(T, S), length(dest))
-        copyto!(new, 1, dest, 1, row - 1)
+        new = allocatecolumn(Base.promote_typejoin(T, S), max(len, length(dest)))
+        row > 1 && copyto!(new, 1, dest, 1, row - 1)
         add!(new, val, L, row)
+        updated[] = merge(updated[], NamedTuple{(nm,)}((new,)))
         return new
     end
+end
+
+@inline function add_or_widen!(val, col, nm, L, columns, row, len, updated)
+    @inbounds add_or_widen!(columns[col], val, nm, L, row, len, updated)
+    return
 end
 
 # when Tables.schema(x) === nothing
@@ -95,20 +92,23 @@ function buildcolumns(::Nothing, rowitr::T) where {T}
     state === nothing && return NamedTuple()
     row::eltype(rowitr), st = state
     names = propertynames(row)
-    cols = length(names)
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
-    columns = Vector{AbstractVector}(undef, cols)
-    eachcolumn(add_or_widen!, names, row, L, columns, 1, true, len)
-    rownbr = 2
+    sch = Schema(names, nothing)
+    columns = NamedTuple{names}(Tuple(Union{}[] for _ = 1:length(names)))
+    return _buildcolumns(rowitr, row, st, sch, L, columns, 1, len, Ref{Any}(columns))
+end
+
+function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
     while true
+        eachcolumn(add_or_widen!, sch, row, L, columns, rownbr, len, updated)
+        rownbr += 1
         state = iterate(rowitr, st)
         state === nothing && break
         row, st = state
-        eachcolumn(add_or_widen!, names, row, L, columns, rownbr, false, len)
-        rownbr += 1
+        columns !== updated[] && return _buildcolumns(rowitr, row, st, sch, L, updated[], rownbr, len, updated)
     end
-    return NamedTuple{names}(Tuple(columns))
+    return columns
 end
 
 @inline function columns(x::T) where {T}

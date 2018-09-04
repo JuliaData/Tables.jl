@@ -79,10 +79,10 @@ function eachcolumn end
     end
 end
 
-@inline function eachcolumn(f::Base.Callable, names::Tuple{Vararg{Symbol}}, row, args...)
+@inline function eachcolumn(f::Base.Callable, sch::Schema{names, nothing}, row, args...) where {names}
     if @generated
-        if fieldcount(names) < 100
-            b = Expr(:block, Any[:(f(getproperty(row, names[$i]), $i, names[$i], args...)) for i = 1:fieldcount(names)]...)
+        if length(names) < 100
+            b = Expr(:block, Any[:(f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:length(names)]...)
         else
             b = quote
                 for (i, nm) in enumerate(names)
