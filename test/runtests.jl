@@ -55,6 +55,15 @@ using Test, Tables
     end
     @test output == [i % 2 == 0 ? i : "$i" for i = 1:101]
 
+    nt = (a=Ref(0), b=Ref(0))
+    Tables.eachcolumn((:a, :b), (a=1, b=2)) do val, col, nm
+        nt[nm][] = val
+    end
+    @test nt.a[] == 1
+    @test nt.b[] == 2
+
+    nt = (a=[1,2,3], b=[4,5,6])
+    @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
 end
 
 @testset "namedtuples.jl" begin
@@ -76,9 +85,9 @@ end
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
 
-    @test Tables.buildcolumns(Tables.Schema((:a, :b, :c), nothing), rt) == nt
+    @test Tables.buildcolumns(nothing, rt) == nt
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
-    @test isequal(Tables.buildcolumns(Tables.Schema((:a, :b, :c), nothing), rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
+    @test isequal(Tables.buildcolumns(nothing, rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
 end
 
 import Base: ==
@@ -97,6 +106,7 @@ end
 Base.eltype(g::GenericRowTable) = GenericRow
 Base.length(g::GenericRowTable) = length(g.data)
 Base.size(g::GenericRowTable) = (length(g.data),)
+Tables.istable(::Type{GenericRowTable}) = true
 Tables.rowaccess(::Type{GenericRowTable}) = true
 Tables.rows(x::GenericRowTable) = x
 Tables.schema(x::GenericRowTable) = Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
@@ -121,6 +131,7 @@ struct GenericColumnTable
     data::Vector{GenericColumn}
 end
 
+Tables.istable(::Type{GenericColumnTable}) = true
 Tables.columnaccess(::Type{GenericColumnTable}) = true
 Tables.columns(x::GenericColumnTable) = x
 Tables.schema(g::GenericColumnTable) = Tables.Schema(Tuple(keys(getfield(g, 1))), Tuple{(eltype(x) for x in getfield(g, 2))...})
