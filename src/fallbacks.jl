@@ -53,7 +53,7 @@ end
 @inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape{1}}, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
-@inline function buildcolumns(schema, rowitr::T, iT=nothing) where {T}
+@inline function buildcolumns(schema, rowitr::T) where {T}
     L = Base.IteratorSize(T)
     len = Base.haslength(L) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
@@ -85,7 +85,7 @@ end
 end
 
 # when Tables.schema(x) === nothing
-function buildcolumns(::Nothing, rowitr::T, iT=Union{}) where {T}
+function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
     row::eltype(rowitr), st = state
@@ -93,7 +93,7 @@ function buildcolumns(::Nothing, rowitr::T, iT=Union{}) where {T}
     L = Base.IteratorSize(T)
     len = Base.haslength(L) ? length(rowitr) : 0
     sch = Schema(names, nothing)
-    columns = NamedTuple{names}(Tuple(iT[] for _ = 1:length(names)))
+    columns = NamedTuple{names}(Tuple(Union{}[] for _ = 1:length(names)))
     return _buildcolumns(rowitr, row, st, sch, L, columns, 1, len, Ref{Any}(columns))
 end
 
@@ -109,10 +109,10 @@ function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
     return columns
 end
 
-@inline function columns(x::T; defaultmissing::Bool=false) where {T}
+@inline function columns(x::T) where {T}
     if rowaccess(T)
         r = rows(x)
-        return buildcolumns(schema(r), r, defaultmissing ? Missing : Union{})
+        return buildcolumns(schema(r), r)
     else
         throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
     end
