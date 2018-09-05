@@ -36,16 +36,35 @@ Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 
-function Base.iterate(rows::DataValueRowIterator{NT}, st=()) where {NT}
-    state = iterate(rows.x, st...)
-    state === nothing && return nothing
-    row, st = state
-    return DataValueRow{NT, typeof(row)}(row), (st,)
+function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
+    if @generated
+        vals = Tuple(:($(fieldtype(NT, i))(getproperty(row, $(nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        q = quote
+            x = iterate(rows.x, st...)
+            x === nothing && return nothing
+            row, st = x
+            return $NT(($(vals...),)), (st,)
+        end
+        # @show q
+        return q
+    else
+        x = iterate(rows.x, st...)
+        x === nothing && return nothing
+        row, st = x
+        return NT(Tuple(fieldtype(NT, i)(getproperty(row, nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+    end
 end
 
-struct DataValueRow{NT, T}
-    row::T
-end
+# function Base.iterate(rows::DataValueRowIterator{NT}, st=()) where {NT}
+#     state = iterate(rows.x, st...)
+#     state === nothing && return nothing
+#     row, st = state
+#     return DataValueRow{NT, typeof(row)}(row), (st,)
+# end
 
-@inline Base.getproperty(dvr::DataValueRow{NamedTuple{names, types}}, nm::Symbol) where {names, types} = getproperty(dvr, Tables.columntype(names, types, nm), Tables.columnindex(names, nm), nm)
-@inline Base.getproperty(dvr::DataValueRow, ::Type{T}, col::Int, nm::Symbol) where {T} = T(getproperty(getfield(dvr, 1), nondatavaluetype(T), col, nm))
+# struct DataValueRow{NT, T}
+#     row::T
+# end
+
+# @inline Base.getproperty(dvr::DataValueRow{NamedTuple{names, types}}, nm::Symbol) where {names, types} = getproperty(dvr, Tables.columntype(names, types, nm), Tables.columnindex(names, nm), nm)
+# @inline Base.getproperty(dvr::DataValueRow, ::Type{T}, col::Int, nm::Symbol) where {T} = T(getproperty(getfield(dvr, 1), nondatavaluetype(T), col, nm))

@@ -183,9 +183,9 @@ end
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 
     dv = Tables.datavaluerows(rt)
-    @test eltype(dv) == NamedTuple{(:a, :b, :c),Tuple{DataValue{Real},DataValue{Float64},DataValue{String}}}
+    @test eltype(dv) == NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}
     rt2 = collect(dv)
-    @test rt2[1] == (a = DataValue{Real}(1), b = DataValue{Float64}(4.0), c = DataValue{String}("7"))
+    @test rt2[1] == (a = 1, b = DataValue{Float64}(4.0), c = "7")
 
     ei = QueryOperators.EnumerableIterable{eltype(dv), typeof(dv)}(dv)
     nt = ei |> columntable
@@ -193,9 +193,13 @@ end
     rt3 = ei |> rowtable
     @test isequal(rt |> rowtable, rt3)
 
-    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
-    map(source::Enumerable, f::Function, f_expr::Expr)
-    mt = ei |> y->QueryOperators.map(y, x->(a=x.a, c=x.c), Expr(:block))
+    # rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+    mt = ei |> y->QueryOperators.map(y, x->(a=x.b, c=x.c), Expr(:block))
     @inferred (mt |> columntable)
     @inferred (mt |> rowtable)
+
+    # uninferrable case
+    mt = ei |> y->QueryOperators.map(y, x->(a=x.a, c=x.c), Expr(:block))
+    @test (mt |> columntable) == (a = Real[1, 2.0, 3], c = ["7", "8", "9"])
+    @test length(mt |> rowtable) == 3
 end

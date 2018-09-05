@@ -94,7 +94,7 @@ end
 function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
-    row::eltype(rowitr), st = state
+    row, st = state
     names = propertynames(row)
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0

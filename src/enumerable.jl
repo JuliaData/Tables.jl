@@ -12,7 +12,11 @@ struct DataValueUnwrapper{S}
     x::S
 end
 
-Tables.schema(dv::DataValueUnwrapper) = Tables.Schema(nondatavaluetype(eltype(dv.x)))
+function Tables.schema(dv::DataValueUnwrapper)
+    eT = eltype(dv.x)
+    !(eT <: NamedTuple) && return nothing
+    return Tables.Schema(nondatavaluetype(eT))
+end
 Base.eltype(rows::DataValueUnwrapper) = DataValueUnwrapRow{eltype(rows.x)}
 Base.IteratorSize(::Type{DataValueUnwrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::DataValueUnwrapper) = length(rows.x)
