@@ -1,68 +1,78 @@
 ### Tables.jl
 
-The Tables.jl package provides four useful interface functions for working with tabular data in a variety of formats.
+The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data through predictable access patterns.
 
 ```julia
-    Tables.schema(table) => NamedTuple{names, types}
-    Tables.AccessStyle(table_type) => Tables.RowAccess() || Tables.ColumnAccess()
-    Tables.rows(table) => iterator with values accessible via getproperty(row, columnname)
-    Tables.columns(table) => Collection of iterators, with each column accessible via getproperty(x, columnname)
+    Tables.rows(table) => Rows
+    Tables.columns(table) => Columns
 ```
+Where `Rows` and `Columns` are the duals of each other:
+* `Rows` is an iterator of property-accessible objects (any type that supports `propertynames(row)` and `getproperty(row, nm::Symbol`)
+* `Columns` is a property-accessible object of iterators (i.e. each column is an iterator)
 
-Essentially, for any table type that implements the interface requirements, one can get access to:
+In addition to these `Rows` and `Columns` objects, it's useful to be able to query properties of these objects:
+* `Tables.schema(x::Union{Rows, Columns}) => Union{Tables.Schema, Nothing}`: returns a `Tables.Schema` object, or `nothing` if the table's schema is unknown
+* For the `Tables.Schema` object:
+  * column names can be accessed as a tuple of Symbols like `sch.names`
+  * column types can be accessed as a tuple of types like `sch.types`
+  * See `?Table.Schema` for more details on this type
 
-1. the schema of a table (it's column names & element types), returned as a NamedTuple _type_ (`NamedTuple{names, types}`), with parameters of `names` which are the column names as a Tuple of Symbols, and `types` which is a Tuple type of types (`Tuple{...}`)
-2. rows of the table via a Row-iterator
-3. the columns of the table via a collection of iterators, where the individual column iterators are accessible via getproperty(table, columnname)
+A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
+This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly).
 
-Let's clarify the definitions of some of the terms that were just used:
+With these simple definitions, powerful workflows are enabled:
+* A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
+* A tabular file format can have automatic integration with in-memory structures and translation to other file formats
 
-* `Tables.rows(src)` returns a `Row` iterator, where `Row` is any object that supports value access via `getproperty(row, nm::Symbol)`. For example, if I have a NamedTuple like `row = (a=1, b=2, c=3)`, its values can be accessed like `row.a`, which is desugared to a call to `getproperty(row, :a)`. Thus a NamedTuple implicitly satisfies the `Row` interface. A `Row` should support `getproperty(row, name)` for any column name returned in a table's `Tables.schema(src)`. This allows an end-user access pattern like:
+So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've alrady defined and the natural access patterns of your table:
 
+First:
+* `Tables.istable(::Type{<:MyTable}) = true`: this provides an explicit affirmation that your type implements the Tables interface
+
+To support `Rows`:
+* Define `Tables.rowaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports valid `Row`-iteration
+* Define `Tables.rows(x::MyTable)`: return a `Row`-iterator object (perhaps the table itself if already defined)
+* Define `Tables.schema(Tables.rows(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
+
+To support `Columns`:
+* Define `Tables.columnaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports returning a valid `Columns` object
+* Define `Tables.columns(x::MyTable)`: return a `Columns`, property-accessible object (perhaps the table itself if it naturally supports property-access to columns)
+* Define `Tables.schema(Tables.columns(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
+
+The final question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
+
+* Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTable`
+
+For example, if `MyTable` is a row-oriented format, I might define my "sink" function like:
 ```julia
-sch = Tables.schema(src)
-names = Tables.names(sch)
-for row in Tables.rows(src)
-    for nm in names
-        foo(getproperty(row, nm))
-    end
-end
-```
-* `Tables.columns(src)` returns an object that satisifes the `Columns` interface, which, similar to a `Row`, allows access to values via `getproperty(columns, nm::Symbol)`, but, unlike a `Row` returning a scalar value, will return a vector or iterator representing all the values in the column. 
-
-
-So how does one go about satisfying these interface functions as a table type developer? It mainly depends on the `Tables.AccessStyle(T)` of your table:
-
-* `Tables.schema(x)`: given an _instance_ of a table type, generate a `NamedTuple` type, with a tuple of symbols for column names (e.g. `(:a, :b, :c)`), and a tuple type of types as the 2nd parameter (e.g. `Tuple{Int, Float64, String}`); like `NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}`
-
-* `Tables.RowAccess()`:
-  * overload `Tables.rows` for your table type (e.g. `Tables.rows(t::MyTableType)`), and return an iterator of `Row`s. Where a `Row` type is any object with keys accessible via `getproperty(obj, key)` (like a NamedTuple)
-
-* `Tables.ColumnAccess()`:
-  * overload `Tables.columns` for your table type (e.g. `Tables.columns(t::MyTableType)`), returning a collection of iterators, with individual column iterators accessible via column names by `getproperty(x, columnname)` (a NamedTuple of Vectors, for example, would satisfy the interface)
-
-The final question is how `MyTableType` can be a "sink" for any other table type:
-
-* Define a function or constructor that takes, at a minimum, a single, untyped argument and then uses the Tables.jl interface functions (`Tables.schema`, `Tables.rows` and `Tables.columns`) on that argument to construct an instance of `MyTableType`
-
-For example, if `MyTableType` is a row-oriented format, I might define my "sink" function like:
-```julia
-function MyTableType(x)
-    mytbl = MyTableType(Tables.schema(x)) # custom constructor that creates an "empty" MyTableType w/ the right schema
-    for row in Tables.rows(x)
-        append!(mytbl, row)
+function MyTable(x)
+    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
+    rows = Tables.rows(x)
+    sch = Tables.schema(rows)
+    names = sch.names
+    types = sch.types
+    # custom constructor that creates an "empty" MyTable according to given column names & types
+    # note that the "unknown" schema case should be considered, i.e. when `sch.types => nothing`
+    mytbl = MyTable(names, types)
+    for row in rows
+        # a convenience function provided in Tables.jl for "unrolling" access to each column/property of a `Row`
+        # it works by applying a provided function to each value; see `?Tables.eachcolumn` for more details
+        Tables.eachcolumn(sch, row) do val, col, name
+            push!(mytbl[col], val)
+        end
     end
     return mytbl
 end
 ```
 
-Alternatively, if `MyTableType` is column-oriented, perhaps my definition would be more like:
-
+Alternatively, if `MyTable` is column-oriented, perhaps my definition would be more like:
 ```julia
-function MyTableType(x)
+function MyTable(x)
+    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
     cols = Tables.columns(x)
-    return MyTableType(collect(map(String, keys(cols))), [col for col in cols])
+    # here we use Tables.eachcolumn to iterate over each column in a `Columns` object
+    return MyTable(collect(propertynames(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
 end
 ```
 
-Obviously every table type is different, but via a combination of `Tables.schema`, `Tables.rows`, and `Tables.columns`, each table type should be able to construct an instance of itself.
+Obviously every table type is different, but via a combination of `Tables.rows` and `Tables.columns` each table type should be able to construct an instance of itself.
