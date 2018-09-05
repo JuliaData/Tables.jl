@@ -3,7 +3,7 @@
 ## we'll provide a default implementation of the dual
 
 # generic row iteration of columns
-rowcount(cols) = length(getproperty(x.columns, propertynames(x.columns)[1]))
+rowcount(cols) = length(getproperty(cols, propertynames(cols)[1]))
 
 struct ColumnsRow{T}
     columns::T # a `Columns` object
