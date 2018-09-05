@@ -14,27 +14,31 @@ unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{T}) where {T} = DataValue{T}
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
-Base.@pure function datavaluetype(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
-    TT = Tuple{Any[ datavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
+Base.@pure function datavaluetype(::Tables.Schema{names, types}) where {names, types}
+    TT = Tuple{Any[ datavaluetype(fieldtype(types, i)) for i = 1:fieldcount(types) ]...}
     return NamedTuple{names, TT}
 end
 
 struct DataValueRowIterator{NT, S}
     x::S
 end
+DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = DataValueRowIterator{NT, S}(x)
 
-# Should maybe make this return a custom DataValueRow type to allow lazier
-# DataValue wrapping; but need to make sure Query/QueryOperators support first
+"Returns a DataValue-based NamedTuple-iterator"
+DataValueRowIterator(::Type{Schema{names, types}}, x::S) where {names, types, S} = DataValueRowIterator{datavaluetype(NamedTuple{names, types}), S}(x)
+function datavaluerows(x)
+    r = Tables.rows(x)
+    #TODO: add support for unknown schema
+    return DataValueRowIterator(datavaluetype(Tables.schema(r)), r)
+end
+
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 
-"Returns a DataValue-based NamedTuple-iterator"
-DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = DataValueRowIterator{datavaluetype(NT), S}(x)
-
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
-        vals = Tuple(:(getproperty(row, $(fieldtype(NT, i)), $i, $(Meta.QuoteNode(names[i])))) for i = 1:fieldcount(NT))
+        vals = Tuple(:($(fieldtype(NT, i))(getproperty(row, $(nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -47,8 +51,7 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(getproperty(row, fieldtype(NT, i), i, names[i]) for i = 1:fieldcount(NT))), (st,)
+        return NT(Tuple(fieldtype(NT, i)(getproperty(row, nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
     end
 end
 
-datavaluerows(x) = DataValueRowIterator(schema(x), rows(x))

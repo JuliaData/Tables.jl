@@ -10,7 +10,7 @@ end
 
 Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
-Base.propertynames(c::ColumnsRow) = propertynames(c.columns)
+Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
 struct RowIterator{T}
     columns::T
@@ -33,6 +33,8 @@ function rows(x::T) where {T}
 end
 
 # build columns from rows
+haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
+
 """
     Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
     
@@ -55,7 +57,7 @@ end
 
 @inline function buildcolumns(schema, rowitr::T) where {T}
     L = Base.IteratorSize(T)
-    len = Base.haslength(L) ? length(rowitr) : 0
+    len = haslength(L) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
     for (i, row) in enumerate(rowitr)
         eachcolumn(add!, schema, row, L, nt, i)
@@ -91,7 +93,7 @@ function buildcolumns(::Nothing, rowitr::T) where {T}
     row::eltype(rowitr), st = state
     names = propertynames(row)
     L = Base.IteratorSize(T)
-    len = Base.haslength(L) ? length(rowitr) : 0
+    len = haslength(L) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = NamedTuple{names}(Tuple(Union{}[] for _ = 1:length(names)))
     return _buildcolumns(rowitr, row, st, sch, L, columns, 1, len, Ref{Any}(columns))

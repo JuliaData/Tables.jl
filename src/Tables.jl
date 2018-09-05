@@ -115,8 +115,11 @@ Obviously every table type is different, but via a combination of `Tables.rows` 
 abstract type Table end
 
 # default definitions
+istable(x::T) where {T} = istable(T)
 istable(::Type{T}) where {T} = false
+rowaccess(x::T) where {T} = rowaccess(T)
 rowaccess(::Type{T}) where {T} = false
+columnaccess(x::T) where {T} = columnaccess(T)
 columnaccess(::Type{T}) where {T} = false
 schema(x) = nothing
 
