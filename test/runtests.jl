@@ -56,7 +56,7 @@ using Test, Tables
     @test output == [i % 2 == 0 ? i : "$i" for i = 1:101]
 
     nt = (a=Ref(0), b=Ref(0))
-    Tables.eachcolumn((:a, :b), (a=1, b=2)) do val, col, nm
+    Tables.eachcolumn(Tables.Schema((:a, :b), nothing), (a=1, b=2)) do val, col, nm
         nt[nm][] = val
     end
     @test nt.a[] == 1
@@ -86,6 +86,7 @@ end
     @test nt == (nt |> rowtable |> columntable)
 
     @test Tables.buildcolumns(nothing, rt) == nt
+    @test Tables.buildcolumns(nothing, rt, Missing) == (a = Union{Missing, Int64}[1, 2, 3], b = Union{Missing, Float64}[4.0, 5.0, 6.0], c = Union{Missing, String}["7", "8", "9"])
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
     @test isequal(Tables.buildcolumns(nothing, rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
 end
