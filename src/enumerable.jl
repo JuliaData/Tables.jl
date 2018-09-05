@@ -1,5 +1,8 @@
-using .QueryOperators: Enumerable
-using .DataValues
+using .Query
+
+@static if isdefined(Query.QueryOperators, :Enumerable)
+
+import .Query.QueryOperators: Enumerable
 
 Tables.istable(::Type{<:Enumerable}) = true
 Tables.rowaccess(::Type{<:Enumerable}) = true
@@ -28,3 +31,5 @@ end
 Base.getproperty(d::DataValueUnwrapRow, ::Type{T}, col::Int, nm::Symbol) where {T} = unwrap(getproperty(getfield(d, 1), T, col, nm))
 Base.getproperty(d::DataValueUnwrapRow, nm::Symbol) = unwrap(getproperty(getfield(d, 1), nm))
 Base.propertynames(d::DataValueUnwrapRow) = propertynames(getfield(d, 1))
+
+end # isdefined
