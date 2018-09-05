@@ -89,7 +89,7 @@ end
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
     @test isequal(Tables.buildcolumns(nothing, rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
 
-    nti = Tables.NamedTupleIterator{nothing, typeof(rt)}(rt)
+    nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
     nti2 = collect(nti)
     @test isequal(rt, nti2)
 
