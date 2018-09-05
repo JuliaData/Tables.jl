@@ -86,7 +86,6 @@ end
     @test nt == (nt |> rowtable |> columntable)
 
     @test Tables.buildcolumns(nothing, rt) == nt
-    @test Tables.buildcolumns(nothing, rt, Missing) == (a = Union{Missing, Int64}[1, 2, 3], b = Union{Missing, Float64}[4.0, 5.0, 6.0], c = Union{Missing, String}["7", "8", "9"])
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
     @test isequal(Tables.buildcolumns(nothing, rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
 end
