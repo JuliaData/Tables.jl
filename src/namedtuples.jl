@@ -36,7 +36,7 @@ function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {
 end
 
 # unknown schema case
-function Base.iterate(rows::NamedTupleIterator{nothing, T}, st=()) where {T}
+function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
     x = iterate(rows.x, st...)
     x === nothing && return nothing
     row, st = x

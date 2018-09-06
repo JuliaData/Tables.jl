@@ -12,7 +12,7 @@ unwrap(x) = x
 unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
 
 datavaluetype(::Type{T}) where {T <: DataValue} = T
-datavaluetype(::Type{T}) where {T} = DataValue{T}
+datavaluetype(::Type{T}) where {T} = T
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
 Base.@pure function datavaluetype(::Tables.Schema{names, types}) where {names, types}
     TT = Tuple{Any[ datavaluetype(fieldtype(types, i)) for i = 1:fieldcount(types) ]...}
@@ -55,3 +55,16 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
     end
 end
 
+# function Base.iterate(rows::DataValueRowIterator{NT}, st=()) where {NT}
+#     state = iterate(rows.x, st...)
+#     state === nothing && return nothing
+#     row, st = state
+#     return DataValueRow{NT, typeof(row)}(row), (st,)
+# end
+
+# struct DataValueRow{NT, T}
+#     row::T
+# end
+
+# @inline Base.getproperty(dvr::DataValueRow{NamedTuple{names, types}}, nm::Symbol) where {names, types} = getproperty(dvr, Tables.columntype(names, types, nm), Tables.columnindex(names, nm), nm)
+# @inline Base.getproperty(dvr::DataValueRow, ::Type{T}, col::Int, nm::Symbol) where {T} = T(getproperty(getfield(dvr, 1), nondatavaluetype(T), col, nm))

@@ -3,6 +3,8 @@
 ## we'll provide a default implementation of the dual
 
 # generic row iteration of columns
+rowcount(cols) = length(getproperty(cols, propertynames(cols)[1]))
+
 struct ColumnsRow{T}
     columns::T # a `Columns` object
     row::Int
@@ -14,9 +16,10 @@ Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
 struct RowIterator{T}
     columns::T
+    len::Int
 end
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
-Base.length(x::RowIterator) = length(getproperty(x.columns, propertynames(x.columns)[1]))
+Base.length(x::RowIterator) = x.len
 schema(x::RowIterator) = schema(x.columns)
 
 function Base.iterate(rows::RowIterator, st=1)
@@ -26,7 +29,8 @@ end
 
 function rows(x::T) where {T}
     if columnaccess(T)
-        return RowIterator(columns(x))
+        cols = columns(x)
+        return RowIterator(cols, rowcount(cols))
     else
         throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
     end
@@ -90,7 +94,7 @@ end
 function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
-    row::eltype(rowitr), st = state
+    row, st = state
     names = propertynames(row)
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
