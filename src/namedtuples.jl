@@ -54,6 +54,12 @@ function rowtable(itr::T) where {T}
     return collect(namedtupleiterator(eltype(r), r))
 end
 
+function rowtable(rt::RowTable, itr::T) where {T}
+    istable(T) || throw(ArgumentError("Vector of NamedTuples requires a table input"))
+    r = rows(itr)
+    return append!(rt, namedtupleiterator(eltype(r), r))
+end
+
 # NamedTuple of Vectors
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
 rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
@@ -73,7 +79,6 @@ end
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
-columntable(sch::Schema{names, types}, x::T) where {names, types, T <: ColumnTable} = x
 function columntable(sch::Schema{names, types}, cols) where {names, types}
     if @generated
         vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(types))
@@ -88,6 +93,22 @@ columntable(::Nothing, cols) = NamedTuple{propertynames(cols)}(Tuple(getarray(co
 function columntable(itr::T) where {T}
     istable(T) || throw(ArgumentError("NamedTuple of AbstractVectors requires a table input"))
     cols = columns(itr)
+    cols isa ColumnTable && return cols
     return columntable(schema(cols), cols)
 end
 columntable(x::ColumnTable) = x
+
+function ctappend(ct1::NamedTuple{N1, T1}, ct2::NamedTuple{N2, T2}) where {N1, T1, N2, T2}
+    if @generated
+        appends = Expr(:block, Any[:(append!(ct1[$(Meta.QuoteNode(nm))], ct2[$(Meta.QuoteNode(nm))])) for nm in N1]...)
+        return quote
+            $appends
+            return ct1
+        end
+    else
+        foreach(nm->append!(ct1[nm], ct2[nm]), nms)
+        return ct1
+    end
+end
+
+columntable(ct::ColumnTable, itr) = ctappend(ct, columntable(itr))

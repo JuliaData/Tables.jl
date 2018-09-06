@@ -84,6 +84,14 @@ end
     @test columntable(rt) == nt
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
+    
+    # append
+    nt2 = columntable(nt, rt)
+    @test Tables.rowcount(nt2) == 6
+    @test Tables.schema(nt2) == Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
+    @test nt2 == (a = [1, 2, 3, 1, 2, 3], b = [4.0, 5.0, 6.0, 4.0, 5.0, 6.0], c = ["7", "8", "9", "7", "8", "9"])
+    rt2 = rowtable(rt, nt)
+    @test length(rt2) == 9
 
     @test Tables.buildcolumns(nothing, rt) == nt
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
