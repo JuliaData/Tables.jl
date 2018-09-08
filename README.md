@@ -24,7 +24,7 @@ With these simple definitions, powerful workflows are enabled:
 * A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
 * A tabular file format can have automatic integration with in-memory structures and translation to other file formats
 
-So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've alrady defined and the natural access patterns of your table:
+So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've already defined and the natural access patterns of your table:
 
 First:
 * `Tables.istable(::Type{<:MyTable}) = true`: this provides an explicit affirmation that your type implements the Tables interface
