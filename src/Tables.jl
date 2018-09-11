@@ -6,7 +6,6 @@ export rowtable, columntable
 
 function __init__()
     @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" include("datavalues.jl")
-    @require Query="1a8c2f83-1ff3-5112-b086-8aa67b057ba1" include("enumerable.jl")
     @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
         using .CategoricalArrays
         allocatecolumn(::Type{CategoricalString{R}}, rows) where {R} = CategoricalArray{String, 1, R}(undef, rows)
@@ -177,5 +176,8 @@ include("namedtuples.jl")
 
 # generic fallback definitions
 include("fallbacks.jl")
+
+# integration with queryverse
+include("query.jl")
 
 end # module
