@@ -95,7 +95,7 @@ function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
     row, st = state
-    names = propertynames(row)
+    names = Tuple(propertynames(row))
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
     sch = Schema(names, nothing)
@@ -112,7 +112,7 @@ function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
         row, st = state
         columns !== updated[] && return _buildcolumns(rowitr, row, st, sch, L, updated[], rownbr, len, updated)
     end
-    return columns
+    return updated[]
 end
 
 @inline function columns(x::T) where {T}

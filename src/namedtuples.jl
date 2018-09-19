@@ -88,7 +88,7 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
     end
 end
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{propertynames(cols)}(Tuple(getarray(col) for col in eachcolumn(cols)))
+columntable(::Nothing, cols) = NamedTuple{Tuple(propertynames(cols))}(Tuple(getarray(col) for col in eachcolumn(cols)))
 
 function columntable(itr::T) where {T}
     istable(T) || throw(ArgumentError("NamedTuple of AbstractVectors requires a table input"))
