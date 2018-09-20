@@ -44,25 +44,32 @@ haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
     
     Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 """
-allocatecolumn(T, len) = Vector{T}(undef, len)
+function allocatecolumn(::Type{T}, len; unwrap = t -> false) where {T}
+    if unwrap(T)
+        names = fieldnames(T)
+        types = map(t -> fieldtype(T, t), names)
+        allocatecolumns(Tables.Schema(names, types), len; unwrap = unwrap)
+    else
+        Vector{T}(undef, len)
+    end
+end
 
-@inline function allocatecolumns(::Schema{names, types}, len) where {names, types}
+@inline function allocatecolumns(::Schema{names, types}, len; unwrap = t -> false) where {names, types}
     if @generated
-        vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
+        vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len; unwrap = unwrap)) for i = 1:fieldcount(types))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
+        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(types, i), len; unwrap = unwrap) for i = 1:fieldcount(types)))
     end
 end
 
 # add! will push! or setindex! a value depending on if the row-iterator HasLength or not
-@inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape{1}}, nt, row) = setindex!(nt[col], val, row)
-@inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
+@inline add!(val, col::Int, nm::Symbol, T, nt, row) = add!(nt[col], val, T, row)
 
-@inline function buildcolumns(schema, rowitr::T) where {T}
+@inline function buildcolumns(schema, rowitr::T; unwrap = t -> false) where {T}
     L = Base.IteratorSize(T)
     len = haslength(L) ? length(rowitr) : 0
-    nt = allocatecolumns(schema, len)
+    nt = allocatecolumns(schema, len; unwrap = unwrap)
     for (i, row) in enumerate(rowitr)
         eachcolumn(add!, schema, row, L, nt, i)
     end
@@ -71,6 +78,15 @@ end
 
 @inline add!(dest::AbstractVector, val, ::Union{Base.HasLength, Base.HasShape{1}}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractVector, val, T, row) = push!(dest, val)
+@generated function add!(dest::NamedTuple{names}, val, T, row) where names
+    exprs = Expr[]
+    for sym in names
+        quot = Expr(:quote, sym)
+        push!(exprs, :(add!(getproperty(dest, $quot), getproperty(val, $quot), T, row)))
+    end
+    Expr(:block, exprs...)
+end
+    
 
 @inline function add_or_widen!(dest::AbstractVector{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
     if S === T || val isa T
@@ -115,10 +131,10 @@ function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
     return updated[]
 end
 
-@inline function columns(x::T) where {T}
+@inline function columns(x::T; unwrap = t -> false) where {T}
     if rowaccess(T)
         r = rows(x)
-        return buildcolumns(schema(r), r)
+        return buildcolumns(schema(r), r; unwrap = unwrap)
     else
         throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
     end
