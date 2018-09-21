@@ -211,3 +211,9 @@ end
     @test (mt |> columntable) == (a = Real[1, 2.0, 3], c = ["7", "8", "9"])
     @test length(mt |> rowtable) == 3
 end
+
+@testset "nesting" begin
+    x = (a = (b = 1,), c = 2)
+    @test Tables.columns([x]) == (a = [(b = 1,)], c = [2])
+    @test Tables.columns([x], unwrap = T -> T <: NamedTuple) == (a = (b = [1,],), c = [2])
+end
