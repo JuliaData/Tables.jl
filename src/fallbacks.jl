@@ -44,22 +44,24 @@ haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
     
     Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 """
-function allocatecolumn(::Type{T}, len; unwrap = t -> false) where {T}
+allocatecolumn(T, len) = Vector{T}(undef, len)
+
+function _allocatecolumn(::Type{T}, len; unwrap = t -> false) where {T}
     if unwrap(T)
         names = fieldnames(T)
         types = map(t -> fieldtype(T, t), names)
         allocatecolumns(Tables.Schema(names, types), len; unwrap = unwrap)
     else
-        Vector{T}(undef, len)
+        allocatecolumn(T, len)
     end
 end
 
 @inline function allocatecolumns(::Schema{names, types}, len; unwrap = t -> false) where {names, types}
     if @generated
-        vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len; unwrap = unwrap)) for i = 1:fieldcount(types))
+        vals = Tuple(:(_allocatecolumn($(fieldtype(types, i)), len; unwrap = unwrap)) for i = 1:fieldcount(types))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(types, i), len; unwrap = unwrap) for i = 1:fieldcount(types)))
+        return NamedTuple{names}(Tuple(_allocatecolumn(fieldtype(types, i), len; unwrap = unwrap) for i = 1:fieldcount(types)))
     end
 end
 
