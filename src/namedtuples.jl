@@ -40,7 +40,7 @@ function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
     x = iterate(rows.x, st...)
     x === nothing && return nothing
     row, st = x
-    names = propertynames(row)
+    names = Tuple(propertynames(row))
     return NamedTuple{names}(Tuple(getproperty(row, nm) for nm in names)), (st,)
 end
 
