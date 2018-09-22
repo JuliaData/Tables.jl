@@ -73,11 +73,11 @@ end
 @inline add!(dest::AbstractVector, val, T, row) = push!(dest, val)
 
 @inline function add_or_widen!(dest::AbstractVector{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
-    if S === T || Base.promote_type(S, T) <: T
+    if S === T || promote_type(S, T) <: T
         add!(dest, val, L, row)
         return dest
     else
-        new = allocatecolumn(Base.promote_type(T, S), max(len, length(dest)))
+        new = allocatecolumn(promote_type(T, S), max(len, length(dest)))
         row > 1 && copyto!(new, 1, dest, 1, row - 1)
         add!(new, val, L, row)
         updated[] = merge(updated[], NamedTuple{(nm,)}((new,)))
