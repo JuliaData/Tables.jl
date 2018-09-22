@@ -97,7 +97,11 @@ end
     @test length(rt2) == 9
 
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
-    @test isequal(Tables.buildcolumns(nothing, rt), (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
+    tt = Tables.buildcolumns(nothing, rt)
+    @test isequal(tt, (a = [1.0, 2.0, 3.0], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
+    @test tt.a[1] === 1.0
+    @test tt.a[2] === 2.0
+    @test tt.a[3] === 3.0
 
     nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
     nti2 = collect(nti)
