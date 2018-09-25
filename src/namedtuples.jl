@@ -1,6 +1,11 @@
 # Vector of NamedTuples
 const RowTable{T} = Vector{T} where {T <: NamedTuple}
 
+# RowTables can't support WeakRefStrings
+unweakref(x) = x
+unweakreftype(T) = T
+Base.@pure unweakreftypes(::Type{T}) where {T <: Tuple} = Tuple{Any[unweakreftype(fieldtype(T, i)) for i = 1:fieldcount(T)]...}
+
 # interface implementation
 istable(::Type{<:RowTable}) = true
 rowaccess(::Type{<:RowTable}) = true
@@ -13,25 +18,25 @@ struct NamedTupleIterator{S, T}
     x::T
 end
 Base.IteratorEltype(::Type{<:NamedTupleIterator{S}}) where {S} = S === nothing ? Base.EltypeUnknown() : Base.HasEltype()
-Base.eltype(rows::NamedTupleIterator{Schema{names, T}}) where {names, T} = NamedTuple{names, T}
+Base.eltype(rows::NamedTupleIterator{Schema{names, T}}) where {names, T} = NamedTuple{names, unweakreftypes(T)}
 Base.IteratorSize(::Type{NamedTupleIterator{S, T}}) where {S, T} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
 function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
     if @generated
-        vals = Tuple(:(getproperty(row, $(fieldtype(T, i)), $i, $(Meta.QuoteNode(names[i])))) for i = 1:fieldcount(T))
+        vals = Tuple(:(unweakref(getproperty(row, $(fieldtype(T, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(T))
         return quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return $(NamedTuple{names, T})(($(vals...),)), (st,)
+            return $(NamedTuple{names, unweakreftypes(T)})(($(vals...),)), (st,)
         end
     else
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, T}(Tuple(getproperty(row, fieldtype(T, i), i, nm) for i = 1:fieldcount(T))), (st,)
+        return NamedTuple{names, unweakreftypes(T)}(Tuple(unweakref(getproperty(row, fieldtype(T, i), i, nm)) for i = 1:fieldcount(T))), (st,)
     end
 end
 
@@ -41,7 +46,7 @@ function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
     x === nothing && return nothing
     row, st = x
     names = Tuple(propertynames(row))
-    return NamedTuple{names}(Tuple(getproperty(row, nm) for nm in names)), (st,)
+    return NamedTuple{names}(Tuple(unweakref(getproperty(row, nm)) for nm in names)), (st,)
 end
 
 namedtupleiterator(::Type{T}, rows::S) where {T <: NamedTuple, S} = rows
