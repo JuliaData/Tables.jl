@@ -153,7 +153,7 @@ struct Schema{names, types} end
 Schema(names::Tuple{Vararg{Symbol}}, types::Type{T}) where {T <: Tuple} = Schema{names, T}()
 Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, types}()
 Schema(names, ::Nothing) = Schema{Tuple(map(Symbol, names)), nothing}()
-Schema(names, types) = Schema{Tuple(map(Symbol, names)), Tuple{types...}}()
+Schema(names, types) = Schema{Tuple(map(Symbol, names)), Core._apply(Core.apply_type, (Tuple,), Any[T for T in types])}()
 
 function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
     println(io, "Tables.Schema:")
