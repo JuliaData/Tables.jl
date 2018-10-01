@@ -36,7 +36,7 @@ function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, unweakreftypes(T)}(Tuple(unweakref(getproperty(row, fieldtype(T, i), i, nm)) for i = 1:fieldcount(T))), (st,)
+        return NamedTuple{names, unweakreftypes(T)}(Tuple(unweakref(getproperty(row, fieldtype(T, i), i, names[i])) for i = 1:fieldcount(T))), (st,)
     end
 end
 
@@ -89,7 +89,7 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
         vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(types))
         return :(NamedTuple{names}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(getarray(getproperty(cols, fieldtype(types, i), i, nm)) for i = 1:fieldcount(types)))
+        return NamedTuple{names}(Tuple(getarray(getproperty(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
     end
 end
 # unknown schema case
