@@ -214,4 +214,8 @@ end
     mt = Tables.DataValueUnwrapper(ei.x |> y->QueryOperators.map(y, x->(a=x.a, c=x.c), Expr(:block)))
     @test (mt |> columntable) == (a = Real[1, 2.0, 3], c = ["7", "8", "9"])
     @test length(mt |> rowtable) == 3
+
+    rt = (a = Missing[missing, missing], b=[1,2])
+    dv = Tables.datavaluerows(rt)
+    @test eltype(dv) == NamedTuple{(:a, :b), Tuple{DataValue{Union{}}, Int}}
 end

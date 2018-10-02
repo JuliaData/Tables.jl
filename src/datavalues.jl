@@ -5,6 +5,7 @@ nondatavaluetype(::Type{DataValue{T}}) where {T} = Union{T, Missing}
 unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
+datavaluetype(::Type{Missing}) = DataValue{Union{}}
 
 struct DataValueRowIterator{NT, S}
     x::S
