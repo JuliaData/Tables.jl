@@ -6,6 +6,9 @@ unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
 datavaluetype(::Type{Missing}) = DataValue{Union{}}
+scalarconvert(T, x) = convert(T, x)
+scalarconvert(::Type{T}, x::T) where {T} = x
+scalarconvert(::Type{T}, ::Missing) where {T <: DataValue} = T()
 
 struct DataValueRowIterator{NT, S}
     x::S
@@ -27,7 +30,7 @@ Base.length(rows::DataValueRowIterator) = length(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
-        vals = Tuple(:($(fieldtype(NT, i))(getproperty(row, $(nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        vals = Tuple(:(scalarconvert($(fieldtype(NT, i)), getproperty(row, $(nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -40,7 +43,7 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(fieldtype(NT, i)(getproperty(row, nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+        return NT(Tuple(scalarconvert(fieldtype(NT, i), getproperty(row, nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
     end
 end
 
