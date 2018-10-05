@@ -5,6 +5,7 @@ nondatavaluetype(::Type{DataValue{T}}) where {T} = Union{T, Missing}
 unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
 datavaluetype(::Type{T}) where {T <: DataValue} = T
 datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
+datavaluetype(::Type{Missing}) = DataValue{Union{}}
 scalarconvert(T, x) = convert(T, x)
 scalarconvert(::Type{T}, x::T) where {T} = x
 scalarconvert(::Type{T}, ::Missing) where {T <: DataValue} = T()

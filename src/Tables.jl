@@ -20,6 +20,8 @@ function __init__()
         using .WeakRefStrings
         allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(rows)
         allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} = StringVector{Union{Missing, String}}(rows)
+        unweakref(wk::WeakRefString) = string(wk)
+        unweakreftype(::Type{<:WeakRefString}) = String
     end
     @require IteratorInterfaceExtensions="82899510-4779-5014-852e-03e436cf321d" begin
         using .IteratorInterfaceExtensions

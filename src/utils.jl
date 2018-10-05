@@ -44,29 +44,25 @@ function eachcolumn end
 
 @inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
     if @generated
-        if length(names) < 100
-            b = Expr(:block, Any[:(f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:length(names)]...)
-        else
-            rle = runlength(types)
-            if length(rle) < 100
-                block = Expr(:block)
-                i = 1
-                for (T, len) in rle
-                    push!(block.args, quote
-                        for j = 0:$(len-1)
-                            f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
-                        end
-                    end)
-                    i += len
-                end
-                b = block
-            else
-                b = quote
-                    for (i, nm) in enumerate(names)
-                        f(getproperty(row, fieldtype(types, i), i, nm), i, nm, args...)
+        rle = runlength(types)
+        if length(rle) < 100
+            block = Expr(:block)
+            i = 1
+            for (T, len) in rle
+                push!(block.args, quote
+                    for j = 0:$(len-1)
+                        f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
                     end
-                    return
+                end)
+                i += len
+            end
+            b = block
+        else
+            b = quote
+                for (i, nm) in enumerate(names)
+                    f(getproperty(row, fieldtype(types, i), i, nm), i, nm, args...)
                 end
+                return
             end
         end
         # println(b)
