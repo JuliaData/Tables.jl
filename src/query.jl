@@ -25,7 +25,7 @@ Tables.rows(x::DataValueUnwrapper) = x
 
 function Tables.schema(dv::DataValueUnwrapper)
     eT = eltype(dv.x)
-    !(eT <: NamedTuple) && return nothing
+    (!(eT <: NamedTuple) || eT === Union{}) && return nothing
     return Tables.Schema(nondatavaluetype(eT))
 end
 Base.eltype(rows::DataValueUnwrapper) = DataValueUnwrapRow{eltype(rows.x)}
