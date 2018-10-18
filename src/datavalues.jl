@@ -10,6 +10,11 @@ scalarconvert(T, x) = convert(T, x)
 scalarconvert(::Type{T}, x::T) where {T} = x
 scalarconvert(::Type{T}, ::Missing) where {T <: DataValue} = T()
 
+@require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
+    using .CategoricalArrays
+    scalarconvert(::Type{DataValue{T}}, x::T) where {T <: CategoricalArrays.CatValue} = DataValue(x)
+end
+
 struct DataValueRowIterator{NT, S}
     x::S
 end
