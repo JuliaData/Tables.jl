@@ -1,5 +1,7 @@
 nondatavaluetype(::Type{T}) where {T} = T
+nondatavaluetype(::Type{Union{}}) = Union{}
 datavaluetype(::Type{T}) where {T} = T
+datavaluetype(::Type{Union{}}) = Union{}
 
 Base.@pure function nondatavaluetype(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
     TT = Tuple{Any[ nondatavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
