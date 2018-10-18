@@ -46,12 +46,12 @@ function eachcolumn end
     if @generated
         rle = runlength(types)
         if length(rle) < 100
-            block = Expr(:block)
+            block = Expr(:block, Expr(:meta, :inline))
             i = 1
             for (T, len) in rle
                 push!(block.args, quote
                     for j = 0:$(len-1)
-                        f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
+                        @inbounds f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
                     end
                 end)
                 i += len
@@ -59,6 +59,7 @@ function eachcolumn end
             b = block
         else
             b = quote
+                $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
                     f(getproperty(row, fieldtype(types, i), i, nm), i, nm, args...)
                 end
