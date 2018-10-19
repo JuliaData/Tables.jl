@@ -117,3 +117,8 @@ function ctappend(ct1::NamedTuple{N1, T1}, ct2::NamedTuple{N2, T2}) where {N1, T
 end
 
 columntable(ct::ColumnTable, itr) = ctappend(ct, columntable(itr))
+
+# partial support for Generators
+rowaccess(::Type{<:Base.Generator}) = true
+rows(g::Base.Generator) = g
+schema(g::Base.Generator) = nothing
