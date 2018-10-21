@@ -170,6 +170,8 @@ function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names
     end
 end
 
+Base.propertynames(sch::Schema) = (:names, :types)
+
 # helper functions
 include("utils.jl")
 
