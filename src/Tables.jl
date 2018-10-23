@@ -9,7 +9,7 @@ function __init__()
     @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
         using .CategoricalArrays
         allocatecolumn(::Type{CategoricalString{R}}, rows) where {R} = CategoricalArray{String, 1, R}(undef, rows)
-        allocatecolumn(::Type{Union{CategoricalString{R}, Missing}}, rows) where {R} = 
+        allocatecolumn(::Type{Union{CategoricalString{R}, Missing}}, rows) where {R} =
             CategoricalArray{Union{String, Missing}, 1, R}(undef, rows)
         allocatecolumn(::Type{CategoricalValue{T, R}}, rows) where {T, R} =
             CategoricalArray{T, 1, R}(undef, rows)
@@ -51,7 +51,7 @@ In addition to these `Rows` and `Columns` objects, it's useful to be able to que
 * For the `Tables.Schema` object:
   * column names can be accessed as a tuple of Symbols like `sch.names`
   * column types can be accessed as a tuple of types like `sch.types`
-  * See `?Table.Schema` for more details on this type
+  * See `?Tables.Schema` for more details on this type
 
 A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
 This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly).
@@ -130,7 +130,7 @@ schema(x) = nothing
 
 Create a `Tables.Schema` object that holds the column names and types for a tabular data object.
 `Tables.Schema` is dual-purposed: provide an easy interface for users to query these properties,
-as well as provide a convenient "structural" type for code generation. 
+as well as provide a convenient "structural" type for code generation.
 
 To get a table's schema, one can call `Tables.schema(tbl)`, but also note that a table may return `nothing`,
 indicating that it's column names and/or column types are unknown (usually not inferrable). This is similar
