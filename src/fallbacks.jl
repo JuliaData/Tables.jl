@@ -56,7 +56,7 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
 end
 
 # add! will push! or setindex! a value depending on if the row-iterator HasLength or not
-@inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape{1}}, nt, row) = setindex!(nt[col], val, row)
+@inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape}, nt, row) = setindex!(nt[col], val, row)
 @inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
 
 @inline function buildcolumns(schema, rowitr::T) where {T}
@@ -69,10 +69,10 @@ end
     return nt
 end
 
-@inline add!(dest::AbstractVector, val, ::Union{Base.HasLength, Base.HasShape{1}}, row) = setindex!(dest, val, row)
-@inline add!(dest::AbstractVector, val, T, row) = push!(dest, val)
+@inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
+@inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
 
-@inline function add_or_widen!(dest::AbstractVector{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
+@inline function add_or_widen!(dest::AbstractArray{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
     if S === T || promote_type(S, T) <: T
         add!(dest, val, L, row)
         return dest
