@@ -51,7 +51,7 @@ In addition to these `Rows` and `Columns` objects, it's useful to be able to que
 * For the `Tables.Schema` object:
   * column names can be accessed as a tuple of Symbols like `sch.names`
   * column types can be accessed as a tuple of types like `sch.types`
-  * See `?Table.Schema` for more details on this type
+  * See `?Tables.Schema` for more details on this type
 
 A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
 This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly).
