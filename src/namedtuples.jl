@@ -65,8 +65,8 @@ function rowtable(rt::RowTable, itr::T) where {T}
     return append!(rt, namedtupleiterator(eltype(r), r))
 end
 
-# NamedTuple of Vectors
-const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+# NamedTuple of arrays of matching dimensionality
+const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractArray{S, D} where S}} where {N, D}
 rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 # interface implementation
