@@ -108,8 +108,11 @@ function select(table, cols::Symbol...)
 end
 
 # Example of selecting columns from a columntable
-nt = (x=1:100, y=rand(100), z=randn(100))
-select(nt, :x)
-select(nt, :x, :z)
+tbl = (x=1:100, y=rand(100), z=randn(100))
+select(tbl, :x)
+select(tbl, :x, :z)
+
+tbl = [(x=1, y="a", z=1.0), (x=2, y="b", z=2.0)]
+select(tbl, :z, :x)
 ```
 

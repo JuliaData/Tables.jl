@@ -84,7 +84,6 @@ end
     @test columntable(rt) == nt
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
-    @test nt == Tables.materializer(nt)(Tables.columns(nt))
 
     @test Tables.buildcolumns(nothing, rt) == nt
     @test Tables.columntable(nothing, nt) == nt
@@ -107,6 +106,27 @@ end
     nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
     nti2 = collect(nti)
     @test isequal(rt, nti2)
+end
+
+@testset "Materializer" begin 
+    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+    nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
+
+    @test nt == Tables.materializer(nt)(Tables.columns(nt))
+    @test nt == Tables.materializer(nt)(Tables.columns(rt))
+    @test nt == Tables.materializer(nt)(rt)
+    @test rt == Tables.materializer(rt)(nt)
+
+    function select(table, cols::Symbol...)
+        Tables.istable(table) || throw(ArgumentError("select requires a table input"))
+        nt = Tables.columntable(table)  # columntable(t) creates a NamedTuple of AbstractVectors
+        newcols = NamedTuple{cols}(nt)
+        Tables.materializer(table)(newcols)
+    end
+
+    @test select(nt, :a, :b, :c) == nt
+    @test select(nt, :c, :a) == NamedTuple{(:c, :a)}(nt)
+    @test select(rt, :a) == [(a=1,), (a=2,), (a=3,)]
 end
 
 import Base: ==
