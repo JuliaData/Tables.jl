@@ -24,22 +24,30 @@ With these simple definitions, powerful workflows are enabled:
 * A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
 * A tabular file format can have automatic integration with in-memory structures and translation to other file formats
 
+
+# Tables Interface
+
 So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've already defined and the natural access patterns of your table:
 
-First:
+## First:
+
 * `Tables.istable(::Type{<:MyTable}) = true`: this provides an explicit affirmation that your type implements the Tables interface
 
-To support `Rows`:
+## To support `Rows`:
+
 * Define `Tables.rowaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports valid `Row`-iteration
 * Define `Tables.rows(x::MyTable)`: return a `Row`-iterator object (perhaps the table itself if already defined)
 * Define `Tables.schema(Tables.rows(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
 
-To support `Columns`:
+## To support `Columns`:
+
 * Define `Tables.columnaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports returning a valid `Columns` object
 * Define `Tables.columns(x::MyTable)`: return a `Columns`, property-accessible object (perhaps the table itself if it naturally supports property-access to columns)
 * Define `Tables.schema(Tables.columns(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
 
-The final question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
+## Sinks (transferring data from one table to another)
+
+Another question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
 
 * Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTable`
 
@@ -76,3 +84,32 @@ end
 ```
 
 Obviously every table type is different, but via a combination of `Tables.rows` and `Tables.columns` each table type should be able to construct an instance of itself.
+
+## Functions that input and output tables:
+
+For functions that input a table, perform some calculation, and output a new table, we need a way of constructing the preferred output table given the input.  For this purpose, the `Tables.materializer(table)` function returns the the constructor for the preferred in-memory structure of the input table.  By default, `Tables.materializer(table)` returns `identity`.
+
+Note that an in-memory table with a properly defined "sink" constructor can reconstruct itself with either of the following:
+
+```julia
+materializer(table)(columns(table)) 
+
+materializer(table)(rows(table))
+```
+
+For example, we may want to select a subset of columns from a column-access table.  One way we could implement it is with the following:
+
+```julia
+function select(table, cols::Symbol...)
+    Tables.istable(table) || throw(ArgumentError("select requires a table input"))
+    nt = Tables.columntable(table)  # columntable(t) creates a NamedTuple of AbstractVectors
+    newcols = NamedTuple{cols}(nt)
+    Tables.materializer(table)(newcols)
+end
+
+# Example of selecting columns from a columntable
+nt = (x=1:100, y=rand(100), z=randn(100))
+select(nt, :x)
+select(nt, :x, :z)
+```
+

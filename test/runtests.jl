@@ -84,6 +84,7 @@ end
     @test columntable(rt) == nt
     @test rt == (rt |> columntable |> rowtable)
     @test nt == (nt |> rowtable |> columntable)
+    @test nt == Tables.materializer(nt)(Tables.columns(nt))
 
     @test Tables.buildcolumns(nothing, rt) == nt
     @test Tables.columntable(nothing, nt) == nt
