@@ -87,9 +87,9 @@ Obviously every table type is different, but via a combination of `Tables.rows` 
 
 ## Functions that input and output tables:
 
-For functions that input a table, perform some calculation, and output a new table, we need a way of constructing the preferred output table given the input.  For this purpose, the `Tables.materializer(table)` function returns the the constructor for the preferred in-memory structure of the input table.  By default, `Tables.materializer(table)` returns `identity`.
+For functions that input a table, perform some calculation, and output a new table, we need a way of constructing the preferred output table given the input.  For this purpose, `Tables.materializer(table)` returns the preferred sink function for a table (`Tables.columntable`, which creates a named tuple of AbstractVectors, is the default).  
 
-Note that an in-memory table with a properly defined "sink" constructor can reconstruct itself with either of the following:
+Note that an in-memory table with a properly defined "sink" function can reconstruct itself with the following:
 
 ```julia
 materializer(table)(columns(table)) 
