@@ -123,6 +123,7 @@ rowaccess(::Type{T}) where {T} = false
 columnaccess(x::T) where {T} = columnaccess(T)
 columnaccess(::Type{T}) where {T} = false
 schema(x) = nothing
+materializer(x) = columntable
 
 # Schema implementation
 """

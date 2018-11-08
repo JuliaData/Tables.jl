@@ -12,6 +12,7 @@ rowaccess(::Type{<:RowTable}) = true
 # a Vector of NamedTuple iterates `Row`s itself
 rows(x::RowTable) = x
 schema(x::Vector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
+materializer(x::RowTable) = rowtable
 
 # struct to transform `Row`s into NamedTuples
 struct NamedTupleIterator{S, T}
@@ -75,6 +76,7 @@ columnaccess(::Type{<:ColumnTable}) = true
 # a NamedTuple of AbstractVectors is itself a `Columns` object
 columns(x::ColumnTable) = x
 schema(x::T) where {T <: ColumnTable} = Schema(names(T), _types(T))
+materializer(x::ColumnTable) = columntable
 
 _eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
 Base.@pure function _types(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
