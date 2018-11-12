@@ -29,8 +29,11 @@ function datavaluerows(x)
     return DataValueRowIterator(datavaluetype(Tables.schema(r)), r)
 end
 
+_iteratorsize(x) = x
+_iteratorsize(::Base.HasShape{1}) = Base.HasLength()
+
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
+Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = _iteratorsize(Base.IteratorSize(S))
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
