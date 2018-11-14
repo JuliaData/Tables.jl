@@ -2,6 +2,8 @@ module Tables
 
 using Requires
 
+using TableTraits, IteratorInterfaceExtensions
+
 export rowtable, columntable
 
 function __init__()
@@ -116,7 +118,8 @@ Obviously every table type is different, but via a combination of `Tables.rows` 
 abstract type Table end
 
 # default definitions
-istable(x::T) where {T} = istable(T)
+istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true ||
+    TableTraits.isiterabletable(x) === missing
 istable(::Type{T}) where {T} = false
 rowaccess(x::T) where {T} = rowaccess(T)
 rowaccess(::Type{T}) where {T} = false
