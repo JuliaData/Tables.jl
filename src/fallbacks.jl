@@ -14,6 +14,16 @@ Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = get
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
+function _isless(c, d, t::Tuple)
+    f = t[1]
+    a, b = getproperty(c, f), getproperty(d, f)
+    isless(a, b) || isequal(a, b) && _isless(c, d, tail(t))
+end
+
+_isless(c, d, ::Tuple{}) = false
+
+Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isless(c, d, propertynames(c))
+
 struct RowIterator{T}
     columns::T
     len::Int
