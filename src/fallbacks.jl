@@ -41,18 +41,14 @@ end
     Expr(:block, exprs...)
 end
 
-struct RowIterator{T}
+struct RowIterator{T, U} <: AbstractVector{U}
     columns::T
     len::Int
+    RowIterator(columns::T, len::Int) where {T} = new{T, ColumnsRow{T}}(columns, len)
 end
-Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
-Base.length(x::RowIterator) = x.len
+Base.size(x::RowIterator) = (x.len,)
+Base.getindex(x::RowIterator, i::Int) = ColumnsRow(x.columns, i)
 schema(x::RowIterator) = schema(x.columns)
-
-function Base.iterate(rows::RowIterator, st=1)
-    st > length(rows) && return nothing
-    return ColumnsRow(rows.columns, st), st + 1
-end
 
 function rows(x::T) where {T}
     if columnaccess(T)
