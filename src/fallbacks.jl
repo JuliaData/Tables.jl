@@ -17,7 +17,7 @@ Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 function _isless(c, d, t::Tuple)
     f = t[1]
     a, b = getproperty(c, f), getproperty(d, f)
-    isless(a, b) || isequal(a, b) && _isless(c, d, tail(t))
+    isless(a, b) || isequal(a, b) && _isless(c, d, Base.tail(t))
 end
 
 _isless(c, d, ::Tuple{}) = false
@@ -27,7 +27,7 @@ Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isless(c, d, proper
 function _isequal(c, d, t::Tuple)
     f = t[1]
     a, b = getproperty(c, f), getproperty(d, f)
-    isequal(a, b) && _isequal(c, d, tail(t))
+    isequal(a, b) && _isequal(c, d, Base.tail(t))
 end
 
 _isequal(c, d, ::Tuple{}) = true
