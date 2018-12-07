@@ -24,6 +24,16 @@ _isless(c, d, ::Tuple{}) = false
 
 Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isless(c, d, propertynames(c))
 
+function _isequal(c, d, t::Tuple)
+    f = t[1]
+    a, b = getproperty(c, f), getproperty(d, f)
+    isequal(a, b) && _isequal(c, d, tail(t))
+end
+
+_isequal(c, d, ::Tuple{}) = true
+
+Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isequal(c, d, propertynames(c))
+
 struct RowIterator{T}
     columns::T
     len::Int
@@ -51,7 +61,7 @@ haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
 
 """
     Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
-    
+
     Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 """
 allocatecolumn(T, len) = Vector{T}(undef, len)
