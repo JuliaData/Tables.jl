@@ -14,25 +14,32 @@ Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = get
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
-function _isless(c, d, t::Tuple)
-    f = t[1]
-    a, b = getproperty(c, f), getproperty(d, f)
-    isless(a, b) || isequal(a, b) && _isless(c, d, Base.tail(t))
+@generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+    exprs = Expr[]
+    for n in names
+        var1 = Expr(:., :c, QuoteNode(n))
+        var2 = Expr(:., :d, QuoteNode(n))
+        bl = quote
+            a, b = $var1, $var2
+            isless(a, b) && return true
+            isequal(a, b) || return false
+        end
+        push!(exprs, bl)
+    end
+    push!(exprs, :(return false))
+    Expr(:block, exprs...)
 end
 
-_isless(c, d, ::Tuple{}) = false
-
-Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isless(c, d, propertynames(c))
-
-function _isequal(c, d, t::Tuple)
-    f = t[1]
-    a, b = getproperty(c, f), getproperty(d, f)
-    isequal(a, b) && _isequal(c, d, Base.tail(t))
+@generated function Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+    exprs = Expr[]
+    for n in names
+        var1 = Expr(:., :c, QuoteNode(n))
+        var2 = Expr(:., :d, QuoteNode(n))
+        push!(exprs, :(isequal($var1, $var2) || return false))
+    end
+    push!(exprs, :(return true))
+    Expr(:block, exprs...)
 end
-
-_isequal(c, d, ::Tuple{}) = true
-
-Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T} = _isequal(c, d, propertynames(c))
 
 struct RowIterator{T}
     columns::T
