@@ -223,6 +223,17 @@ end
     @test sortperm([a, b, c, d]) == [3, 1, 2, 4]
 end
 
+@testset "rowiterator array" begin
+    t = (x = [1, 1, 0, 2], y = [-1, 1, 3, 2])
+    rt = Tables.rows(t)
+    @test rt isa AbstractArray
+    @test length(rt) == 4
+    @test Base.IndexStyle(rt) == IndexLinear()
+    @test Base.IndexStyle(typeof(rt)) == IndexLinear()
+    @test rt[3].x == 0
+    @test rt[3].y == 3
+end
+
 @static if :Query in Symbol.(Base.loaded_modules_array())
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 
