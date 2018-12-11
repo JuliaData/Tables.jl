@@ -14,6 +14,33 @@ Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = get
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
+@generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+    exprs = Expr[]
+    for n in names
+        var1 = Expr(:., :c, QuoteNode(n))
+        var2 = Expr(:., :d, QuoteNode(n))
+        bl = quote
+            a, b = $var1, $var2
+            isless(a, b) && return true
+            isequal(a, b) || return false
+        end
+        push!(exprs, bl)
+    end
+    push!(exprs, :(return false))
+    Expr(:block, exprs...)
+end
+
+@generated function Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+    exprs = Expr[]
+    for n in names
+        var1 = Expr(:., :c, QuoteNode(n))
+        var2 = Expr(:., :d, QuoteNode(n))
+        push!(exprs, :(isequal($var1, $var2) || return false))
+    end
+    push!(exprs, :(return true))
+    Expr(:block, exprs...)
+end
+
 struct RowIterator{T}
     columns::T
     len::Int
@@ -41,7 +68,7 @@ haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
 
 """
     Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
-    
+
     Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 """
 allocatecolumn(T, len) = Vector{T}(undef, len)

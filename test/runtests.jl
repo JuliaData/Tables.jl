@@ -212,6 +212,17 @@ end
     @test gr == (gr |> genericrowtable)
 end
 
+@testset "isless" begin
+    t = (x = [1, 1, 0, 2], y = [-1, 1, 3, 2])
+    a,b,c,d = Tables.rows(t)
+    @test isless(a, b)
+    @test isless(c, d)
+    @test !isless(d, a)
+    @test !isequal(a, b)
+    @test isequal(a, a)
+    @test sortperm([a, b, c, d]) == [3, 1, 2, 4]
+end
+
 @static if :Query in Symbol.(Base.loaded_modules_array())
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 
