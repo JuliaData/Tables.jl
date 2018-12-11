@@ -48,6 +48,7 @@ struct RowIterator{T, U} <: AbstractVector{U}
 end
 Base.size(x::RowIterator) = (x.len,)
 Base.getindex(x::RowIterator, i::Int) = ColumnsRow(x.columns, i)
+Base.IndexStyle(::Type{<:RowIterator}) = IndexLinear()
 schema(x::RowIterator) = schema(x.columns)
 
 function rows(x::T) where {T}
