@@ -1,10 +1,12 @@
 environment:
   matrix:
   - julia_version: 1.0
-  - julia_version: latest
+  - julia_version: 1.1
+  - julia_version: nightly
 
 platform:
   - x86 # 32-bit
+  - x64 # 64-bit
 
 branches:
   only:
