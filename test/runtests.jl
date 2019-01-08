@@ -1,4 +1,4 @@
-using Test, Tables
+using Test, Tables, TableTraits
 
 @testset "utils.jl" begin
 
@@ -221,6 +221,19 @@ end
     @test !isequal(a, b)
     @test isequal(a, a)
     @test sortperm([a, b, c, d]) == [3, 1, 2, 4]
+end
+
+struct ColumnSource
+end
+
+TableTraits.supports_get_columns_copy_using_missing(::ColumnSource) = true
+
+function TableTraits.get_columns_copy_using_missing(x::ColumnSource)
+    return (a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"])
+end
+
+let x=ColumnSource()
+    @test Tables.columns(x) == TableTraits.get_columns_copy_using_missing(x)
 end
 
 @static if :Query in Symbol.(Base.loaded_modules_array())
