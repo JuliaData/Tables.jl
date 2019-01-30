@@ -1,6 +1,6 @@
 module Tables
 
-using Requires
+using Requires, LinearAlgebra
 
 using TableTraits, IteratorInterfaceExtensions
 
@@ -187,5 +187,8 @@ include("fallbacks.jl")
 
 # integration with queryverse
 include("query.jl")
+
+# matrix integration
+include("matrix.jl")
 
 end # module
