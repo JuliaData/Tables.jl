@@ -38,7 +38,7 @@ using Test, Tables, TableTraits
     @test output == [1, 2, 3]
 
     nt = NamedTuple{Tuple(Symbol("a$i") for i = 1:101)}(Tuple(i for i = 1:101))
-    NT =typeof(nt)
+    NT = typeof(nt)
     @test Tables.runlength(Tables.types(NT)) == [(Int, 101)]
     output = zeros(Int, 101)
     Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
@@ -187,7 +187,7 @@ end
 
 @testset "Tables.jl interface" begin
 
-    @test !Tables.istable(1)
+    @test Tables.istable(1)
     @test !Tables.istable(Int)
     @test !Tables.rowaccess(1)
     @test !Tables.rowaccess(Int)
@@ -204,7 +204,7 @@ end
     @test sch.names == (:a, :b)
     @test sch.types == (Int64, Float64)
     @test_throws ArgumentError sch.foobar
-    
+
     gr = GenericRowTable([GenericRow(1, 4.0, "7"), GenericRow(2, 5.0, "8"), GenericRow(3, 6.0, "9")])
     gc = GenericColumnTable(Dict(:a=>1, :b=>2, :c=>3), [GenericColumn([1,2,3]), GenericColumn([4.0, 5.0, 6.0]), GenericColumn(["7", "8", "9"])])
     @test gc == (gr |> genericcolumntable)
@@ -244,19 +244,19 @@ end
     rt2 = collect(dv)
     @test rt2[1] == (a = 1, b = DataValue{Float64}(4.0), c = "7")
 
-    ei = Tables.DataValueUnwrapper(QueryOperators.EnumerableIterable{eltype(dv), typeof(dv)}(dv))
+    ei = Tables.IteratorWrapper(QueryOperators.EnumerableIterable{eltype(dv), typeof(dv)}(dv))
     nt = ei |> columntable
     @test isequal(rt, nt)
     rt3 = ei |> rowtable
     @test isequal(rt |> rowtable, rt3)
 
     # rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
-    mt = Tables.DataValueUnwrapper(ei.x |> y->QueryOperators.map(y, x->(a=x.b, c=x.c), Expr(:block)))
+    mt = Tables.IteratorWrapper(ei.x |> y->QueryOperators.map(y, x->(a=x.b, c=x.c), Expr(:block)))
     @inferred (mt |> columntable)
     @inferred (mt |> rowtable)
 
     # uninferrable case
-    mt = Tables.DataValueUnwrapper(ei.x |> y->QueryOperators.map(y, x->(a=x.a, c=x.c), Expr(:block)))
+    mt = Tables.IteratorWrapper(ei.x |> y->QueryOperators.map(y, x->(a=x.a, c=x.c), Expr(:block)))
     @test (mt |> columntable) == (a = Real[1, 2.0, 3], c = ["7", "8", "9"])
     @test length(mt |> rowtable) == 3
 

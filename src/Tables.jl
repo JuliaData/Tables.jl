@@ -118,8 +118,7 @@ Obviously every table type is different, but via a combination of `Tables.rows` 
 abstract type Table end
 
 # default definitions
-istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true ||
-    TableTraits.isiterabletable(x) === missing
+istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true || Base.isiterable(T)
 istable(::Type{T}) where {T} = false
 rowaccess(x::T) where {T} = rowaccess(T)
 rowaccess(::Type{T}) where {T} = false
@@ -185,7 +184,7 @@ include("namedtuples.jl")
 # generic fallback definitions
 include("fallbacks.jl")
 
-# integration with queryverse
-include("query.jl")
+# allow any valid iterator to be a table
+include("iteratorwrapper.jl")
 
 end # module
