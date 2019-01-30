@@ -40,6 +40,7 @@ columnaccess(::Type{<:MatrixTable}) = true
 columns(m::MatrixTable) = m
 Base.getproperty(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, 3)[:, col]
 Base.getproperty(m::MatrixTable, nm::Symbol) = getfield(m, 3)[:, getfield(m, 2)[nm]]
+Base.propertynames(m::MatrixTable) = names(m)
 
 function astable(m::Union{Adjoint, Matrix}; header::Vector{Symbol}=[Symbol("Column$i") for i = 1:size(m, 2)])
     length(header) == size(m, 2) || throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2))"))
@@ -49,6 +50,12 @@ end
 
 function asmatrix(table)
     cols = Tables.columns(table)
-    T = reduce(promote_type, schema(cols).types)
-    # TODO: finish this
+    types = schema(cols).types
+    T = reduce(promote_type, types)
+    n, p = rowcount(cols), length(types)
+    mat = Matrix{T}(undef, n, p)
+    for (i, col) in enumerate(Tables.eachcolumn(cols))
+        copyto!(mat, n * (i - 1) + 1, col)
+    end
+    return mat
 end
