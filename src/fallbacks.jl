@@ -58,13 +58,10 @@ function rows(x::T) where {T}
     if columnaccess(T)
         cols = columns(x)
         return RowIterator(cols, rowcount(cols))
-    else
-        it = TableTraits.isiterabletable(x)
-        if it === true || it === missing
-            return DataValueUnwrapper(IteratorInterfaceExtensions.getiterator(x))
-        end
-        throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
+    elseif istable(x)
+        return IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
     end
+    throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
 end
 
 # build columns from rows
@@ -152,15 +149,8 @@ end
         return buildcolumns(schema(r), r)
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return TableTraits.get_columns_copy_using_missing(x)
-    else
-        it = TableTraits.isiterabletable(x)
-        y = IteratorInterfaceExtensions.getiterator(x)
-        if it === true
-            return columns(DataValueUnwrapper(y))
-        elseif it === missing
-            # non-NamedTuple or EltypeUnknown
-            return buildcolumns(nothing, DataValueUnwrapper(y))
-        end
-        throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
+    elseif istable(x)
+        return columns(IteratorWrapper(IteratorInterfaceExtensions.getiterator(x)))
     end
+    throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
 end
