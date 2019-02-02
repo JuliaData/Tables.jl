@@ -188,4 +188,7 @@ include("fallbacks.jl")
 # integration with queryverse
 include("query.jl")
 
+# simple table operations on table inputs
+include("operations.jl")
+
 end # module
