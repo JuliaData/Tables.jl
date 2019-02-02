@@ -4,6 +4,7 @@ authors = ["quinnj <quinn.jacobd@gmail.com>"]
 version = "0.1.14"
 
 [deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
