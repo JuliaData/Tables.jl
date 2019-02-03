@@ -20,8 +20,9 @@ function __init__()
     end
     @require WeakRefStrings="ea10d353-3f73-51f8-a26c-33c1cb351aa5" begin
         using .WeakRefStrings
-        allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(rows)
-        allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} = StringVector{Union{Missing, String}}(rows)
+        allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(undef, rows)
+        allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} =
+            StringVector{Union{Missing, String}}(undef, rows)
         unweakref(wk::WeakRefString) = string(wk)
         unweakreftype(::Type{<:WeakRefString}) = String
     end
