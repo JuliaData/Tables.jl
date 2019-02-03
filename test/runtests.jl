@@ -236,6 +236,102 @@ let x=ColumnSource()
     @test Tables.columns(x) == TableTraits.get_columns_copy_using_missing(x)
 end
 
+@testset "operations.jl" begin
+ctable = (A=[1, missing, 3], B=[1.0, 2.0, 3.0], C=["hey", "there", "sailor"])
+
+## Tables.transform
+# test various ways of inputting Tables.transform functions
+table = Tables.transform(ctable, Dict{String, Base.Callable}("C" => Symbol)) |> Tables.columntable
+@test table.C == [:hey, :there, :sailor]
+
+table = ctable |> Tables.transform(C=Symbol) |> Tables.columntable
+@test table.C == [:hey, :there, :sailor]
+
+table = Tables.transform(ctable, Dict{Symbol, Base.Callable}(:C => Symbol)) |> Tables.columntable
+@test table.C == [:hey, :there, :sailor]
+
+table = Tables.transform(ctable, Dict{Int, Base.Callable}(3 => Symbol)) |> Tables.columntable
+@test table.C == [:hey, :there, :sailor]
+
+# test simple Tables.transforms + return types
+table = ctable |> Tables.transform(Dict("A"=>x->x+1)) |> Tables.columntable
+@test isequal(table.A, [2, missing, 4])
+@test typeof(table.A) == Vector{Union{Missing, Int}}
+
+table = ctable |> Tables.transform(Dict("A"=>x->coalesce(x+1, 0))) |> Tables.columntable
+@test table.A == [2, 0, 4]
+
+table = ctable |> Tables.transform(Dict("A"=>x->coalesce(x+1, 0.0))) |> Tables.columntable
+@test table.A == [2, 0.0, 4]
+
+table = ctable |> Tables.transform(Dict(2=>x->x==2.0 ? missing : x)) |> Tables.columntable
+@test isequal(table.B, [1.0, missing, 3.0])
+@test typeof(table.B) == Vector{Union{Float64, Missing}}
+
+# test row sinks
+# test various ways of inputting Tables.transform functions
+table = Tables.transform(ctable, Dict{String, Base.Callable}("C" => Symbol)) |> Tables.rowtable
+@test table[1].C == :hey
+
+table = ctable |> Tables.transform(C=Symbol) |> Tables.rowtable
+@test table[1].C == :hey
+
+table = Tables.transform(ctable, Dict{Symbol, Base.Callable}(:C => Symbol)) |> Tables.rowtable
+@test table[1].C == :hey
+
+table = Tables.transform(ctable, Dict{Int, Base.Callable}(3 => Symbol)) |> Tables.rowtable
+@test table[1].C == :hey
+
+# test simple transforms + return types
+table = ctable |> Tables.transform(Dict("A"=>x->x+1)) |> Tables.rowtable
+@test isequal(map(x->x.A, table), [2, missing, 4])
+@test typeof(map(x->x.A, table)) == Vector{Union{Missing, Int}}
+
+table = ctable |> Tables.transform(Dict("A"=>x->coalesce(x+1, 0))) |> Tables.rowtable
+@test map(x->x.A, table) == [2, 0, 4]
+
+table = ctable |> Tables.transform(Dict("A"=>x->coalesce(x+1, 0.0))) |> Tables.rowtable
+@test map(x->x.A, table) == [2, 0.0, 4]
+
+table = ctable |> Tables.transform(Dict(2=>x->x==2.0 ? missing : x)) |> Tables.rowtable
+@test isequal(map(x->x.B, table), [1.0, missing, 3.0])
+@test typeof(map(x->x.B, table)) == Vector{Union{Float64, Missing}}
+
+## Tables.select
+table = ctable |> Tables.select(:A) |> Tables.columntable
+@test length(table) == 1
+@test isequal(table.A, [1, missing, 3])
+
+table = ctable |> Tables.select("A") |> Tables.columntable
+@test length(table) == 1
+@test isequal(table.A, [1, missing, 3])
+
+# column re-ordering
+table = ctable |> Tables.select(:A, :C) |> Tables.columntable
+@test length(table) == 2
+
+table = ctable |> Tables.select(:C, :A) |> Tables.columntable
+@test isequal(ctable.A, table.A)
+@test isequal(ctable[1], table[2])
+
+# row sink
+table = ctable |> Tables.select(:A) |> Tables.rowtable
+@test length(table[1]) == 1
+@test isequal(map(x->x.A, table), [1, missing, 3])
+
+table = ctable |> Tables.select("A") |> Tables.rowtable
+@test length(table[1]) == 1
+@test isequal(map(x->x.A, table), [1, missing, 3])
+
+# column re-ordering
+table = ctable |> Tables.select(:A, :C) |> Tables.rowtable
+@test length(table[1]) == 2
+
+table = ctable |> Tables.select(:C, :A) |> Tables.rowtable
+@test isequal(ctable.A, map(x->x.A, table))
+@test isequal(ctable[1], map(x->x[2], table))
+end
+
 @static if :Query in Symbol.(Base.loaded_modules_array())
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 

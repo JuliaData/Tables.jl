@@ -188,4 +188,7 @@ include("fallbacks.jl")
 # allow any valid iterator to be a table
 include("iteratorwrapper.jl")
 
+# simple table operations on table inputs
+include("operations.jl")
+
 end # module
