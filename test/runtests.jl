@@ -129,6 +129,26 @@ end
     @test select(rt, :a) == [(a=1,), (a=2,), (a=3,)]
 end
 
+@testset "Matrix integration" begin
+    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+    nt = (a=[1,2,3], b=[4.0, 5.0, 6.0])
+
+    mat = Tables.matrix(rt)
+    @test nt.a == mat[:, 1]
+    @test size(mat) == (3, 3)
+    @test eltype(mat) == Any
+    mat2 = Tables.matrix(nt)
+    @test eltype(mat2) == Float64
+    @test mat2[:, 1] == nt.a
+
+    tbl = Tables.table(mat) |> columntable
+    @test keys(tbl) == (:Column1, :Column2, :Column3)
+    @test tbl.Column1 == [1, 2, 3]
+    tbl2 = Tables.table(mat2) |> rowtable
+    @test length(tbl2) == 3
+    @test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
+end
+
 import Base: ==
 struct GenericRow
     a::Int

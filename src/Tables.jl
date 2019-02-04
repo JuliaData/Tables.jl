@@ -1,6 +1,6 @@
 module Tables
 
-using Requires
+using Requires, LinearAlgebra
 
 using TableTraits, IteratorInterfaceExtensions
 
@@ -190,5 +190,8 @@ include("iteratorwrapper.jl")
 
 # simple table operations on table inputs
 include("operations.jl")
+
+# matrix integration
+include("matrix.jl")
 
 end # module
