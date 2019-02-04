@@ -3,14 +3,14 @@ istable(::Type{<:AbstractMatrix}) = false
 rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
 columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
 
-struct MatrixTable{T}
+struct MatrixTable{T <: AbstractMatrix}
     names::Vector{Symbol}
     lookup::Dict{Symbol, Int}
     matrix::T
 end
 
 istable(::Type{<:MatrixTable}) = true
-names(m::MatrixTable) = getfield(m, 1)
+names(m::MatrixTable) = getfield(m, :names)
 
 # row interface
 struct MatrixRow{T}
@@ -19,16 +19,16 @@ struct MatrixRow{T}
 end
 
 Base.getproperty(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
-    getfield(getfield(m, 2), 3)[getfield(m, 1), col]
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
 Base.getproperty(m::MatrixRow, nm::Symbol) =
-    getfield(getfield(m, 2), 3)[getfield(m, 1), getfield(getfield(m, 2), 2)[nm]]
-Base.propertynames(m::MatrixRow) = names(getfield(m, 2))
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
+Base.propertynames(m::MatrixRow) = names(getfield(m, :source))
 
 rowaccess(::Type{<:MatrixTable}) = true
-schema(m::MatrixTable{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, 3), 2), eltype(T)})
+schema(m::MatrixTable{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
 rows(m::MatrixTable) = m
 Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
-Base.length(m::MatrixTable) = size(getfield(m, 3), 1)
+Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
 
 function Base.iterate(m::MatrixTable, st=1)
     st > length(m) && return nothing
@@ -38,14 +38,17 @@ end
 # column interface
 columnaccess(::Type{<:MatrixTable}) = true
 columns(m::MatrixTable) = m
-Base.getproperty(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, 3)[:, col]
-Base.getproperty(m::MatrixTable, nm::Symbol) = getfield(m, 3)[:, getfield(m, 2)[nm]]
+Base.getproperty(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
+Base.getproperty(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
 Base.propertynames(m::MatrixTable) = names(m)
 
 """
-Tables.table(m::AbstractMatrix; header::Vector{Symbol}=...)
+Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
 
-Convert an AbstractMatrix (Matrix, Adjoint, etc.) to a MatrixTable, which satisfies the Tables.jl interface. This allows accesing the matrix via `Tables.rows` and `Tables.columns`. An optional keyword argument `header` can be passed as a Vector{Symbol} to be used as the column names. Note that no copy of the AbstractMatrix is made.
+Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies
+the Tables.jl interface. This allows accesing the matrix via `Tables.rows` and
+`Tables.columns`. An optional keyword argument `header` can be passed as a `Vector{Symbol}`
+to be used as the column names. Note that no copy of the `AbstractMatrix` is made.
 """
 function table(m::AbstractMatrix; header::Vector{Symbol}=[Symbol("Column$i") for i = 1:size(m, 2)])
     length(header) == size(m, 2) || throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2))"))
@@ -56,7 +59,9 @@ end
 """
 Tables.matrix(table)
 
-Convert any table source input to a Matrix. If the table column types are not homogenous, they will be promoted to the most common type in the materialized Matrix. Note that column names are ignored in the conversion.
+Materialize any table source input as a `Matrix`. If the table column types are not homogenous,
+they will be promoted to a common type in the materialized `Matrix`. Note that column names are
+ignored in the conversion.
 """
 function matrix(table)
     cols = Tables.columns(table)
