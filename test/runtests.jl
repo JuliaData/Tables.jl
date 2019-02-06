@@ -140,6 +140,7 @@ end
     mat2 = Tables.matrix(nt)
     @test eltype(mat2) == Float64
     @test mat2[:, 1] == nt.a
+    @test !Tables.istable(mat2)
 
     tbl = Tables.table(mat) |> columntable
     @test keys(tbl) == (:Column1, :Column2, :Column3)
