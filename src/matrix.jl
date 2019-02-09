@@ -62,15 +62,16 @@ Tables.matrix(table; vardim::Int=2)
 
 Materialize any table source input as a `Matrix`. If the table column types are not homogenous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are
-ignored in the conversion.
+ignored in the conversion. By default, input table columns will be materialized as corresponding
+matrix columns; passing `dims=1` will transpose the input with input columns as matrix rows.
 """
-function matrix(table; vardim::Int=2)
-    vardim == 1 || vardim == 2 || throw(ArgumentError("`vardim` keyword argument must be 1 or 2"))
+function matrix(table; dims::Int=2)
+    dims == 1 || dims == 2 || throw(ArgumentError("`dims` keyword argument must be 1 or 2"))
     cols = Tables.columns(table)
     types = schema(cols).types
     T = reduce(promote_type, types)
     n, p = rowcount(cols), length(types)
-    if vardim == 2
+    if dims == 2
         mat = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(Tables.eachcolumn(cols))
             mat[:, i] = col

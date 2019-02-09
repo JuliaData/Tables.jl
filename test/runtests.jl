@@ -141,7 +141,7 @@ end
     @test eltype(mat2) == Float64
     @test mat2[:, 1] == nt.a
     @test !Tables.istable(mat2)
-    mat3 = Tables.matrix(nt; vardim=1)
+    mat3 = Tables.matrix(nt; dims=1)
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
     @test mat3[2, :] == nt.b
