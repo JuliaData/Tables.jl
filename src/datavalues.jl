@@ -24,8 +24,10 @@ DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = DataValueRo
 DataValueRowIterator(::Type{Schema{names, types}}, x::S) where {names, types, S} = DataValueRowIterator{datavaluetype(NamedTuple{names, types}), S}(x)
 
 function datavaluerows(x)
-    r = Tables.rowtable(x)
-    return DataValueRowIterator(datavaluetype(Tables.schema(r)), r)
+    r = Tables.rows(x)
+    s = Tables.schema(r)
+    s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
+    return DataValueRowIterator(datavaluetype(s), r)
 end
 
 _iteratorsize(x) = x
