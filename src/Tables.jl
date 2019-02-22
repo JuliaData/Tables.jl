@@ -2,7 +2,7 @@ module Tables
 
 using Requires, LinearAlgebra
 
-using TableTraits, IteratorInterfaceExtensions
+using TableTraits
 
 export rowtable, columntable
 
