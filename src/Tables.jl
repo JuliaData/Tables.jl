@@ -4,6 +4,8 @@ using Requires, LinearAlgebra
 
 using TableTraits
 
+import IteratorInterfaceExtensions
+
 export rowtable, columntable
 
 function __init__()
@@ -25,13 +27,6 @@ function __init__()
             StringVector{Union{Missing, String}}(undef, rows)
         unweakref(wk::WeakRefString) = string(wk)
         unweakreftype(::Type{<:WeakRefString}) = String
-    end
-    @require IteratorInterfaceExtensions="82899510-4779-5014-852e-03e436cf321d" begin
-        using .IteratorInterfaceExtensions
-        IteratorInterfaceExtensions.getiterator(x::RowTable) = datavaluerows(x)
-        IteratorInterfaceExtensions.isiterable(x::RowTable) = true
-        IteratorInterfaceExtensions.getiterator(x::ColumnTable) = datavaluerows(x)
-        IteratorInterfaceExtensions.isiterable(x::ColumnTable) = true
     end
 end
 
@@ -193,5 +188,10 @@ include("operations.jl")
 
 # matrix integration
 include("matrix.jl")
+
+IteratorInterfaceExtensions.getiterator(x::RowTable) = datavaluerows(x)
+IteratorInterfaceExtensions.isiterable(x::RowTable) = true
+IteratorInterfaceExtensions.getiterator(x::ColumnTable) = datavaluerows(x)
+IteratorInterfaceExtensions.isiterable(x::ColumnTable) = true
 
 end # module
