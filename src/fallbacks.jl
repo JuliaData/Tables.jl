@@ -150,7 +150,8 @@ end
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return TableTraits.get_columns_copy_using_missing(x)
     elseif istable(x)
-        return columns(IteratorWrapper(IteratorInterfaceExtensions.getiterator(x)))
+        iw = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
+        return buildcolumns(schema(iw), iw)
     end
     throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
 end

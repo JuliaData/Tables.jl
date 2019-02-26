@@ -24,6 +24,7 @@ end
 
 # generic fallback from getproperty w/ type information to basic symbol lookup
 Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm)
+Base.getproperty(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {names, types, T} = Core.getfield(x, i)
 
 """
     Tables.eachcolumn(f, sch, row, args...)
