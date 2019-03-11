@@ -58,20 +58,28 @@ function table(m::AbstractMatrix; header::Vector{Symbol}=[Symbol("Column$i") for
 end
 
 """
-Tables.matrix(table)
+Tables.matrix(table; transpose::Bool=false)
 
 Materialize any table source input as a `Matrix`. If the table column types are not homogenous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are
-ignored in the conversion.
+ignored in the conversion. By default, input table columns will be materialized as corresponding
+matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows.
 """
-function matrix(table)
+function matrix(table; transpose::Bool=false)
     cols = Tables.columns(table)
     types = schema(cols).types
     T = reduce(promote_type, types)
     n, p = rowcount(cols), length(types)
-    mat = Matrix{T}(undef, n, p)
-    for (i, col) in enumerate(Tables.eachcolumn(cols))
-        copyto!(mat, n * (i - 1) + 1, col)
+    if !transpose
+        mat = Matrix{T}(undef, n, p)
+        for (i, col) in enumerate(Tables.eachcolumn(cols))
+            mat[:, i] = col
+        end
+    else
+        mat = Matrix{T}(undef, p, n)
+        for (i, col) in enumerate(Tables.eachcolumn(cols))
+            mat[i, :] = col
+        end
     end
     return mat
 end
