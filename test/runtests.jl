@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits
+using Test, Tables, TableTraits, DataValues, QueryOperators
 
 @testset "utils.jl" begin
 
@@ -353,7 +353,7 @@ table = ctable |> Tables.select(:C, :A) |> Tables.rowtable
 @test isequal(ctable[1], map(x->x[2], table))
 end
 
-@static if :Query in Symbol.(Base.loaded_modules_array())
+@testset "TableTraits integration" begin
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 
     dv = Tables.datavaluerows(rt)
