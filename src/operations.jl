@@ -97,17 +97,30 @@ rows(s::Select{T, columnaccess, names}) where {T, columnaccess, names} = columna
 
 # we need to iterate a "row view" in case the underlying source has unknown schema
 # to ensure each iterated row only has `names` propertynames
-struct SelectRow{T, names}
+struct SelectRow{T, names, inds}
     row::T
 end
 
-Base.getproperty(row::SelectRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(row, 1), T, col, nm)
+function unsafe_get(inds, i)
+    @inbounds v = inds[i]
+    return v
+end
+Base.getproperty(row::SelectRow{S, names, inds}, ::Type{T}, col::Int, nm::Symbol) where {S, names, inds, T} = getproperty(getfield(row, 1), T, unsafe_get(inds, col), nm)
 Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = names
 
-function Base.iterate(s::Select{T, names}, st=()) where {T, names}
-    state = iterate(getfield(s, 1), st...)
+function Base.iterate(s::Select{T, columnaccess, names}) where {T, columnaccess, names}
+    state = iterate(getfield(s, 1))
     state === nothing && return nothing
     row, st = state
-    return SelectRow{typeof(row), names}(row), (st,)
+    props = Tuple(propertynames(row))
+    inds = ntuple(i->columnindex(props, names[i]), length(names))
+    return SelectRow{typeof(row), names, inds}(row), (inds, st)
+end
+
+function Base.iterate(s::Select{T, columnaccess, names}, st) where {T, columnaccess, names}
+    state = iterate(getfield(s, 1), st[2])
+    state === nothing && return nothing
+    row, newst = state
+    return SelectRow{typeof(row), names, st[1]}(row), (st[1], newst)
 end
