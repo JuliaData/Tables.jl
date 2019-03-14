@@ -109,7 +109,7 @@ Base.getproperty(row::SelectRow{S, names, inds}, ::Type{T}, col::Int, nm::Symbol
 Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = names
 
-function Base.iterate(s::Select{T, columnaccess, names}) where {T, columnaccess, names}
+function Base.iterate(s::Select{T, false, names}) where {T, names}
     state = iterate(getfield(s, 1))
     state === nothing && return nothing
     row, st = state
