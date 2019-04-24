@@ -137,3 +137,28 @@ function Base.iterate(s::Select{T, false, names}, st) where {T, names}
     row, newst = state
     return SelectRow{typeof(row), names, st[1]}(row), (st[1], newst)
 end
+
+# map
+struct Map{T, F}
+    source::T
+    func::F
+end
+
+select(f::Base.Callable) = x->select(x, f)
+select(x, f::Base.Callable) = Map(rows(x), f)
+select(f::Base.Callable, x) = Map(rows(x), f)
+
+istable(::Type{<:Map}) = true
+rowaccess(::Type{<:Map}) = true
+rows(m::Map) = m
+schema(m::Map) = nothing
+
+Base.IteratorSize(::Type{Map{T, F}}) where {T, F} = Base.IteratorSize(T)
+Base.length(m::Map) = length(m.source)
+Base.IteratorEltype(::Type{<:Map}) = Base.EltypeUnknown()
+
+function Base.iterate(m::Map, st=())
+    state = iterate(m.source, st...)
+    state === nothing && return nothing
+    return m.func(state[1]), (state[2],)
+end
