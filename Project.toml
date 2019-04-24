@@ -15,5 +15,8 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
 QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
 
+[compat]
+julia = "≥ 1.0.0"
+
 [targets]
 test = ["Test", "DataValues", "QueryOperators"]
