@@ -7,12 +7,12 @@ Base.getproperty(row::TransformsRow, ::Type{T}, col::Int, nm::Symbol) where {T} 
 Base.getproperty(row::TransformsRow, nm::Symbol) = (getfunc(row, getfield(row, 2), nm))(getproperty(getfield(row, 1), nm))
 Base.propertynames(row::TransformsRow) = propertynames(getfield(row, 1))
 
-struct Transforms{T, F, C}
+struct Transforms{C, T, F}
     source::T
     funcs::F # NamedTuple of columnname=>transform function
 end
 Base.propertynames(t::Transforms) = propertynames(getfield(t, 1))
-Base.getproperty(t::Transforms, nm::Symbol) = map(getfunc(t, getfield(t, 2), nm), getproperty(getfield(t, 1), nm))
+Base.getproperty(t::Transforms, nm::Symbol) = Base.map(getfunc(t, getfield(t, 2), nm), getproperty(getfield(t, 1), nm))
 
 transform(funcs) = x->transform(x, funcs)
 transform(; kw...) = transform(kw.data)
@@ -24,7 +24,7 @@ function transform(src::T, funcs) where {T}
     else
         x = rows(src)
     end
-    return Transforms{typeof(x), typeof(funcs), cols}(x, funcs)
+    return Transforms{cols, typeof(x), typeof(funcs)}(x, funcs)
 end
 
 getfunc(row, nt::NamedTuple, i, nm) = get(nt, i, identity)
@@ -39,17 +39,17 @@ getfunc(row, d::Dict{Int, <:Base.Callable}, nm) = get(d, findfirst(isequal(nm), 
 
 istable(::Type{<:Transforms}) = true
 rowaccess(::Type{<:Transforms}) = true
-rows(t::Transforms{T, F, false}) where {T, F} = t
-columnaccess(::Type{Transforms{T, F, C}}) where {T, F, C} = C
-columns(t::Transforms{T, F, true}) where {T, F} = t
+rows(t::Transforms{false, T, F}) where {T, F} = t
+columnaccess(::Type{Transforms{C, T, F}}) where {T, F, C} = C
+columns(t::Transforms{true, T, F}) where {T, F} = t
 # avoid relying on inference here and just let sinks figure things out
 schema(t::Transforms) = nothing
 
-Base.IteratorSize(::Type{<:Transforms{T}}) where {T} = Base.IteratorSize(T)
+Base.IteratorSize(::Type{<:Transforms{C, T}}) where {C, T} = Base.IteratorSize(T)
 Base.length(t::Transforms) = length(getfield(t, 1))
-Base.eltype(t::Transforms{T, F}) where {T, F} = TransformsRow{eltype(getfield(t, 1)), F}
+Base.eltype(t::Transforms{C, T, F}) where {C, T, F} = TransformsRow{eltype(getfield(t, 1)), F}
 
-@inline function Base.iterate(t::Transforms, st=())
+@inline function Base.iterate(t::Transforms{false}, st=())
     state = iterate(getfield(t, 1), st...)
     state === nothing && return nothing
     return TransformsRow(state[1], getfield(t, 2)), (state[2],)
@@ -61,7 +61,7 @@ struct Select{T, columnaccess, names}
 end
 
 select(names::Symbol...) = x->select(x, names...)
-select(names::String...) = x->select(x, map(Symbol, names)...)
+select(names::String...) = x->select(x, Base.map(Symbol, names)...)
 function select(x::T, names::Symbol...) where {T}
     colaccess = columnaccess(T)
     r = colaccess ? columns(x) : rows(x)
