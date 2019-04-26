@@ -118,7 +118,7 @@ function Base.iterate(s::Select{T, false, names}) where {T, names}
     return SelectRow{typeof(row), names, inds}(row), (inds, st)
 end
 
-function Base.iterate(s::Select{T, columnaccess, names}, st) where {T, columnaccess, names}
+function Base.iterate(s::Select{T, false, names}, st) where {T, names}
     state = iterate(getfield(s, 1), st[2])
     state === nothing && return nothing
     row, newst = state
