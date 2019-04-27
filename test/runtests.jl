@@ -327,6 +327,10 @@ table = ctable |> Tables.select(:A) |> Tables.columntable
 @test length(table) == 1
 @test isequal(table.A, [1, missing, 3])
 
+table = ctable |> Tables.select(1) |> Tables.columntable
+@test length(table) == 1
+@test isequal(table.A, [1, missing, 3])
+
 table = ctable |> Tables.select("A") |> Tables.columntable
 @test length(table) == 1
 @test isequal(table.A, [1, missing, 3])
@@ -334,13 +338,28 @@ table = ctable |> Tables.select("A") |> Tables.columntable
 # column re-ordering
 table = ctable |> Tables.select(:A, :C) |> Tables.columntable
 @test length(table) == 2
+@test isequal(table.A, [1, missing, 3])
+@test isequal(table[2], ["hey", "there", "sailor"])
+
+table = ctable |> Tables.select(1, 3) |> Tables.columntable
+@test length(table) == 2
+@test isequal(table.A, [1, missing, 3])
+@test isequal(table[2], ["hey", "there", "sailor"])
 
 table = ctable |> Tables.select(:C, :A) |> Tables.columntable
 @test isequal(ctable.A, table.A)
 @test isequal(ctable[1], table[2])
 
+table = ctable |> Tables.select(3, 1) |> Tables.columntable
+@test isequal(ctable.A, table.A)
+@test isequal(ctable[1], table[2])
+
 # row sink
 table = ctable |> Tables.select(:A) |> Tables.rowtable
+@test length(table[1]) == 1
+@test isequal(map(x->x.A, table), [1, missing, 3])
+
+table = ctable |> Tables.select(1) |> Tables.rowtable
 @test length(table[1]) == 1
 @test isequal(map(x->x.A, table), [1, missing, 3])
 
@@ -351,10 +370,22 @@ table = ctable |> Tables.select("A") |> Tables.rowtable
 # column re-ordering
 table = ctable |> Tables.select(:A, :C) |> Tables.rowtable
 @test length(table[1]) == 2
+@test isequal(map(x->x.A, table), [1, missing, 3])
+@test isequal(map(x->x[2], table), ["hey", "there", "sailor"])
+
+table = ctable |> Tables.select(1, 3) |> Tables.rowtable
+@test length(table[1]) == 2
+@test isequal(map(x->x.A, table), [1, missing, 3])
+@test isequal(map(x->x[2], table), ["hey", "there", "sailor"])
 
 table = ctable |> Tables.select(:C, :A) |> Tables.rowtable
 @test isequal(ctable.A, map(x->x.A, table))
 @test isequal(ctable[1], map(x->x[2], table))
+
+table = ctable |> Tables.select(3, 1) |> Tables.rowtable
+@test isequal(ctable.A, map(x->x.A, table))
+@test isequal(ctable[1], map(x->x[2], table))
+
 end
 
 @testset "TableTraits integration" begin
