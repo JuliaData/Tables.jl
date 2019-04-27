@@ -212,7 +212,7 @@ end
 
 @testset "Tables.jl interface" begin
 
-    @test Tables.istable(1)
+    @test !Tables.istable(1)
     @test !Tables.istable(Int)
     @test !Tables.rowaccess(1)
     @test !Tables.rowaccess(Int)

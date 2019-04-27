@@ -55,13 +55,11 @@ namedtupleiterator(::Type{T}, rows::S) where {T, S} = NamedTupleIterator{typeof(
 
 # sink function
 function rowtable(itr::T) where {T}
-    istable(itr) || throw(ArgumentError("Vector of NamedTuples requires a table input"))
     r = rows(itr)
     return collect(namedtupleiterator(eltype(r), r))
 end
 
 function rowtable(rt::RowTable, itr::T) where {T}
-    istable(itr) || throw(ArgumentError("Vector of NamedTuples requires a table input"))
     r = rows(itr)
     return append!(rt, namedtupleiterator(eltype(r), r))
 end
@@ -98,7 +96,6 @@ end
 columntable(::Nothing, cols) = NamedTuple{Tuple(propertynames(cols))}(Tuple(getarray(col) for col in eachcolumn(cols)))
 
 function columntable(itr::T) where {T}
-    istable(itr) || throw(ArgumentError("NamedTuple of AbstractVectors requires a table input"))
     cols = columns(itr)
     cols isa ColumnTable && return cols
     return columntable(schema(cols), cols)
