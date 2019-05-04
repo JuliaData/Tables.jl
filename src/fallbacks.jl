@@ -58,7 +58,7 @@ function rows(x::T) where {T}
     if columnaccess(T)
         cols = columns(x)
         return RowIterator(cols, rowcount(cols))
-    elseif Base.isiterable(T)
+    elseif TableTraits.isiterabletable(x) === true || Base.isiterable(T)
         return IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
     end
     throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
@@ -149,7 +149,7 @@ end
         return buildcolumns(schema(r), r)
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return TableTraits.get_columns_copy_using_missing(x)
-    elseif Base.isiterable(T)
+    elseif TableTraits.isiterabletable(x) === true || Base.isiterable(T)
         iw = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
         return buildcolumns(schema(iw), iw)
     end

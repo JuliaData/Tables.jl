@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators
+using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions
 
 @testset "utils.jl" begin
 
@@ -259,6 +259,19 @@ end
 
 let x=ColumnSource()
     @test Tables.columns(x) == TableTraits.get_columns_copy_using_missing(x)
+end
+
+struct ColumnSource2
+end
+
+IteratorInterfaceExtensions.isiterable(x::ColumnSource2) = true
+TableTraits.isiterabletable(::ColumnSource2) = true
+
+IteratorInterfaceExtensions.getiterator(::ColumnSource2) =
+    Tables.rows((a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"]))
+
+let x=ColumnSource2()
+    @test Tables.columns(x) == (a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"])
 end
 
 @testset "operations.jl" begin
