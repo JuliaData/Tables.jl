@@ -271,7 +271,7 @@ IteratorInterfaceExtensions.getiterator(::ColumnSource2) =
     Tables.rows((a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"]))
 
 let x=ColumnSource2()
-    @test Tables.columns(x) == (a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"])
+    @test Tables.source(Tables.columns(x)) == (a=[1,2,3], b=[4.,5.,6.], c=["A", "B", "C"])
 end
 
 @testset "operations.jl" begin
