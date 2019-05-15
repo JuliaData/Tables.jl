@@ -41,8 +41,6 @@ function __init__()
         allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(undef, rows)
         allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} =
             StringVector{Union{Missing, String}}(undef, rows)
-        unweakref(wk::WeakRefString) = string(wk)
-        unweakreftype(::Type{<:WeakRefString}) = String
     end
 end
 
