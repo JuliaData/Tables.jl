@@ -24,6 +24,7 @@ struct IteratorWrapper{S}
     x::S
 end
 
+nondatavaluerows(x) = IteratorWrapper(x)
 Tables.istable(::Type{<:IteratorWrapper}) = true
 Tables.rowaccess(::Type{<:IteratorWrapper}) = true
 Tables.rows(x::IteratorWrapper) = x

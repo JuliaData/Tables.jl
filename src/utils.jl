@@ -28,14 +28,13 @@ Base.getproperty(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) whe
 
 """
     Tables.eachcolumn(f, sch, row, args...)
-    Tables.eachcolumn(f, names, row, args...)
     Tables.eachcolumn(Tables.columns(x))
 
-    The first two definitions take a function `f`, table schema `sch` or table's column names `names` as a tuple of Symbols, a `row` type (that satisfies the Row interface), and any other `args...`;
-    they generate calls to get the value for each column in the row (`getproperty(row, nm)`) and then calls `f(val, col, name, args...)`, where `f` is the
-    user-provided function, `val` is a row's column value, `col` is the column index as an `Int`, and `name` is the row's column name as a Symbol.
+    The first definition takes a function `f`, table schema `sch`, a `row` type (that satisfies the `Tables.Row` interface), and any other `args...`;
+    it generates calls to get the value for each column in the row (`getproperty(row, nm)`) and then calls `f(val, col, name, args...)`, where `f` is the
+    user-provided function, `val` is a row's column value, `col` is the column index as an `Int`, and `name` is the row's column name as a `Symbol`.
 
-    While the first two definitions apply to a `Row` object, the last definition simply returns a property-iterator over a `Columns` object.
+    While the first definition applies to a `Row` object, the last definition simply returns a property-iterator over a `Columns` object.
     For example, one could "collect" every column of a `Columns` object by doing:
     ```julia
     vectors = [collect(col) for col in Tables.eachcolumn(Tables.columns(x))]
