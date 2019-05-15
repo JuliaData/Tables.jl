@@ -5,12 +5,12 @@ nondatavaluetype(::Type{Union{}}) = Union{}
 datavaluetype(::Type{T}) where {T} = T
 datavaluetype(::Type{Union{}}) = Union{}
 
-Base.@pure function nondatavaluetype(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
+Base.@pure function nondatavaluenamedtuple(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
     TT = Tuple{Any[ nondatavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
     return NamedTuple{names, TT}
 end
 
-Base.@pure function datavaluetype(::Tables.Schema{names, types}) where {names, types}
+Base.@pure function datavaluenamedtuple(::Tables.Schema{names, types}) where {names, types}
     TT = Tuple{Any[ datavaluetype(fieldtype(types, i)) for i = 1:fieldcount(types) ]...}
     return NamedTuple{names, TT}
 end
@@ -24,7 +24,7 @@ struct IteratorWrapper{S}
     x::S
 end
 
-nondatavaluerows(x) = IteratorWrapper(x)
+nondatavaluerows(x) = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
 Tables.istable(::Type{<:IteratorWrapper}) = true
 Tables.rowaccess(::Type{<:IteratorWrapper}) = true
 Tables.rows(x::IteratorWrapper) = x
@@ -32,8 +32,10 @@ Tables.rows(x::IteratorWrapper) = x
 function Tables.schema(dv::IteratorWrapper)
     eT = eltype(dv.x)
     (!(eT <: NamedTuple) || eT === Union{}) && return nothing
-    return Tables.Schema(nondatavaluetype(eT))
+    return Tables.Schema(nondatavaluenamedtuple(eT))
 end
+
+Base.IteratorEltype(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorEltype(S)
 Base.eltype(rows::IteratorWrapper) = IteratorRow{eltype(rows.x)}
 Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
@@ -67,23 +69,16 @@ Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
 struct DataValueRowIterator{NT, S}
     x::S
 end
-DataValueRowIterator(::Type{NT}, x::S) where {NT <: NamedTuple, S} = DataValueRowIterator{NT, S}(x)
-
-"Returns a DataValue-based NamedTuple-iterator"
-DataValueRowIterator(::Type{Schema{names, types}}, x::S) where {names, types, S} = DataValueRowIterator{datavaluetype(NamedTuple{names, types}), S}(x)
 
 function datavaluerows(x)
     r = Tables.rows(x)
     s = Tables.schema(r)
     s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
-    return DataValueRowIterator(datavaluetype(s), r)
+        return DataValueRowIterator{datavaluenamedtuple(s), typeof(r)}(r)
 end
 
-_iteratorsize(x) = x
-_iteratorsize(::Base.HasShape{1}) = Base.HasLength()
-
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = _iteratorsize(Base.IteratorSize(S))
+Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}

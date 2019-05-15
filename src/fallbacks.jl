@@ -59,14 +59,12 @@ function rows(x::T) where {T}
         cols = columns(x)
         return RowIterator(cols, rowcount(cols))
     elseif IteratorInterfaceExtensions.isiterable(x)
-        return IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
+        return nondatavaluerows(x)
     end
     throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
 end
 
 # build columns from rows
-haslength(L) = L isa Union{Base.HasShape, Base.HasLength}
-
 """
     Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
 
@@ -89,7 +87,7 @@ end
 
 @inline function buildcolumns(schema, rowitr::T) where {T}
     L = Base.IteratorSize(T)
-    len = haslength(L) ? length(rowitr) : 0
+    len = Base.haslength(L) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
     for (i, row) in enumerate(rowitr)
         eachcolumn(add!, schema, row, L, nt, i)
@@ -125,7 +123,7 @@ function buildcolumns(::Nothing, rowitr::T) where {T}
     row, st = state
     names = Tuple(propertynames(row))
     L = Base.IteratorSize(T)
-    len = haslength(L) ? length(rowitr) : 0
+    len = Base.haslength(L) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = NamedTuple{names}(Tuple(Union{}[] for _ = 1:length(names)))
     return _buildcolumns(rowitr, row, st, sch, L, columns, 1, len, Ref{Any}(columns))
@@ -163,7 +161,7 @@ Base.getproperty(x::CopiedColumns, nm::Symbol) = getproperty(source(x), nm)
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return CopiedColumns(TableTraits.get_columns_copy_using_missing(x))
     elseif IteratorInterfaceExtensions.isiterable(x)
-        iw = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
+        iw = nondatavaluerows(x)
         return CopiedColumns(buildcolumns(schema(iw), iw))
     end
     throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
