@@ -154,7 +154,7 @@ columns(x::CopiedColumns) = x
 schema(x::CopiedColumns) = schema(source(x))
 materializer(x::CopiedColumns) = materializer(source(x))
 Base.propertynames(x::CopiedColumns) = propertynames(source(x))
-Base.getproperty(x::CopiedColumns, nm) = getproperty(source(x), nm)
+Base.getproperty(x::CopiedColumns, nm::Symbol) = getproperty(source(x), nm)
 
 @inline function columns(x::T) where {T}
     if rowaccess(T)
