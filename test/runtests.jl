@@ -258,7 +258,7 @@ function TableTraits.get_columns_copy_using_missing(x::ColumnSource)
 end
 
 let x=ColumnSource()
-    @test Tables.columns(x) == TableTraits.get_columns_copy_using_missing(x)
+    @test Tables.source(Tables.columns(x)) == Tables.source(Tables.CopiedColumns(TableTraits.get_columns_copy_using_missing(x)))
 end
 
 struct ColumnSource2
