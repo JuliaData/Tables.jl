@@ -143,15 +143,28 @@ function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
     return updated[]
 end
 
+struct CopiedColumns{T}
+    x::T
+end
+
+source(x::CopiedColumns) = getfield(x, :x)
+istable(::Type{<:CopiedColumns}) = true
+columnaccess(::Type{<:CopiedColumns}) = true
+columns(x::CopiedColumns) = x
+schema(x::CopiedColumns) = schema(source(x))
+materializer(x::CopiedColumns) = materializer(source(x))
+Base.propertynames(x::CopiedColumns) = propertynames(source(x))
+Base.getproperty(x::CopiedColumns, nm) = getproperty(source(x), nm)
+
 @inline function columns(x::T) where {T}
     if rowaccess(T)
         r = rows(x)
-        return buildcolumns(schema(r), r)
+        return CopiedColumns(buildcolumns(schema(r), r))
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
-        return TableTraits.get_columns_copy_using_missing(x)
+        return CopiedColumns(TableTraits.get_columns_copy_using_missing(x))
     elseif IteratorInterfaceExtensions.isiterable(x)
         iw = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
-        return buildcolumns(schema(iw), iw)
+        return CopiedColumns(buildcolumns(schema(iw), iw))
     end
     throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
 end
