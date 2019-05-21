@@ -39,6 +39,7 @@ Base.IteratorEltype(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorEltype(
 Base.eltype(rows::IteratorWrapper) = IteratorRow{eltype(rows.x)}
 Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
+Base.size(rows::IteratorWrapper) = size(rows.x)
 
 @noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which don't satisfy the Tables.jl Row-iterator interface"))
 
@@ -80,6 +81,7 @@ end
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
 Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
+Base.size(rows::DataValueRowIterator) = size(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
