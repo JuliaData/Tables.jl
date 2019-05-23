@@ -120,13 +120,12 @@ function MyTable(x)
     cols = length(columnnames)
     # create an emtpy MyTable with just the expected column names
     mytbl = MyTable(columnnames)
-    while true
+    while state !== nothing
+        row, st = state
         Tables.eachcolumn(sch, row) do val, columnindex::Int, columnname::Symbol
             push!(mytbl[columnindex], val)
         end
         state = iterate(rows, st)
-        state === nothing && break
-        row, st = state
     end
     return mytbl
 end
