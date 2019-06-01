@@ -97,7 +97,6 @@ end
             return b
         end
     else
-        println("bad")
         for (i, nm) in enumerate(names)
             f(getproperty(row, nm), i, nm, args...)
         end
