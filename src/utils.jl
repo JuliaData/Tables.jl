@@ -79,17 +79,23 @@ end
 @inline function eachcolumn(f::Base.Callable, sch::Schema{names, nothing}, row, args...) where {names}
     if @generated
         if length(names) < 100
-            b = Expr(:block, Any[:(f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)) for i = 1:length(names)]...)
+            block = Expr(:block, Expr(:meta, :inline))
+            for i = 1:length(names)
+                push!(block.args, quote
+                    f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                end)
+            end
+            return block
         else
             b = quote
+                $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
                     f(getproperty(row, nm), i, nm, args...)
                 end
                 return
             end
+            return b
         end
-        # println(b)
-        return b
     else
         for (i, nm) in enumerate(names)
             f(getproperty(row, nm), i, nm, args...)
