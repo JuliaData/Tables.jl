@@ -98,23 +98,45 @@ end
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
 
-@inline function add_or_widen!(dest::AbstractArray{T}, val::S, nm::Symbol, L, row, len, updated) where {T, S}
+function replacex(nt::NamedTuple{names, types}, nm::Symbol, x::AbstractArray{T}) where {names, types, T}
+    ind = columnindex(names, nm)
+    return NamedTuple{names}(ntuple(i->i == ind ? x : nt[i], length(names)))
+end
+
+@inline function add_or_widen!(dest::AbstractArray{T}, val::S, nm::Symbol, row, updated, L) where {T, S}
     if S === T || promote_type(S, T) <: T
         add!(dest, val, L, row)
         return dest
     else
-        new = allocatecolumn(promote_type(T, S), max(len, length(dest)))
+        new = allocatecolumn(promote_type(T, S), length(dest))
         row > 1 && copyto!(new, 1, dest, 1, row - 1)
         add!(new, val, L, row)
-        updated[] = merge(updated[], NamedTuple{(nm,)}((new,)))
+        updated[] = replacex(updated[], nm, new)
         return new
     end
 end
 
-@inline function add_or_widen!(val, col, nm, L, columns, row, len, updated)
-    @inbounds add_or_widen!(columns[col], val, nm, L, row, len, updated)
-    return
+function _buildcolumns(rowitr, row, st, sch, columns, rownbr, updated)
+    while true
+        eachcolumn(sch, row, rownbr, columns, updated, Base.IteratorSize(rowitr)) do val, col, nm, rownbr, columns, updated, L
+            Base.@_inline_meta
+            add_or_widen!(columns[col], val, nm, rownbr, updated, L)
+        end
+        rownbr += 1
+        state = iterate(rowitr, st)
+        state === nothing && break
+        row, st = state
+        columns !== updated[] && return _buildcolumns(rowitr, row, st, sch, updated[], rownbr, updated)
+    end
+    return updated
 end
+
+struct EmptyVector <: AbstractVector{Union{}}
+    len::Int
+end
+Base.IndexStyle(::Type{EmptyVector}) = Base.IndexLinear()
+Base.size(x::EmptyVector) = (x.len,)
+Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
 
 # when Tables.schema(x) === nothing
 function buildcolumns(::Nothing, rowitr::T) where {T}
@@ -122,23 +144,10 @@ function buildcolumns(::Nothing, rowitr::T) where {T}
     state === nothing && return NamedTuple()
     row, st = state
     names = Tuple(propertynames(row))
-    L = Base.IteratorSize(T)
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
-    columns = NamedTuple{names}(Tuple(Union{}[] for _ = 1:length(names)))
-    return _buildcolumns(rowitr, row, st, sch, L, columns, 1, len, Ref{Any}(columns))
-end
-
-function _buildcolumns(rowitr, row, st, sch, L, columns, rownbr, len, updated)
-    while true
-        eachcolumn(add_or_widen!, sch, row, L, columns, rownbr, len, updated)
-        rownbr += 1
-        state = iterate(rowitr, st)
-        state === nothing && break
-        row, st = state
-        columns !== updated[] && return _buildcolumns(rowitr, row, st, sch, L, updated[], rownbr, len, updated)
-    end
-    return updated[]
+    columns = NamedTuple{names}(Tuple(EmptyVector(len) for _ = 1:length(names)))
+    return _buildcolumns(rowitr, row, st, sch, columns, 1, Ref{Any}(columns))[]
 end
 
 struct CopiedColumns{T}

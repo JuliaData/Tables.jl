@@ -31,7 +31,7 @@ Tables.rows(x::IteratorWrapper) = x
 
 function Tables.schema(dv::IteratorWrapper)
     eT = eltype(dv.x)
-    (!(eT <: NamedTuple) || eT === Union{}) && return nothing
+    (!(eT <: NamedTuple) || eT === Union{}) && return schema(dv.x)
     return Tables.Schema(nondatavaluenamedtuple(eT))
 end
 
@@ -75,7 +75,7 @@ function datavaluerows(x)
     r = Tables.rows(x)
     s = Tables.schema(r)
     s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
-        return DataValueRowIterator{datavaluenamedtuple(s), typeof(r)}(r)
+    return DataValueRowIterator{datavaluenamedtuple(s), typeof(r)}(r)
 end
 
 Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT

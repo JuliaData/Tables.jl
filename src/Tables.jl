@@ -170,7 +170,7 @@ Schema(names, types) = Schema{Tuple(Base.map(Symbol, names)), Tuple{types...}}()
 
 function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
     println(io, "Tables.Schema:")
-    Base.print_matrix(io, hcat(collect(names), collect(fieldtype(types, i) for i = 1:fieldcount(types))))
+    Base.print_matrix(io, hcat(collect(names), types === nothing ? fill(nothing, length(names)) : collect(fieldtype(types, i) for i = 1:fieldcount(types))))
 end
 
 function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names, types}
