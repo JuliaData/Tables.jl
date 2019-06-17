@@ -44,6 +44,15 @@ function eachcolumn end
 
 @inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
     if @generated
+        if length(names) < 101
+            block = Expr(:block, Expr(:meta, :inline))
+            for i = 1:length(names)
+                push!(block.args, quote
+                    f(getproperty(row, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                end)
+            end
+            return block
+        end
         rle = runlength(types)
         if length(rle) < 100
             block = Expr(:block, Expr(:meta, :inline))
