@@ -100,16 +100,14 @@ end
 
 replacex(t, col::Int, x) = ntuple(i->i == col ? x : t[i], length(t))
 
-@inline function add_or_widen!(val::S, col, nm, rownbr, columns, updated, L) where {S}
-    @inbounds dest = columns[col]
-    T = eltype(dest)
-    if S === T || promote_type(S, T) <: T
-        add!(dest, val, L, rownbr)
+@inline function add_or_widen!(dest::AbstractArray{T}, val, col::Int, row, updated, L) where {T}
+    if val isa T
+        add!(dest, val, L, row)
         return
     else
-        new = allocatecolumn(promote_type(T, S), length(dest))
-        rownbr > 1 && copyto!(new, 1, dest, 1, rownbr - 1)
-        add!(new, val, L, rownbr)
+        new = allocatecolumn(promote_type(T, typeof(val)), length(dest))
+        row > 1 && copyto!(new, 1, dest, 1, row - 1)
+        add!(new, val, L, row)
         updated[] = replacex(updated[], col, new)
         return
     end
@@ -123,7 +121,10 @@ function __buildcolumns(rowitr, st, sch, columns, rownbr, updated)
         rownbr += 1
         # add_or_widen!(columns[1], row[1], 1, rownbr, updated, Base.IteratorSize(rowitr))
         # add_or_widen!(columns[2], row[2], 2, rownbr, updated, Base.IteratorSize(rowitr))
-        eachcolumn(add_or_widen!, sch, row, rownbr, columns, updated, Base.IteratorSize(rowitr))
+        eachcolumns(sch, row, columns, rownbr, updated, Base.IteratorSize(rowitr)) do val, col, nm, column, rownbr, updated, L
+            Base.@_inline_meta
+            @inbounds add_or_widen!(column, val, col, rownbr, updated, L)
+        end
         columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated)
     end
     return updated
@@ -137,7 +138,10 @@ Base.size(x::EmptyVector) = (x.len,)
 Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
 
 function _buildcolumns(rowitr, row, st, sch, columns, updated)
-    eachcolumn(add_or_widen!, sch, row, 1, columns, updated, Base.IteratorSize(rowitr))
+    eachcolumns(sch, row, columns, 1, updated, Base.IteratorSize(rowitr)) do val, col, nm, column, rownbr, updated, L
+        Base.@_inline_meta
+        add_or_widen!(column, val, col, rownbr, updated, L)
+    end
     return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
 end
 
