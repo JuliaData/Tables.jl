@@ -49,7 +49,7 @@ Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
 schema(x::RowIterator) = schema(x.columns)
 
-function Base.iterate(rows::RowIterator, st=1)
+@inline function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
     return ColumnsRow(rows.columns, st), st + 1
 end
@@ -98,35 +98,33 @@ end
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
 
-function replacex(nt::NamedTuple{names, types}, nm::Symbol, x::AbstractArray{T}) where {names, types, T}
-    ind = columnindex(names, nm)
-    return NamedTuple{names}(ntuple(i->i == ind ? x : nt[i], length(names)))
-end
+replacex(t, col::Int, x) = ntuple(i->i == col ? x : t[i], length(t))
 
-@inline function add_or_widen!(dest::AbstractArray{T}, val::S, nm::Symbol, row, updated, L) where {T, S}
+@inline function add_or_widen!(val::S, col, nm, rownbr, columns, updated, L) where {S}
+    @inbounds dest = columns[col]
+    T = eltype(dest)
     if S === T || promote_type(S, T) <: T
-        add!(dest, val, L, row)
-        return dest
+        add!(dest, val, L, rownbr)
+        return
     else
         new = allocatecolumn(promote_type(T, S), length(dest))
-        row > 1 && copyto!(new, 1, dest, 1, row - 1)
-        add!(new, val, L, row)
-        updated[] = replacex(updated[], nm, new)
-        return new
+        rownbr > 1 && copyto!(new, 1, dest, 1, rownbr - 1)
+        add!(new, val, L, rownbr)
+        updated[] = replacex(updated[], col, new)
+        return
     end
 end
 
-function _buildcolumns(rowitr, row, st, sch, columns, rownbr, updated)
+function __buildcolumns(rowitr, st, sch, columns, rownbr, updated)
     while true
-        eachcolumn(sch, row, rownbr, columns, updated, Base.IteratorSize(rowitr)) do val, col, nm, rownbr, columns, updated, L
-            Base.@_inline_meta
-            add_or_widen!(columns[col], val, nm, rownbr, updated, L)
-        end
-        rownbr += 1
         state = iterate(rowitr, st)
         state === nothing && break
         row, st = state
-        columns !== updated[] && return _buildcolumns(rowitr, row, st, sch, updated[], rownbr, updated)
+        rownbr += 1
+        # add_or_widen!(columns[1], row[1], 1, rownbr, updated, Base.IteratorSize(rowitr))
+        # add_or_widen!(columns[2], row[2], 2, rownbr, updated, Base.IteratorSize(rowitr))
+        eachcolumn(add_or_widen!, sch, row, rownbr, columns, updated, Base.IteratorSize(rowitr))
+        columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated)
     end
     return updated
 end
@@ -138,16 +136,21 @@ Base.IndexStyle(::Type{EmptyVector}) = Base.IndexLinear()
 Base.size(x::EmptyVector) = (x.len,)
 Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
 
+function _buildcolumns(rowitr, row, st, sch, columns, updated)
+    eachcolumn(add_or_widen!, sch, row, 1, columns, updated, Base.IteratorSize(rowitr))
+    return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
+end
+
 # when Tables.schema(x) === nothing
-function buildcolumns(::Nothing, rowitr::T) where {T}
+@inline function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
     row, st = state
     names = Tuple(propertynames(row))
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
-    columns = NamedTuple{names}(Tuple(EmptyVector(len) for _ = 1:length(names)))
-    return _buildcolumns(rowitr, row, st, sch, columns, 1, Ref{Any}(columns))[]
+    columns = Tuple(EmptyVector(len) for _ = 1:length(names))
+    return NamedTuple{names}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
 end
 
 struct CopiedColumns{T}

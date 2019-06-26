@@ -157,8 +157,14 @@ Base.IteratorSize(::Type{Map{T, F}}) where {T, F} = Base.IteratorSize(T)
 Base.length(m::Map) = length(m.source)
 Base.IteratorEltype(::Type{<:Map}) = Base.EltypeUnknown()
 
-function Base.iterate(m::Map, st=())
-    state = iterate(m.source, st...)
+@inline function Base.iterate(m::Map)
+    state = iterate(m.source)
     state === nothing && return nothing
-    return m.func(state[1]), (state[2],)
+    return m.func(state[1]), state[2]
+end
+
+@inline function Base.iterate(m::Map, st)
+    state = iterate(m.source, st)
+    state === nothing && return nothing
+    return m.func(state[1]), state[2]
 end
