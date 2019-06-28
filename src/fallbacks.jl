@@ -154,7 +154,7 @@ end
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = Tuple(EmptyVector(len) for _ = 1:length(names))
-    return NamedTuple{names}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
+    return NamedTuple{Base.map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
 end
 
 struct CopiedColumns{T}

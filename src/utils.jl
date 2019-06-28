@@ -42,13 +42,16 @@ Base.getproperty(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) whe
 """
 function eachcolumn end
 
+quot(s::Symbol) = Meta.QuoteNode(s)
+quot(x::Int) = x
+
 @inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
     if @generated
         if length(names) < 101
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getproperty(row, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                    f(getproperty(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), args...)
                 end)
             end
             return block
@@ -91,7 +94,7 @@ end
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                    f(getproperty(row, $(quot(names[i]))), $i, $(quot(names[i])), args...)
                 end)
             end
             return block
@@ -119,7 +122,7 @@ end
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), columns[$i], args...)
+                    f(getproperty(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
                 end)
             end
             return block
