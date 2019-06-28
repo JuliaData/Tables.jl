@@ -51,8 +51,14 @@ struct IteratorRow{T}
     row::T
 end
 
-Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T} = DataValueInterfaces.unwrap(getproperty(getfield(d, 1), T, col, nm))
-Base.getproperty(d::IteratorRow, nm::Symbol) = DataValueInterfaces.unwrap(getproperty(getfield(d, 1), nm))
+function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T}
+    x = getproperty(getfield(d, 1), T, col, nm)
+    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+end
+function Base.getproperty(d::IteratorRow, nm::Symbol)
+    x = getproperty(getfield(d, 1), nm)
+    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+end
 Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
 
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
