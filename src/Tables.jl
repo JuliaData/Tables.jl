@@ -1,6 +1,6 @@
 module Tables
 
-using Requires, LinearAlgebra
+using Requires, LinearAlgebra, DataValueInterfaces
 
 using TableTraits
 
@@ -9,23 +9,6 @@ import IteratorInterfaceExtensions
 export rowtable, columntable
 
 function __init__()
-    @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" begin
-        using .DataValues
-
-        # DataValue overloads for iteratorwrapper.jl definitions
-        nondatavaluetype(::Type{DataValue{T}}) where {T} = Union{T, Missing}
-        unwrap(x::DataValue) = isna(x) ? missing : DataValues.unsafe_get(x)
-        datavaluetype(::Type{T}) where {T <: DataValue} = T
-        datavaluetype(::Type{Union{T, Missing}}) where {T} = DataValue{T}
-        datavaluetype(::Type{Missing}) = DataValue{Union{}}
-
-        scalarconvert(::Type{T}, ::Missing) where {T <: DataValue} = T()
-
-        @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
-            using .CategoricalArrays
-            scalarconvert(::Type{DataValue{T}}, x::T) where {T <: CategoricalArrays.CatValue} = DataValue(x)
-        end
-    end
     @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
         using .CategoricalArrays
         allocatecolumn(::Type{CategoricalString{R}}, rows) where {R} = CategoricalArray{String, 1, R}(undef, rows)
