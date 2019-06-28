@@ -23,6 +23,7 @@ Base.getproperty(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
 Base.getproperty(m::MatrixRow, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
+propertytype(m::MatrixRow, nm) = eltype(getfield(m, :source).matrix)
 Base.propertynames(m::MatrixRow) = names(getfield(m, :source))
 
 rowaccess(::Type{<:MatrixTable}) = true

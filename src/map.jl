@@ -10,9 +10,18 @@ missingvalue(::Type{Missing}, x) = MissingValue{Missing}(missing)
 
 Base.getindex(x::MissingValue) = x.x
 
+Base.ismissing(x::MissingValue) = ismissing(x[])
 Base.nonmissingtype(::Type{MissingValue{T}}) where {T} = T
 
-import Base: ==, isequal, <, isless, isapprox, !, ~, +, -, ^, &, |, xor
+Base.promote_rule(::Type{MissingValue{S}}, ::Type{T}) where {S,T} = MissingValue{promote_type(S, T)}
+Base.promote_rule(::Type{MissingValue{T}}, ::Type{Any}) where {T} = MissingValue{Any}
+Base.promote_rule(::Type{MissingValue{Union{}}}, ::Type{Any}) = MissingValue{Any}
+Base.promote_rule( ::Type{Any}, ::Type{MissingValue{Union{}}}) = MissingValue{Any}
+Base.promote_rule(::Type{MissingValue{S}}, ::Type{MissingValue{T}}) where {S,T} = MissingValue{promote_type(S, T)}
+
+Base.convert(::Type{Union{Missing, T}}, value::MissingValue{T}) where T = value[]
+
+import Base: ==, isequal, <, isless, isapprox, !, ~, +, -, *, /, ^, &, |, xor
 
 # Unary operators/functions
 for f in (:(!), :(~), :(+), :(-), :(zero), :(one), :(oneunit),
@@ -21,7 +30,7 @@ for f in (:(!), :(~), :(+), :(-), :(zero), :(one), :(oneunit),
           :(iszero), :(transpose), :(adjoint), :(float), :(conj),
           :(abs), :(abs2), :(iseven), :(ispow2),
           :(real), :(imag), :(sign), :(inv))
-    @eval ($f)(x::MissingValue) = x[]
+    @eval ($f)(x::MissingValue{T}) where {T} = MissingValue{T}(($f)(x[]))
 end
 
 # Binary comparisons
@@ -38,9 +47,10 @@ end
 for f in (:(+), :(-), :(*), :(/), :(^), :(div), :(mod), :(fld), :(rem))
     @eval begin
         # Scalar with missing
-        ($f)(x::MissingValue, y::MissingValue) = ($f)(x[], y[])
-        ($f)(x::MissingValue, y::Number)  = ($f)(x[], y)
-        ($f)(y::Number, x::MissingValue) = ($f)(x[], y)
+        ($f)(x::MissingValue{T}, y::MissingValue{T}) where {T} = MissingValue{T}(($f)(x[], y[]))
+        ($f)(x::MissingValue{T}, y::MissingValue{S}) where {T, S} = MissingValue{promote_type(T, S)}(($f)(x[], y[]))
+        ($f)(x::MissingValue{T}, y::Number) where {T}  = MissingValue{T}(($f)(x[], y))
+        ($f)(y::Number, x::MissingValue{T}) where {T} = MissingValue{T}(($f)(x[], y))
     end
 end
 
@@ -56,11 +66,11 @@ for f in (:(&), :(|), :xor)
 end
 
 # to avoid ambiguity warnings
-(^)(x::MissingValue, y::Integer) = ^(x[], y)
+(^)(x::MissingValue{T}, y::Integer) where {T} = MissingValue{T}(^(x[], y))
 ==(x::MissingValue, y::WeakRef) = ==(x[], y)
 ==(y::WeakRef, x::MissingValue) = ==(x[], y)
-*(x::MissingValue, y::AbstractString) = *(x[], y)
-*(y::AbstractString, x::MissingValue) = *(x[], y)
+*(x::MissingValue{T}, y::AbstractString) where {T} = MissingValue{T}(*(x[], y))
+*(y::AbstractString, x::MissingValue{T}) where {T} = MissingValue{T}(*(x[], y))
 
 Base.coalesce(x::MissingValue, y...) = coalesce(x[], y...)
 
@@ -88,11 +98,9 @@ Base.coalesce(x::MissingValue, y...) = coalesce(x[], y...)
 # end
 
 nonmissingvaluetype(::Type{T}) where {T} = T
-nonmissingvaluetype(::Type{Union{}}) = Union{}
 nonmissingvaluetype(::Type{MissingValue{T}}) where {T} = Union{T, Missing}
 
 missingvaluetype(::Type{T}) where {T} = T
-missingvaluetype(::Type{Union{}}) = Union{}
 missingvaluetype(::Type{T}) where {T <: MissingValue} = T
 missingvaluetype(::Type{Union{T, Missing}}) where {T} = MissingValue{T}
 missingvaluetype(::Type{Missing}) = MissingValue{Union{}}
@@ -107,23 +115,21 @@ Base.@pure function missingtypenamedtupletype(::Schema{names, types}) where {nam
     return NamedTuple{names, TT}
 end
 
-wrap(x) = x
-wrap(nt::NT) where {NT <: NamedTuple} = missingtypenamedtupletype(NT)(nt)
+wrap(::Type{T}, x) where {T} = x
+wrap(u::Union, x) = missingvaluetype(u)(x)
 
 unwrap2(x) = x
 unwrap2(nt::NT) where {NT <: NamedTuple} = nonmissingtypenamedtupletype(NT)(nt)
 
 # map
-struct Map{NT, F, T}
+struct Map{F, T}
     func::F
     source::T
 end
 
 function Map(f::F, x::T) where {F <: Base.Callable, T}
     r = rows(x)
-    s = Tables.schema(r)
-    s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
-    return Map{missingtypenamedtupletype(s), F, T}(f, r)
+    return Map{F, typeof(r)}(f, r)
 end
 Map(f::Base.Callable) = x->Map(f, x)
 
@@ -136,14 +142,26 @@ Base.IteratorSize(::Type{Map{T, F}}) where {T, F} = Base.IteratorSize(T)
 Base.length(m::Map) = length(m.source)
 Base.IteratorEltype(::Type{<:Map}) = Base.EltypeUnknown()
 
+struct MissingValueWrapper{T}
+    x::T
+end
+
+@inline function Base.getproperty(m::MissingValueWrapper, nm::Symbol)
+    T = propertytype(getfield(m, :x), nm)
+    x = wrap(T, getproperty(getfield(m, :x), nm))
+    return x
+end
+
 @inline function Base.iterate(m::Map)
     state = iterate(m.source)
     state === nothing && return nothing
-    return unwrap2(m.func(wrap(state[1]))), state[2]
+    x = m.func(MissingValueWrapper(state[1]))
+    # @show x
+    return unwrap2(x), state[2]
 end
 
 @inline function Base.iterate(m::Map, st)
     state = iterate(m.source, st)
     state === nothing && return nothing
-    return unwrap(m.func(wrap(state[1]))), state[2]
+    return unwrap2(m.func(MissingValueWrapper(state[1]))), state[2]
 end

@@ -8,6 +8,8 @@ import IteratorInterfaceExtensions
 
 export rowtable, columntable
 
+propertytype(obj, nm) = fieldtype(typeof(obj), nm)
+
 function __init__()
     @require DataValues="e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5" begin
         using .DataValues

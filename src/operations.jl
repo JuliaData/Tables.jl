@@ -5,6 +5,7 @@ end
 
 Base.getproperty(row::TransformsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = (getfunc(row, getfield(row, 2), col, nm))(getproperty(getfield(row, 1), T, col, nm))
 Base.getproperty(row::TransformsRow, nm::Symbol) = (getfunc(row, getfield(row, 2), nm))(getproperty(getfield(row, 1), nm))
+propertytype(row::TransformsRow, nm) = typeof(getproperty(row, nm))
 Base.propertynames(row::TransformsRow) = propertynames(getfield(row, 1))
 
 struct Transforms{C, T, F}
@@ -116,6 +117,7 @@ getind(nms::NTuple{N, Symbol}, inds, col) where {N} = inds[col]
 getind(inds::NTuple{N, Int}, inds2, col) where {N} = inds[col]
 Base.getproperty(row::SelectRow{S, names, inds}, ::Type{T}, col::Int, nm::Symbol) where {S, names, inds, T} = getproperty(getfield(row, 1), T, getind(names, inds, col), nm)
 Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
+propertytype(row::SelectRow, nm) = propertytype(getfield(row, 1), nm)
 getprops(row, nms::NTuple{N, Symbol}) where {N} = nms
 getprops(row, inds::NTuple{N, Int}) where {N} = propertynames(getfield(row, 1))[inds]
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)

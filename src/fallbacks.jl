@@ -12,6 +12,7 @@ end
 
 Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
+@inline propertytype(c::ColumnsRow, nm::Symbol) = eltype(getproperty(getfield(c, 1), nm))
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
 @generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
