@@ -82,15 +82,15 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
 end
 
 # add! will push! or setindex! a value depending on if the row-iterator HasLength or not
-@inline add!(val, col::Int, nm::Symbol, ::Union{Base.HasLength, Base.HasShape}, nt, row) = setindex!(nt[col], val, row)
-@inline add!(val, col::Int, nm::Symbol, T, nt, row) = push!(nt[col], val)
+@inline add!(val, col::Int, nm, dest::AbstractArray, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
+@inline add!(val, col::Int, nm, dest::AbstractArray, L, row) = push!(dest, val)
 
 @inline function buildcolumns(schema, rowitr::T) where {T}
     L = Base.IteratorSize(T)
     len = Base.haslength(T) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
     for (i, row) in enumerate(rowitr)
-        eachcolumn(add!, schema, row, L, nt, i)
+        eachcolumns(add!, schema, row, nt, L, i)
     end
     return nt
 end
