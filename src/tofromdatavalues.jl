@@ -78,50 +78,21 @@ Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.Iter
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
-struct DataValueRow{NT, T}
-    x::T
+function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
+    if @generated
+        vals = Tuple(:(convert($(fieldtype(NT, i)), getproperty(row, $(DataValueInterfaces.nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        q = quote
+            x = iterate(rows.x, st...)
+            x === nothing && return nothing
+            row, st = x
+            return $NT(($(vals...),)), (st,)
+        end
+        # @show q
+        return q
+    else
+        x = iterate(rows.x, st...)
+        x === nothing && return nothing
+        row, st = x
+        return NT(Tuple(convert(fieldtype(NT, i), getproperty(row, DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+    end
 end
-DataValueRow{NT}(x::T) where {NT, T} = DataValueRow{NT, T}(x)
-
-@inline function Base.iterate(rows::DataValueRowIterator{NT}) where {NT}
-    x = iterate(rows.x)
-    x === nothing && return nothing
-    row, st = x
-    return DataValueRow{NT}(row), st
-end
-
-@inline function Base.iterate(rows::DataValueRowIterator{NT}, st) where {NT}
-    x = iterate(rows.x, st)
-    x === nothing && return nothing
-    row, st = x
-    return DataValueRow{NT}(row), st
-end
-
-@inline function Base.getproperty(d::DataValueRow{NT}, nm::Symbol) where {NT}
-    x = getproperty(getfield(d, 1), nm)
-    return convert(fieldtype(NT, nm), x)
-end
-Base.propertynames(d::DataValueRow) = propertynames(getfield(d, 1))
-
-function Base.convert(::Type{NamedTuple{names, types}}, dvr::DataValueRow{NamedTuple{names, types}}) where {names, types}
-    return NamedTuple{names, types}(ntuple(i->getproperty(getfield(dvr, 1), names[i]), fieldcount(types)))
-end
-
-# function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
-#     if @generated
-#         vals = Tuple(:(convert($(fieldtype(NT, i)), getproperty(row, $(DataValueInterfaces.nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
-#         q = quote
-#             x = iterate(rows.x, st...)
-#             x === nothing && return nothing
-#             row, st = x
-#             return $NT(($(vals...),)), (st,)
-#         end
-#         # @show q
-#         return q
-#     else
-#         x = iterate(rows.x, st...)
-#         x === nothing && return nothing
-#         row, st = x
-#         return NT(Tuple(convert(fieldtype(NT, i), getproperty(row, DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
-#     end
-# end
