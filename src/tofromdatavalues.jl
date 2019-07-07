@@ -32,7 +32,7 @@ Base.size(rows::IteratorWrapper) = size(rows.x)
 
 @noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which don't satisfy the Tables.jl Row-iterator interface"))
 
-function Base.iterate(rows::IteratorWrapper)
+@inline function Base.iterate(rows::IteratorWrapper)
     x = iterate(rows.x)
     x === nothing && return nothing
     row, st = x
@@ -40,7 +40,7 @@ function Base.iterate(rows::IteratorWrapper)
     return IteratorRow(row), st
 end
 
-function Base.iterate(rows::IteratorWrapper, st)
+@inline function Base.iterate(rows::IteratorWrapper, st)
     x = iterate(rows.x, st)
     x === nothing && return nothing
     row, st = x
@@ -51,11 +51,11 @@ struct IteratorRow{T}
     row::T
 end
 
-function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T}
+@inline function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T}
     x = getproperty(getfield(d, 1), T, col, nm)
     return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
 end
-function Base.getproperty(d::IteratorRow, nm::Symbol)
+@inline function Base.getproperty(d::IteratorRow, nm::Symbol)
     x = getproperty(getfield(d, 1), nm)
     return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
 end
@@ -78,10 +78,36 @@ Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.Iter
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
-function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
+# struct DataValueRow{NT, T}
+#     x::T
+# end
+# DataValueRow{NT}(x::T) where {NT, T} = DataValueRow{NT, T}(x)
+
+# @inline function Base.iterate(rows::DataValueRowIterator{NT}) where {NT}
+#     x = iterate(rows.x)
+#     x === nothing && return nothing
+#     row, st = x
+#     return DataValueRow{NT}(row), st
+# end
+
+# @inline function Base.iterate(rows::DataValueRowIterator{NT}, st) where {NT}
+#     x = iterate(rows.x, st)
+#     x === nothing && return nothing
+#     row, st = x
+#     return DataValueRow{NT}(row), st
+# end
+
+# @inline function Base.getproperty(d::DataValueRow{NT}, nm::Symbol) where {NT}
+#     x = getproperty(getfield(d, 1), nm)
+#     return convert(fieldtype(NT, nm), x)
+# end
+# Base.propertynames(d::DataValueRow) = propertynames(getfield(d, 1))
+
+@inline function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
         vals = Tuple(:(convert($(fieldtype(NT, i)), getproperty(row, $(DataValueInterfaces.nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
         q = quote
+            Base.@_inline_meta
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
