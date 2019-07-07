@@ -42,13 +42,16 @@ Base.getproperty(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) whe
 """
 function eachcolumn end
 
+quot(s::Symbol) = Meta.QuoteNode(s)
+quot(x::Int) = x
+
 @inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
     if @generated
         if length(names) < 101
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getproperty(row, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                    f(getproperty(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), args...)
                 end)
             end
             return block
@@ -91,7 +94,7 @@ end
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getproperty(row, $(Meta.QuoteNode(names[i]))), $i, $(Meta.QuoteNode(names[i])), args...)
+                    f(getproperty(row, $(quot(names[i]))), $i, $(quot(names[i])), args...)
                 end)
             end
             return block
@@ -108,6 +111,51 @@ end
     else
         for (i, nm) in enumerate(names)
             f(getproperty(row, nm), i, nm, args...)
+        end
+        return
+    end
+end
+
+# this are specialized `eachcolumn`s where we also want
+# the indexing of `columns` to be constant propagated, so it needs to be returned from the generated function
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns, args...) where {names, types}
+    if @generated
+        if length(names) < 101
+            block = Expr(:block, Expr(:meta, :inline))
+            for i = 1:length(names)
+                push!(block.args, quote
+                    f(getproperty(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
+                end)
+            end
+            return block
+        end
+        rle = runlength(types)
+        if length(rle) < 100
+            block = Expr(:block, Expr(:meta, :inline))
+            i = 1
+            for (T, len) in rle
+                push!(block.args, quote
+                    for j = 0:$(len-1)
+                        @inbounds f(getproperty(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j], args...)
+                    end
+                end)
+                i += len
+            end
+            b = block
+        else
+            b = quote
+                $(Expr(:meta, :inline))
+                for (i, nm) in enumerate(names)
+                    f(getproperty(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
+                end
+                return
+            end
+        end
+        # println(b)
+        return b
+    else
+        for (i, nm) in enumerate(names)
+            f(getproperty(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
         end
         return
     end
