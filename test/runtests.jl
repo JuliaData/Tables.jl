@@ -373,7 +373,7 @@ tran2 = rtable |> Tables.transform(C=Symbol)
 @test Tables.rows(tran2) === tran2
 @test Base.IteratorSize(typeof(tran2)) == Base.HasShape{1}()
 @test length(tran2) == 3
-@test eltype(tran2) == Tables.TransformsRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},NamedTuple{(:C,),Tuple{DataType}}}
+@test eltype(tran2) == Tables.TransformsRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},NamedTuple{(:C,),Tuple{DataType}}}
 trow = first(tran2)
 @test trow.A === 1
 @test trow.B === 1.0
@@ -464,7 +464,7 @@ sel = rtable |> Tables.select(:A)
 @test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
 @test length(sel) == 3
 @test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
-@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},(:A,)}
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},(:A,)}
 @test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
 @test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
 srow = first(sel)
@@ -476,7 +476,7 @@ sel = rtable |> Tables.select(1)
 @test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
 @test length(sel) == 3
 @test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
-@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},(1,)}
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},(1,)}
 @test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
 @test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
 srow = first(sel)
