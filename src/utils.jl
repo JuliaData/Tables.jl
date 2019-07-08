@@ -23,7 +23,7 @@ Base.@pure function runlength(::Type{T}) where {T <: Tuple}
 end
 
 # generic fallback from getproperty w/ type information to basic symbol lookup
-Base.getproperty(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getproperty(x, nm)
+Base.getproperty(x, ::Type{T}, i::Int, nm) where {T} = getproperty(x, nm)
 Base.getproperty(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {names, types, T} = Core.getfield(x, i)
 
 """
@@ -156,6 +156,34 @@ end
     else
         for (i, nm) in enumerate(names)
             f(getproperty(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
+        end
+        return
+    end
+end
+
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns, args...) where {names}
+    if @generated
+        if length(names) < 100
+            block = Expr(:block, Expr(:meta, :inline))
+            for i = 1:length(names)
+                push!(block.args, quote
+                    f(getproperty(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
+                end)
+            end
+            return block
+        else
+            b = quote
+                $(Expr(:meta, :inline))
+                for (i, nm) in enumerate(names)
+                    f(getproperty(row, nm), i, nm, columns[i], args...)
+                end
+                return
+            end
+            return b
+        end
+    else
+        for (i, nm) in enumerate(names)
+            f(getproperty(row, nm), i, nm, columns[i], args...)
         end
         return
     end

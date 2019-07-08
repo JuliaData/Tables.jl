@@ -148,8 +148,13 @@ and other optimization use-cases.
 struct Schema{names, types} end
 Schema(names::Tuple{Vararg{Symbol}}, types::Type{T}) where {T <: Tuple} = Schema{names, T}()
 Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, types}()
-Schema(names, ::Nothing) = Schema{Tuple(Base.map(Symbol, names)), nothing}()
-Schema(names, types) = Schema{Tuple(Base.map(Symbol, names)), Tuple{types...}}()
+
+# pass through Ints to allow Tuples to act as rows
+sym(x) = Symbol(x)
+sym(x::Int) = x
+
+Schema(names, ::Nothing) = Schema{Tuple(Base.map(sym, names)), nothing}()
+Schema(names, types) = Schema{Tuple(Base.map(sym, names)), Tuple{types...}}()
 
 function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
     println(io, "Tables.Schema:")

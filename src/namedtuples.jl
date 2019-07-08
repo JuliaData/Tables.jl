@@ -14,25 +14,25 @@ struct NamedTupleIterator{S, T}
     x::T
 end
 Base.IteratorEltype(::Type{<:NamedTupleIterator{S}}) where {S} = S === nothing ? Base.EltypeUnknown() : Base.HasEltype()
-Base.eltype(rows::NamedTupleIterator{Schema{names, T}}) where {names, T} = NamedTuple{names, T}
+Base.eltype(rows::NamedTupleIterator{Schema{names, T}}) where {names, T} = NamedTuple{Base.map(Symbol, names), T}
 Base.IteratorSize(::Type{NamedTupleIterator{S, T}}) where {S, T} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
 function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
     if @generated
-        vals = Tuple(:(getproperty(row, $(fieldtype(T, i)), $i, $(Meta.QuoteNode(names[i])))) for i = 1:fieldcount(T))
+        vals = Tuple(:(getproperty(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
         return quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return $(NamedTuple{names, T})(($(vals...),)), (st,)
+            return $(NamedTuple{Base.map(Symbol, names), T})(($(vals...),)), (st,)
         end
     else
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{names, T}(Tuple(getproperty(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
+        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getproperty(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
     end
 end
 
@@ -42,7 +42,7 @@ function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
     x === nothing && return nothing
     row, st = x
     names = Tuple(propertynames(row))
-    return NamedTuple{names}(Tuple(getproperty(row, nm) for nm in names)), (st,)
+    return NamedTuple{Base.map(Symbol, names)}(Tuple(getproperty(row, nm) for nm in names)), (st,)
 end
 
 namedtupleiterator(::Type{T}, rows::S) where {T <: NamedTuple, S} = rows
@@ -81,14 +81,14 @@ getarray(x) = collect(x)
 
 function columntable(sch::Schema{names, types}, cols) where {names, types}
     if @generated
-        vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(types, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(types))
-        return :(NamedTuple{names}(($(vals...),)))
+        vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(types, i)), $i, $(quot(names[i]))))) for i = 1:fieldcount(types))
+        return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(getarray(getproperty(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
+        return NamedTuple{Base.map(Symbol, names)}(Tuple(getarray(getproperty(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
     end
 end
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{Tuple(propertynames(cols))}(Tuple(getarray(col) for col in eachcolumn(cols)))
+columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, propertynames(cols)))}(Tuple(getarray(col) for col in eachcolumn(cols)))
 
 function columntable(itr::T) where {T}
     cols = columns(itr)
@@ -99,7 +99,7 @@ columntable(x::ColumnTable) = x
 
 function ctappend(ct1::NamedTuple{N1, T1}, ct2::NamedTuple{N2, T2}) where {N1, T1, N2, T2}
     if @generated
-        appends = Expr(:block, Any[:(append!(ct1[$(Meta.QuoteNode(nm))], ct2[$(Meta.QuoteNode(nm))])) for nm in N1]...)
+        appends = Expr(:block, Any[:(append!(ct1[$(quot(nm))], ct2[$(quot(nm))])) for nm in N1]...)
         return quote
             $appends
             return ct1
