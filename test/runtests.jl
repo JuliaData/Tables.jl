@@ -156,7 +156,7 @@ end
     nti2 = collect(nti)
     @test isequal(rt, nti2)
     nti = Tables.NamedTupleIterator{typeof(Tables.Schema((:a, :b, :c), (Union{Int, Float64}, Union{Float64, Missing}, String))), typeof(rt)}(rt)
-    @test eltype(typeof(nti)) == NamedTuple{(:a, :b, :c),Tuple{Union{Float64, Int64},Union{Missing, Float64},String}}
+    @test eltype(typeof(nti)) == NamedTuple{(:a, :b, :c),Tuple{Union{Float64, Int},Union{Missing, Float64},String}}
 
     # test really wide tables
     nms = Tuple(Symbol("i", i) for i = 1:101)
