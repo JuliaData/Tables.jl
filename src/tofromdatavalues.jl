@@ -51,11 +51,15 @@ struct IteratorRow{T}
     row::T
 end
 
-function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T}
+function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm) where {T}
     x = getproperty(getfield(d, 1), T, col, nm)
     return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
 end
 function Base.getproperty(d::IteratorRow, nm::Symbol)
+    x = getproperty(getfield(d, 1), nm)
+    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+end
+function Base.getproperty(d::IteratorRow, nm::Int)
     x = getproperty(getfield(d, 1), nm)
     return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
 end

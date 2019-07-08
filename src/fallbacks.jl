@@ -11,6 +11,7 @@ struct ColumnsRow{T}
 end
 
 Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
+Base.getproperty(c::ColumnsRow, nm::Int) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
@@ -75,9 +76,9 @@ allocatecolumn(T, len) = Vector{T}(undef, len)
 @inline function allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
         vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
-        return :(NamedTuple{names}(($(vals...),)))
+        return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
     else
-        return NamedTuple{names}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
+        return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
 end
 
