@@ -114,7 +114,7 @@ end
 Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
 
 getprops(row, nms::NTuple{N, Symbol}) where {N} = nms
-getprops(row, inds::NTuple{N, Int}) where {N} = propertynames(getfield(row, 1))[inds]
+getprops(row, inds::NTuple{N, Int}) where {N} = ntuple(i->propertynames(getfield(row, 1))[inds[i]], N)
 
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)
 

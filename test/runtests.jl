@@ -151,6 +151,8 @@ end
 
     nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
     @test Base.IteratorEltype(typeof(nti)) == Base.EltypeUnknown()
+    @test Base.IteratorSize(typeof(nti)) == Base.HasShape{1}()
+    @test length(nti) == 3
     nti2 = collect(nti)
     @test isequal(rt, nti2)
     nti = Tables.NamedTupleIterator{typeof(Tables.Schema((:a, :b, :c), (Union{Int, Float64}, Union{Float64, Missing}, String))), typeof(rt)}(rt)
@@ -369,7 +371,7 @@ tran2 = rtable |> Tables.transform(C=Symbol)
 @test Tables.rowaccess(typeof(tran2))
 @test !Tables.columnaccess(typeof(tran2))
 @test Tables.rows(tran2) === tran2
-@test Base.IteratorSize(tran2) == Base.HasShape{1}()
+@test Base.IteratorSize(typeof(tran2)) == Base.HasShape{1}()
 @test length(tran2) == 3
 @test eltype(tran2) == Tables.TransformsRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},NamedTuple{(:C,),Tuple{DataType}}}
 trow = first(tran2)
@@ -465,6 +467,20 @@ sel = rtable |> Tables.select(:A)
 @test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},(:A,)}
 @test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
 @test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
+srow = first(sel)
+@test propertynames(srow) == (:A,)
+
+sel = rtable |> Tables.select(1)
+@test Tables.rowaccess(typeof(sel))
+@test Tables.rows(sel) === sel
+@test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
+@test length(sel) == 3
+@test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int64},Float64,String}},(1,)}
+@test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
+@test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
+srow = first(sel)
+@test propertynames(srow) == (:A,)
 
 table = ctable |> Tables.select(:A) |> Tables.columntable
 @test length(table) == 1
@@ -545,6 +561,7 @@ end
     @test Tables.rowaccess(typeof(ei))
     @test Tables.rows(ei) === ei
     @test Base.IteratorEltype(typeof(ei)) == Base.HasEltype()
+    @test Base.IteratorSize(typeof(ei)) == Base.HasLength()
     @test eltype(typeof(ei)) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
     nt = ei |> columntable
     @test isequal(rt, nt)
