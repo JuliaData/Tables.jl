@@ -26,7 +26,7 @@ end
 
 Base.IteratorEltype(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorEltype(S)
 Base.eltype(x::IteratorWrapper{S}) where {S} = IteratorRow{eltype(x.x)}
-Base.eltype(::Type{IteratorWrapper{S}}) where {S} = IteratorRow{eltype{S}}
+Base.eltype(::Type{IteratorWrapper{S}}) where {S} = IteratorRow{eltype(S)}
 Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)

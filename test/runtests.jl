@@ -314,6 +314,9 @@ end
     @test gc == (gr |> genericcolumntable)
     @test gr == (gc |> genericrowtable)
     @test gr == (gr |> genericrowtable)
+
+    @test_throws ArgumentError Tables.columns(Int64)
+    @test_throws ArgumentError Tables.rows(Int64)
 end
 
 @testset "isless" begin
@@ -461,6 +464,7 @@ sel = ctable |> Tables.select(1)
 sel = rtable |> Tables.select(:A)
 @test Tables.rowaccess(typeof(sel))
 @test Tables.rows(sel) === sel
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
 @test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
 @test length(sel) == 3
 @test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
@@ -473,6 +477,7 @@ srow = first(sel)
 sel = rtable |> Tables.select(1)
 @test Tables.rowaccess(typeof(sel))
 @test Tables.rows(sel) === sel
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
 @test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
 @test length(sel) == 3
 @test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
@@ -553,6 +558,7 @@ end
     dv = Tables.datavaluerows(rt)
     @test Base.IteratorSize(typeof(dv)) == Base.HasLength()
     @test eltype(dv) == NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}
+    @test_throws MethodError size(dv)
     rt2 = collect(dv)
     @test rt2[1] == (a = 1, b = DataValue{Float64}(4.0), c = "7")
 
@@ -563,6 +569,8 @@ end
     @test Base.IteratorEltype(typeof(ei)) == Base.HasEltype()
     @test Base.IteratorSize(typeof(ei)) == Base.HasLength()
     @test eltype(ei) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
+    @test eltype(typeof(ei)) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
+    @test_throws MethodError size(ei)
     nt = ei |> columntable
     @test isequal(rt, nt)
     rt3 = ei |> rowtable

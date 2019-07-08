@@ -3,7 +3,6 @@ struct TransformsRow{T, F}
     funcs::F
 end
 
-Base.getproperty(row::TransformsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = (getfunc(row, getfield(row, 2), col, nm))(getproperty(getfield(row, 1), T, col, nm))
 Base.getproperty(row::TransformsRow, nm::Symbol) = (getfunc(row, getfield(row, 2), nm))(getproperty(getfield(row, 1), nm))
 Base.propertynames(row::TransformsRow) = propertynames(getfield(row, 1))
 
@@ -22,11 +21,6 @@ function transform(src::T, funcs::F) where {T, F}
     x = C ? columns(src) : rows(src)
     return Transforms{C, typeof(x), F}(x, funcs)
 end
-
-getfunc(row, nt::NamedTuple, i, nm) = get(nt, i, identity)
-getfunc(row, d::Dict{String, <:Base.Callable}, i, nm) = get(d, String(nm), identity)
-getfunc(row, d::Dict{Symbol, <:Base.Callable}, i, nm) = get(d, nm, identity)
-getfunc(row, d::Dict{Int, <:Base.Callable}, i, nm) = get(d, i, identity)
 
 getfunc(row, nt::NamedTuple, nm) = get(nt, nm, identity)
 getfunc(row, d::Dict{String, <:Base.Callable}, nm) = get(d, String(nm), identity)
