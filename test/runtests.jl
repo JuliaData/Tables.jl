@@ -562,7 +562,7 @@ end
     @test Tables.rows(ei) === ei
     @test Base.IteratorEltype(typeof(ei)) == Base.HasEltype()
     @test Base.IteratorSize(typeof(ei)) == Base.HasLength()
-    @test eltype(typeof(ei)) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
+    @test eltype(ei) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
     nt = ei |> columntable
     @test isequal(rt, nt)
     rt3 = ei |> rowtable
