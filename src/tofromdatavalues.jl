@@ -18,14 +18,15 @@ Tables.istable(::Type{<:IteratorWrapper}) = true
 Tables.rowaccess(::Type{<:IteratorWrapper}) = true
 Tables.rows(x::IteratorWrapper) = x
 
-function Tables.schema(dv::IteratorWrapper)
-    eT = eltype(dv.x)
+function Tables.schema(dv::IteratorWrapper{S}) where {S}
+    eT = eltype(S)
     (!(eT <: NamedTuple) || eT === Union{}) && return schema(dv.x)
     return Tables.Schema(nondatavaluenamedtuple(eT))
 end
 
 Base.IteratorEltype(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorEltype(S)
-Base.eltype(rows::IteratorWrapper) = IteratorRow{eltype(rows.x)}
+Base.eltype(x::IteratorWrapper{S}) where {S} = IteratorRow{eltype(x.x)}
+Base.eltype(::Type{IteratorWrapper{S}}) where {S} = IteratorRow{eltype(S)}
 Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)

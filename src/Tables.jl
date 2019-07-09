@@ -8,6 +8,10 @@ import IteratorInterfaceExtensions
 
 export rowtable, columntable
 
+if !hasmethod(getproperty, Tuple{Tuple, Int})
+    Base.getproperty(t::Tuple, i::Int) = t[i]
+end
+
 function __init__()
     @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
         using .CategoricalArrays

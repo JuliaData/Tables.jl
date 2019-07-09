@@ -13,8 +13,8 @@ materializer(x::RowTable) = rowtable
 struct NamedTupleIterator{S, T}
     x::T
 end
-Base.IteratorEltype(::Type{<:NamedTupleIterator{S}}) where {S} = S === nothing ? Base.EltypeUnknown() : Base.HasEltype()
-Base.eltype(rows::NamedTupleIterator{Schema{names, T}}) where {names, T} = NamedTuple{Base.map(Symbol, names), T}
+Base.IteratorEltype(::Type{NamedTupleIterator{S, T}}) where {S, T} = S === Nothing ? Base.EltypeUnknown() : Base.HasEltype()
+Base.eltype(::Type{NamedTupleIterator{Schema{names, T}, S}}) where {names, T, S} = NamedTuple{Base.map(Symbol, names), T}
 Base.IteratorSize(::Type{NamedTupleIterator{S, T}}) where {S, T} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)

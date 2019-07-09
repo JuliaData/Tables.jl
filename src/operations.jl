@@ -3,7 +3,6 @@ struct TransformsRow{T, F}
     funcs::F
 end
 
-Base.getproperty(row::TransformsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = (getfunc(row, getfield(row, 2), col, nm))(getproperty(getfield(row, 1), T, col, nm))
 Base.getproperty(row::TransformsRow, nm::Symbol) = (getfunc(row, getfield(row, 2), nm))(getproperty(getfield(row, 1), nm))
 Base.propertynames(row::TransformsRow) = propertynames(getfield(row, 1))
 
@@ -23,11 +22,6 @@ function transform(src::T, funcs::F) where {T, F}
     return Transforms{C, typeof(x), F}(x, funcs)
 end
 
-getfunc(row, nt::NamedTuple, i, nm) = get(nt, i, identity)
-getfunc(row, d::Dict{String, <:Base.Callable}, i, nm) = get(d, String(nm), identity)
-getfunc(row, d::Dict{Symbol, <:Base.Callable}, i, nm) = get(d, nm, identity)
-getfunc(row, d::Dict{Int, <:Base.Callable}, i, nm) = get(d, i, identity)
-
 getfunc(row, nt::NamedTuple, nm) = get(nt, nm, identity)
 getfunc(row, d::Dict{String, <:Base.Callable}, nm) = get(d, String(nm), identity)
 getfunc(row, d::Dict{Symbol, <:Base.Callable}, nm) = get(d, nm, identity)
@@ -41,7 +35,7 @@ columns(t::Transforms{true}) = t
 # avoid relying on inference here and just let sinks figure things out
 schema(t::Transforms) = nothing
 IteratorInterfaceExtensions.isiterable(x::Transforms) = true
-IteratorInterfaceExtensions.getiterator(x::Transforms) = datavaluerows(x)
+IteratorInterfaceExtensions.getiterator(x::Transforms) = datavaluerows(columntable(x))
 
 Base.IteratorSize(::Type{Transforms{false, T, F}}) where {T, F} = Base.IteratorSize(T)
 Base.length(t::Transforms{false}) = length(getfield(t, 1))
@@ -61,6 +55,7 @@ end
 select(names::Symbol...) = x->select(x, names...)
 select(names::String...) = x->select(x, Base.map(Symbol, names)...)
 select(inds::Integer...) = x->select(x, Base.map(Int, inds)...)
+
 function select(x::T, names...) where {T}
     colaccess = columnaccess(T)
     r = colaccess ? columns(x) : rows(x)
@@ -93,10 +88,8 @@ end
 # columns: make Select property-accessible
 Base.getproperty(s::Select{T, true, names}, nm::Symbol) where {T, names} = getproperty(getfield(s, 1), nm)
 Base.propertynames(s::Select{T, true, names}) where {T, names} = namesubset(propertynames(getfield(s, 1)), names)
-columnaccess(::Type{Select{T, columnaccess, names}}) where {T, columnaccess, names} = columnaccess
+columnaccess(::Type{Select{T, C, names}}) where {T, C, names} = C
 columns(s::Select{T, true, names}) where {T, names} = s
-# need this rows definition to break recursion of fallback rows + getiterator + datavaluerows
-rows(s::Select{T, true, names}) where {T, names} = RowIterator(s, rowcount(getfield(s, 1)))
 
 # rows: implement Iterator interface
 Base.IteratorSize(::Type{Select{T, false, names}}) where {T, names} = Base.IteratorSize(T)
@@ -108,32 +101,27 @@ rows(s::Select{T, false, names}) where {T, names} = s
 
 # we need to iterate a "row view" in case the underlying source has unknown schema
 # to ensure each iterated row only has `names` propertynames
-struct SelectRow{T, names, inds}
+struct SelectRow{T, names}
     row::T
 end
 
-getind(nms::NTuple{N, Symbol}, inds, col) where {N} = inds[col]
-getind(inds::NTuple{N, Int}, inds2, col) where {N} = inds[col]
-Base.getproperty(row::SelectRow{S, names, inds}, ::Type{T}, col::Int, nm::Symbol) where {S, names, inds, T} = getproperty(getfield(row, 1), T, getind(names, inds, col), nm)
 Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
+
 getprops(row, nms::NTuple{N, Symbol}) where {N} = nms
-getprops(row, inds::NTuple{N, Int}) where {N} = propertynames(getfield(row, 1))[inds]
+getprops(row, inds::NTuple{N, Int}) where {N} = ntuple(i->propertynames(getfield(row, 1))[inds[i]], N)
+
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)
 
-getcolumnindex(nms::NTuple{N, Symbol}, props, i) where {N} = columnindex(props, nms[i])
-getcolumnindex(inds::NTuple{N, Int}, props, i) where {N} = inds[i]
-function Base.iterate(s::Select{T, false, names}) where {T, names}
+@inline function Base.iterate(s::Select{T, false, names}) where {T, names}
     state = iterate(getfield(s, 1))
     state === nothing && return nothing
     row, st = state
-    props = Tuple(propertynames(row))
-    inds = ntuple(i->getcolumnindex(names, props, i), length(names))
-    return SelectRow{typeof(row), names, inds}(row), (inds, st)
+    return SelectRow{typeof(row), names}(row), st
 end
 
-function Base.iterate(s::Select{T, false, names}, st) where {T, names}
-    state = iterate(getfield(s, 1), st[2])
+@inline function Base.iterate(s::Select{T, false, names}, st) where {T, names}
+    state = iterate(getfield(s, 1), st)
     state === nothing && return nothing
-    row, newst = state
-    return SelectRow{typeof(row), names, st[1]}(row), (st[1], newst)
+    row, st = state
+    return SelectRow{typeof(row), names}(row), st
 end

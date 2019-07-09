@@ -64,6 +64,44 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
     nt = (a=[1,2,3], b=[4,5,6])
     @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
+    @test IteratorInterfaceExtensions.isiterable(nt)
+    @test IteratorInterfaceExtensions.getiterator(nt) == Tables.datavaluerows(nt)
+
+    rows = Tables.rows(nt)
+    @test eltype(rows) == Tables.ColumnsRow{typeof(nt)}
+    @test Tables.schema(rows) == Tables.Schema((:a, :b), (Int, Int))
+    row = first(rows)
+    @test row.a == 1
+
+    rt = Tables.rowtable(nt)
+    @test IteratorInterfaceExtensions.isiterable(rt)
+    @test IteratorInterfaceExtensions.getiterator(rt) == Tables.datavaluerows(rt)
+
+    @test Tables.sym(1) === 1
+    @test Tables.sym("hey") == :hey
+
+    @test propertynames(Tables.Schema((:a, :b), nothing)) == (:names, :types)
+
+    v = Tables.EmptyVector(1)
+    @test_throws UndefRefError v[1]
+    @test Base.IndexStyle(typeof(v)) == Base.IndexLinear()
+
+    @test Tables.istable(Tables.CopiedColumns)
+    @test Tables.columnaccess(Tables.CopiedColumns)
+    c = Tables.CopiedColumns(nt)
+    @test Tables.columns(c) === c
+    @test Tables.materializer(c) == Tables.materializer(nt)
+
+    @test_throws ArgumentError Tables.columntable([1,2,3])
+
+    tt = [(1,2,3), (4,5,6)]
+    r = Tables.nondatavaluerows(tt)
+    row = first(r)
+    @test getproperty(row, 1) == 1
+    @test Tables.columntable(tt) == NamedTuple{(Symbol("1"), Symbol("2"), Symbol("3"))}(([1, 4], [2, 5], [3, 6]))
+
+    @test Tables.getarray([1,2,3]) == [1,2,3]
+    @test Tables.getarray((1,2,3)) == [1,2,3]
 end
 
 @testset "namedtuples.jl" begin
@@ -78,6 +116,7 @@ end
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
     @test Tables.rowcount(nt) == 3
     @test Tables.schema(nt) == Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
+    @test Tables.istable(typeof(nt))
     @test Tables.columnaccess(typeof(nt))
     @test Tables.columns(nt) === nt
     @test rowtable(nt) == rt
@@ -88,6 +127,11 @@ end
     @test Tables.buildcolumns(nothing, rt) == nt
     @test Tables.columntable(nothing, nt) == nt
 
+    # test push!
+    rtf = Iterators.Filter(x->x.a >= 1, rt)
+    @test Tables.columntable(rtf) == nt
+    @test Tables.buildcolumns(nothing, rtf) == nt
+
     # append
     nt2 = columntable(nt, rt)
     @test Tables.rowcount(nt2) == 6
@@ -97,6 +141,8 @@ end
     @test length(rt2) == 9
 
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
+    @test Tables.istable(typeof(rt))
+    @test Tables.rowaccess(typeof(rt))
     tt = Tables.buildcolumns(nothing, rt)
     @test isequal(tt, (a = [1.0, 2.0, 3.0], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
     @test tt.a[1] === 1.0
@@ -104,8 +150,24 @@ end
     @test tt.a[3] === 3.0
 
     nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
+    @test Base.IteratorEltype(typeof(nti)) == Base.EltypeUnknown()
+    @test Base.IteratorSize(typeof(nti)) == Base.HasShape{1}()
+    @test length(nti) == 3
     nti2 = collect(nti)
     @test isequal(rt, nti2)
+    nti = Tables.NamedTupleIterator{typeof(Tables.Schema((:a, :b, :c), (Union{Int, Float64}, Union{Float64, Missing}, String))), typeof(rt)}(rt)
+    @test eltype(typeof(nti)) == NamedTuple{(:a, :b, :c),Tuple{Union{Float64, Int},Union{Missing, Float64},String}}
+
+    # test really wide tables
+    nms = Tuple(Symbol("i", i) for i = 1:101)
+    vals = Tuple(rand(Int, 3) for i = 1:101)
+    nt = NamedTuple{nms}(vals)
+    rt = Tables.rowtable(nt)
+    @test length(rt) == 3
+    @test length(rt[1]) == 101
+    @test eltype(rt).parameters[1] == nms
+    @test Tables.columntable(rt) == nt
+    @test Tables.buildcolumns(nothing, rt) == nt
 end
 
 @testset "Materializer" begin 
@@ -127,6 +189,8 @@ end
     @test select(nt, :a, :b, :c) == nt
     @test select(nt, :c, :a) == NamedTuple{(:c, :a)}(nt)
     @test select(rt, :a) == [(a=1,), (a=2,), (a=3,)]
+
+    @test Tables.materializer(1) === Tables.columntable
 end
 
 @testset "Matrix integration" begin
@@ -137,10 +201,13 @@ end
     @test nt.a == mat[:, 1]
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
+    @test_throws ArgumentError Tables.rows(mat)
+    @test_throws ArgumentError Tables.columns(mat)
     mat2 = Tables.matrix(nt)
     @test eltype(mat2) == Float64
     @test mat2[:, 1] == nt.a
     @test !Tables.istable(mat2)
+    @test !Tables.istable(typeof(mat2))
     mat3 = Tables.matrix(nt; transpose=true)
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
@@ -152,6 +219,18 @@ end
     tbl2 = Tables.table(mat2) |> rowtable
     @test length(tbl2) == 3
     @test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
+
+    mattbl = Tables.table(mat)
+    @test Tables.istable(typeof(mattbl))
+    @test Tables.rowaccess(typeof(mattbl))
+    @test Tables.rows(mattbl) === mattbl
+    @test Tables.columnaccess(typeof(mattbl))
+    @test Tables.columns(mattbl) === mattbl
+    @test mattbl.Column1 == [1,2,3]
+    matrow = first(mattbl)
+    @test eltype(mattbl) == typeof(matrow)
+    @test matrow.Column1 == 1
+    @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 end
 
 import Base: ==
@@ -235,6 +314,9 @@ end
     @test gc == (gr |> genericcolumntable)
     @test gr == (gc |> genericrowtable)
     @test gr == (gr |> genericrowtable)
+
+    @test_throws ArgumentError Tables.columns(Int64)
+    @test_throws ArgumentError Tables.rows(Int64)
 end
 
 @testset "isless" begin
@@ -276,8 +358,33 @@ end
 
 @testset "operations.jl" begin
 ctable = (A=[1, missing, 3], B=[1.0, 2.0, 3.0], C=["hey", "there", "sailor"])
+rtable = Tables.rowtable(ctable)
 
 ## Tables.transform
+tran = ctable |> Tables.transform(C=Symbol)
+@test Tables.istable(typeof(tran))
+@test !Tables.rowaccess(typeof(tran))
+@test Tables.columnaccess(typeof(tran))
+@test Tables.columns(tran) === tran
+@test IteratorInterfaceExtensions.isiterable(tran)
+@test typeof(IteratorInterfaceExtensions.getiterator(tran)) <: Tables.DataValueRowIterator
+
+tran2 = rtable |> Tables.transform(C=Symbol)
+@test Tables.istable(typeof(tran2))
+@test Tables.rowaccess(typeof(tran2))
+@test !Tables.columnaccess(typeof(tran2))
+@test Tables.rows(tran2) === tran2
+@test Base.IteratorSize(typeof(tran2)) == Base.HasShape{1}()
+@test length(tran2) == 3
+@test eltype(tran2) == Tables.TransformsRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},NamedTuple{(:C,),Tuple{DataType}}}
+trow = first(tran2)
+@test trow.A === 1
+@test trow.B === 1.0
+@test trow.C == :hey
+ctable2 = Tables.columntable(tran2)
+@test isequal(ctable2.A, ctable.A)
+@test ctable2.C == map(Symbol, ctable.C)
+
 # test various ways of inputting Tables.transform functions
 table = Tables.transform(ctable, Dict{String, Base.Callable}("C" => Symbol)) |> Tables.columntable
 @test table.C == [:hey, :there, :sailor]
@@ -336,6 +443,50 @@ table = ctable |> Tables.transform(Dict(2=>x->x==2.0 ? missing : x)) |> Tables.r
 @test typeof(map(x->x.B, table)) == Vector{Union{Float64, Missing}}
 
 ## Tables.select
+sel = ctable |> Tables.select(:A)
+@test Tables.istable(typeof(sel))
+@test IteratorInterfaceExtensions.isiterable(sel)
+@test IteratorInterfaceExtensions.getiterator(sel) == Tables.datavaluerows(sel)
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
+@test Tables.columnaccess(typeof(sel))
+@test Tables.columns(sel) === sel
+@test propertynames(sel) == (:A,)
+
+sel = ctable |> Tables.select(1)
+@test Tables.istable(typeof(sel))
+@test IteratorInterfaceExtensions.isiterable(sel)
+@test IteratorInterfaceExtensions.getiterator(sel) == Tables.datavaluerows(sel)
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
+@test Tables.columnaccess(typeof(sel))
+@test Tables.columns(sel) === sel
+@test propertynames(sel) == (:A,)
+
+sel = rtable |> Tables.select(:A)
+@test Tables.rowaccess(typeof(sel))
+@test Tables.rows(sel) === sel
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
+@test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
+@test length(sel) == 3
+@test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},(:A,)}
+@test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
+@test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
+srow = first(sel)
+@test propertynames(srow) == (:A,)
+
+sel = rtable |> Tables.select(1)
+@test Tables.rowaccess(typeof(sel))
+@test Tables.rows(sel) === sel
+@test Tables.schema(sel) == Tables.Schema((:A,), (Union{Int, Missing},))
+@test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
+@test length(sel) == 3
+@test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},(1,)}
+@test isequal(Tables.columntable(sel), (A = [1, missing, 3],))
+@test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
+srow = first(sel)
+@test propertynames(srow) == (:A,)
+
 table = ctable |> Tables.select(:A) |> Tables.columntable
 @test length(table) == 1
 @test isequal(table.A, [1, missing, 3])
@@ -405,11 +556,21 @@ end
     rt = (a = Real[1, 2.0, 3], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"])
 
     dv = Tables.datavaluerows(rt)
+    @test Base.IteratorSize(typeof(dv)) == Base.HasLength()
     @test eltype(dv) == NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}
+    @test_throws MethodError size(dv)
     rt2 = collect(dv)
     @test rt2[1] == (a = 1, b = DataValue{Float64}(4.0), c = "7")
 
     ei = Tables.nondatavaluerows(QueryOperators.EnumerableIterable{eltype(dv), typeof(dv)}(dv))
+    @test Tables.istable(typeof(ei))
+    @test Tables.rowaccess(typeof(ei))
+    @test Tables.rows(ei) === ei
+    @test Base.IteratorEltype(typeof(ei)) == Base.HasEltype()
+    @test Base.IteratorSize(typeof(ei)) == Base.HasLength()
+    @test eltype(ei) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
+    @test eltype(typeof(ei)) == Tables.IteratorRow{NamedTuple{(:a, :b, :c),Tuple{Real,DataValue{Float64},String}}}
+    @test_throws MethodError size(ei)
     nt = ei |> columntable
     @test isequal(rt, nt)
     rt3 = ei |> rowtable
