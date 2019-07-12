@@ -589,4 +589,7 @@ end
     rt = (a = Missing[missing, missing], b=[1,2])
     dv = Tables.datavaluerows(rt)
     @test eltype(dv) == NamedTuple{(:a, :b), Tuple{DataValue{Union{}}, Int}}
+
+    # DataValue{Any}
+    @test isequal(Tables.columntable(Tables.nondatavaluerows([(a=DataValue{Any}(), b=DataValue{Int}())])), (a = Any[missing], b = Union{Missing, Int64}[missing]))
 end

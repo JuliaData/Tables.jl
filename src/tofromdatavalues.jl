@@ -19,7 +19,7 @@ Tables.rowaccess(::Type{<:IteratorWrapper}) = true
 Tables.rows(x::IteratorWrapper) = x
 
 function Tables.schema(dv::IteratorWrapper{S}) where {S}
-    eT = eltype(S)
+    eT = eltype(dv.x)
     (!(eT <: NamedTuple) || eT === Union{}) && return schema(dv.x)
     return Tables.Schema(nondatavaluenamedtuple(eT))
 end
@@ -52,17 +52,26 @@ struct IteratorRow{T}
     row::T
 end
 
+unwrap(::Type{T}, x) where {T} = convert(T, x)
+unwrap(::Type{Any}, x) = x.hasvalue ? x.value : missing
+
 function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm) where {T}
     x = getproperty(getfield(d, 1), T, col, nm)
-    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+    TT = typeof(x)
+    TTT = DataValueInterfaces.nondatavaluetype(TT)
+    return TT == TTT ? x : unwrap(TTT, x)
 end
 function Base.getproperty(d::IteratorRow, nm::Symbol)
     x = getproperty(getfield(d, 1), nm)
-    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+    TT = typeof(x)
+    TTT = DataValueInterfaces.nondatavaluetype(TT)
+    return TT == TTT ? x : unwrap(TTT, x)
 end
 function Base.getproperty(d::IteratorRow, nm::Int)
     x = getproperty(getfield(d, 1), nm)
-    return convert(DataValueInterfaces.nondatavaluetype(typeof(x)), x)
+    TT = typeof(x)
+    TTT = DataValueInterfaces.nondatavaluetype(TT)
+    return TT == TTT ? x : unwrap(TTT, x)
 end
 Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
 
