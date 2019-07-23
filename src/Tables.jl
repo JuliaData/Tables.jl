@@ -195,9 +195,4 @@ include("operations.jl")
 # matrix integration
 include("matrix.jl")
 
-IteratorInterfaceExtensions.getiterator(x::RowTable) = datavaluerows(x)
-IteratorInterfaceExtensions.isiterable(x::RowTable) = true
-IteratorInterfaceExtensions.getiterator(x::ColumnTable) = datavaluerows(x)
-IteratorInterfaceExtensions.isiterable(x::ColumnTable) = true
-
 end # module

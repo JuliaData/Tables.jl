@@ -64,18 +64,12 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
     nt = (a=[1,2,3], b=[4,5,6])
     @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
-    @test IteratorInterfaceExtensions.isiterable(nt)
-    @test IteratorInterfaceExtensions.getiterator(nt) == Tables.datavaluerows(nt)
 
     rows = Tables.rows(nt)
     @test eltype(rows) == Tables.ColumnsRow{typeof(nt)}
     @test Tables.schema(rows) == Tables.Schema((:a, :b), (Int, Int))
     row = first(rows)
     @test row.a == 1
-
-    rt = Tables.rowtable(nt)
-    @test IteratorInterfaceExtensions.isiterable(rt)
-    @test IteratorInterfaceExtensions.getiterator(rt) == Tables.datavaluerows(rt)
 
     @test Tables.sym(1) === 1
     @test Tables.sym("hey") == :hey
