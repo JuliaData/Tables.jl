@@ -71,7 +71,7 @@ end
 
     Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 """
-allocatecolumn(T, len) = Vector{T}(undef, len)
+allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 
 @inline function allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
