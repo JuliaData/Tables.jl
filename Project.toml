@@ -5,7 +5,7 @@ version = "0.2.10"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+DataAPI = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

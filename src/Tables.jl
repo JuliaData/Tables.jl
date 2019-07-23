@@ -1,34 +1,11 @@
 module Tables
 
-using Requires, LinearAlgebra, DataValueInterfaces
-
-using TableTraits
-
-import IteratorInterfaceExtensions
+using LinearAlgebra, DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions
 
 export rowtable, columntable
 
 if !hasmethod(getproperty, Tuple{Tuple, Int})
     Base.getproperty(t::Tuple, i::Int) = t[i]
-end
-
-function __init__()
-    @require CategoricalArrays="324d7699-5711-5eae-9e2f-1d82baa6b597" begin
-        using .CategoricalArrays
-        allocatecolumn(::Type{CategoricalString{R}}, rows) where {R} = CategoricalArray{String, 1, R}(undef, rows)
-        allocatecolumn(::Type{Union{CategoricalString{R}, Missing}}, rows) where {R} =
-            CategoricalArray{Union{String, Missing}, 1, R}(undef, rows)
-        allocatecolumn(::Type{CategoricalValue{T, R}}, rows) where {T, R} =
-            CategoricalArray{T, 1, R}(undef, rows)
-        allocatecolumn(::Type{Union{Missing, CategoricalValue{T, R}}}, rows) where {T, R} =
-            CategoricalArray{Union{Missing, T}, 1, R}(undef, rows)
-    end
-    @require WeakRefStrings="ea10d353-3f73-51f8-a26c-33c1cb351aa5" begin
-        using .WeakRefStrings
-        allocatecolumn(::Type{WeakRefString{T}}, rows) where {T} = StringVector(undef, rows)
-        allocatecolumn(::Type{Union{Missing, WeakRefString{T}}}, rows) where {T} =
-            StringVector{Union{Missing, String}}(undef, rows)
-    end
 end
 
 "Abstract row type with a simple required interface: row values are accessible via `getproperty(row, field)`; for example, a NamedTuple like `nt = (a=1, b=2, c=3)` can access its value for `a` like `nt.a` which turns into a call to the function `getproperty(nt, :a)`"
