@@ -15,8 +15,12 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.runlength(Tables.types(NT)) == [(Int64, 3)]
     @test Tables.columnindex(Tables.names(NT), :a) == 1
     @test Tables.columnindex(Tables.names(NT), :i) == 0
+    @test Tables.columnindex(NT, :a) == 1
+    @test Tables.columnindex(NT, :i) == 0
     @test Tables.columntype(Tables.names(NT), Tables.types(NT), :a) == Int64
     @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
+    @test Tables.columntype(NT, :a) == Int64
+    @test Tables.columntype(NT, :i) == Union{}
 
     NT = NamedTuple{Tuple(Symbol("a$i") for i = 1:20), Tuple{vcat(fill(Int, 10), fill(String, 10))...}}
     @test Tables.names(NT) === Tuple(Symbol("a$i") for i = 1:20)
