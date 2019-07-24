@@ -176,9 +176,6 @@ include("matrix.jl")
 columnindex(table, colname) = columnindex(schema(table).names, colname)
 
 "Return the column type of a `colname` in a table with a known schema; returns Union{} if `colname` doesn't exist in table"
-function columntype(table, colname)
-    sch = schema(table)
-    return columntype(sch.names, sch.types, colname)
-end
+columntype(table, colname) = columntype(schema(table), colname)
 
 end # module

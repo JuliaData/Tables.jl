@@ -214,6 +214,8 @@ Base.@pure function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
     return 0
 end
 
+Base.@pure columntype(::Schema{names, types}, name::Symbol) where {names, types} = columntype(names, types, name)
+
 "given tuple type and a Symbol `name`, compute the type of the name in the tuples types"
 Base.@pure function columntype(names::Tuple{Vararg{Symbol}}, ::Type{T}, name::Symbol) where {T <: Tuple}
     i = 1

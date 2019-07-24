@@ -15,12 +15,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.runlength(Tables.types(NT)) == [(Int64, 3)]
     @test Tables.columnindex(Tables.names(NT), :a) == 1
     @test Tables.columnindex(Tables.names(NT), :i) == 0
-    @test Tables.columnindex(NT, :a) == 1
-    @test Tables.columnindex(NT, :i) == 0
     @test Tables.columntype(Tables.names(NT), Tables.types(NT), :a) == Int64
     @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
-    @test Tables.columntype(NT, :a) == Int64
-    @test Tables.columntype(NT, :i) == Union{}
 
     NT = NamedTuple{Tuple(Symbol("a$i") for i = 1:20), Tuple{vcat(fill(Int, 10), fill(String, 10))...}}
     @test Tables.names(NT) === Tuple(Symbol("a$i") for i = 1:20)
@@ -68,6 +64,10 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
     nt = (a=[1,2,3], b=[4,5,6])
     @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
+    @test Tables.columnindex(nt, :i) == 0
+    @test Tables.columnindex(nt, :a) == 1
+    @test Tables.columntype(nt, :a) == Int
+    @test Tables.columntype(nt, :i) == Union{}
 
     rows = Tables.rows(nt)
     @test eltype(rows) == Tables.ColumnsRow{typeof(nt)}
