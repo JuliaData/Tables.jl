@@ -64,6 +64,10 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
     nt = (a=[1,2,3], b=[4,5,6])
     @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
+    @test Tables.columnindex(nt, :i) == 0
+    @test Tables.columnindex(nt, :a) == 1
+    @test Tables.columntype(nt, :a) == Int
+    @test Tables.columntype(nt, :i) == Union{}
 
     rows = Tables.rows(nt)
     @test eltype(rows) == Tables.ColumnsRow{typeof(nt)}

@@ -172,4 +172,10 @@ include("operations.jl")
 # matrix integration
 include("matrix.jl")
 
+"Return the column index (1-based) of a `colname` in a table with a known schema; returns 0 if `colname` doesn't exist in table"
+columnindex(table, colname) = columnindex(schema(table).names, colname)
+
+"Return the column type of a `colname` in a table with a known schema; returns Union{} if `colname` doesn't exist in table"
+columntype(table, colname) = columntype(schema(table), colname)
+
 end # module
