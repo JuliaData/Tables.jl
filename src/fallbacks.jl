@@ -12,7 +12,7 @@ end
 
 Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
 Base.getproperty(c::ColumnsRow, nm::Int) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
-Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
+@inline Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
 Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
 
 @generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
@@ -50,7 +50,7 @@ Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
 schema(x::RowIterator) = schema(x.columns)
 
-function Base.iterate(rows::RowIterator, st=1)
+@inline function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
     return ColumnsRow(rows.columns, st), st + 1
 end

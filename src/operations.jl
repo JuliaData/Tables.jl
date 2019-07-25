@@ -125,3 +125,37 @@ end
     row, st = state
     return SelectRow{typeof(row), names}(row), st
 end
+
+# map
+struct Map{F, T}
+    func::F
+    source::T
+end
+
+function Map(f::F, x::T) where {F <: Base.Callable, T}
+    r = rows(x)
+    return Map{F, typeof(r)}(f, r)
+end
+Map(f::Base.Callable) = x->Map(f, x)
+
+istable(::Type{<:Map}) = true
+rowaccess(::Type{<:Map}) = true
+rows(m::Map) = m
+schema(m::Map) = nothing
+
+Base.IteratorSize(::Type{Map{T, F}}) where {T, F} = Base.IteratorSize(T)
+Base.length(m::Map) = length(m.source)
+Base.IteratorEltype(::Type{<:Map}) = Base.EltypeUnknown()
+
+@inline function Base.iterate(m::Map)
+    state = iterate(m.source)
+    state === nothing && return nothing
+    return m.func(state[1]), state[2]
+end
+
+@inline function Base.iterate(m::Map, st)
+    state = iterate(m.source, st)
+    state === nothing && return nothing
+    return m.func(state[1]), state[2]
+end
+
