@@ -441,6 +441,17 @@ table = ctable |> Tables.transform(Dict(2=>x->x==2.0 ? missing : x)) |> Tables.r
 @test typeof(map(x->x.B, table)) == Vector{Union{Float64, Missing}}
 
 ## Tables.select
+
+# 117
+sel = Tables.select(ctable)
+@test Tables.istable(typeof(sel))
+@test Tables.schema(sel) == Tables.Schema((:A, :B, :C), (Union{Int, Missing}, Float64, String))
+@test Tables.columnaccess(typeof(sel))
+@test Tables.columns(sel) === sel
+@test propertynames(sel) == (:A, :B, :C)
+@test isequal(Tables.columntable(sel), ctable)
+@test isequal(Tables.rowtable(sel), rtable)
+
 sel = ctable |> Tables.select(:A)
 @test Tables.istable(typeof(sel))
 @test IteratorInterfaceExtensions.isiterable(sel)
@@ -458,6 +469,19 @@ sel = ctable |> Tables.select(1)
 @test Tables.columnaccess(typeof(sel))
 @test Tables.columns(sel) === sel
 @test propertynames(sel) == (:A,)
+
+sel = Tables.select(rtable)
+@test Tables.rowaccess(typeof(sel))
+@test Tables.rows(sel) === sel
+@test Tables.schema(sel) == Tables.Schema((:A, :B, :C), (Union{Int, Missing}, Float64, String))
+@test Base.IteratorSize(typeof(sel)) == Base.HasShape{1}()
+@test length(sel) == 3
+@test Base.IteratorEltype(typeof(sel)) == Base.HasEltype()
+@test eltype(sel) == Tables.SelectRow{NamedTuple{(:A, :B, :C),Tuple{Union{Missing, Int},Float64,String}},()}
+@test isequal(Tables.columntable(sel), ctable)
+@test isequal(Tables.rowtable(sel), rtable)
+srow = first(sel)
+@test propertynames(srow) == (:A, :B, :C)
 
 sel = rtable |> Tables.select(:A)
 @test Tables.rowaccess(typeof(sel))
