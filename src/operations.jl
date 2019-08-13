@@ -74,10 +74,14 @@ Base.@pure function typesubset(::Schema{names, types}, inds::NTuple{N, Int}) whe
     return Tuple{Any[fieldtype(types, i) for i in inds]...}
 end
 
+typesubset(::Schema{names, types}, ::Tuple{}) where {names, types} = Tuple{}
+
 namesubset(::Schema{names, types}, nms::NTuple{N, Symbol}) where {names, types, N} = nms
 Base.@pure namesubset(::Schema{names, T}, inds::NTuple{N, Int}) where {names, T, N} = ntuple(i -> names[inds[i]], N)
+namesubset(::Schema{names, types}, ::Tuple{}) where {names, types} = ()
 namesubset(names, nms::NTuple{N, Symbol}) where {N} = nms
 namesubset(names, inds::NTuple{N, Int}) where {N} = ntuple(i -> names[inds[i]], N)
+namesubset(names, ::Tuple{}) = ()
 
 function schema(s::Select{T, columnaccess, names}) where {T, columnaccess, names}
     sch = schema(getfield(s, 1))
@@ -109,6 +113,7 @@ Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
 
 getprops(row, nms::NTuple{N, Symbol}) where {N} = nms
 getprops(row, inds::NTuple{N, Int}) where {N} = ntuple(i->propertynames(getfield(row, 1))[inds[i]], N)
+getprops(row, ::Tuple{}) = ()
 
 Base.propertynames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)
 
