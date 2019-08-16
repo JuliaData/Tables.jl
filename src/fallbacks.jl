@@ -62,7 +62,7 @@ end
 function rows(x::T) where {T}
     if columnaccess(T)
         cols = columns(x)
-        return RowIterator(cols, rowcount(cols))
+        return RowIterator(cols, Int(rowcount(cols)))
     elseif IteratorInterfaceExtensions.isiterable(x)
         return nondatavaluerows(x)
     end
