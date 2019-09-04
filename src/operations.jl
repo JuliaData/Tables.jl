@@ -130,3 +130,6 @@ end
     row, st = state
     return SelectRow{typeof(row), names}(row), st
 end
+
+function rename end
+function rename! end
