@@ -13,6 +13,7 @@ DataValueInterfaces = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
 QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
 
@@ -22,4 +23,4 @@ IteratorInterfaceExtensions = "0.1.1, 1"
 TableTraits = "0.4.1, 1"
 
 [targets]
-test = ["Test", "DataValues", "QueryOperators"]
+test = ["Test", "Compat", "DataValues", "QueryOperators"]

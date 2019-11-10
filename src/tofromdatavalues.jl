@@ -75,6 +75,14 @@ function Base.getproperty(d::IteratorRow, nm::Int)
 end
 Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
 
+function Base.propertynames(d::IteratorRow{<:NamedTuple{names}}) where {names}
+    if @isdefined(names)
+        return names
+    else
+        return propertynames(getfield(d, 1))
+    end
+end
+
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
 struct DataValueRowIterator{NT, S}
     x::S

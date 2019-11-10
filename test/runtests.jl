@@ -1,4 +1,5 @@
 using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions
+using Compat: hasproperty
 
 @testset "utils.jl" begin
 
@@ -614,4 +615,12 @@ end
 
     # DataValue{Any}
     @test isequal(Tables.columntable(Tables.nondatavaluerows([(a=DataValue{Any}(), b=DataValue{Int}())])), (a = Any[missing], b = Union{Missing, Int64}[missing]))
+
+    # Inferrability of IteratorRow
+    has_a(row) = Val(hasproperty(row, :a))
+    @test (@inferred has_a(Tables.IteratorRow((a = 1,)))) === Val(true)
+    @test (@inferred has_a(Tables.IteratorRow((b = 1,)))) === Val(false)
+    # Don't panic even in a pathological case:
+    @test has_a(Tables.IteratorRow{NamedTuple}((a = 1,))) === Val(true)
+    @test has_a(Tables.IteratorRow{NamedTuple}((b = 1,))) === Val(false)
 end
