@@ -75,7 +75,7 @@ The answer is mostly straightforward: just use the interface functions. A note d
 
 ```julia
 function MyTable(x)
-    # Tables.istable(x) || throw(ArgumentError("input is not a table))
+    # Tables.istable(x) || throw(ArgumentError("input is not a table"))
     rows = Tables.rows(x)
     sch = Tables.schema(rows)
     names = sch.names
