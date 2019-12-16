@@ -74,6 +74,12 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.schema(rows) == Tables.Schema((:a, :b), (Int, Int))
     row = first(rows)
     @test row.a == 1
+    @test Tables.istable(rows)
+    @test Tables.rowaccess(rows)
+    @test Tables.rows(rows) === rows
+    @test Tables.columnaccess(rows)
+    @test Tables.columns(rows) === nt
+    @test Tables.materializer(rows) === Tables.materializer(nt)
 
     @test Tables.sym(1) === 1
     @test Tables.sym("hey") == :hey
