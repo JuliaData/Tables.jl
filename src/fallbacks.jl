@@ -52,6 +52,12 @@ struct RowIterator{T}
 end
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
+istable(::Type{<:RowIterator}) = true
+rowaccess(::Type{<:RowIterator}) = true
+rows(x::RowIterator) = x
+columnaccess(::Type{<:RowIterator{T}}) where T = columnaccess(T)
+columns(x::RowIterator) = x.columns
+materializer(x::RowIterator) = materializer(x.columns)
 schema(x::RowIterator) = schema(x.columns)
 
 function Base.iterate(rows::RowIterator, st=1)
