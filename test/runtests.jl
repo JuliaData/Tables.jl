@@ -238,8 +238,8 @@ end
 end
 
 @testset "Sparse Matrix integration" begin
-    rt = [(a=1, b=4.0, c=7f0), (a=2, b=5.0, c=8f0), (a=3, b=6.0, c=9f0)]
-    nt = (a=sparse([1, 2, 3]), b=sparse([4., 5., 6.]))
+    rt = [(a=1, b=4.0, c=7f0), (a=2, b=0., c=8f0), (a=0, b=6.0, c=9f0)]
+    nt = (a=sparse([1, 2, 0]), b=sparse([4., 0., 6.]))
 
     mat = Tables.sparsematrix(rt)
     @test nt.a == mat[:, 1]
@@ -259,10 +259,10 @@ end
 
     tbl = Tables.table(mat) |> columntable
     @test keys(tbl) == (:Column1, :Column2, :Column3)
-    @test tbl.Column1 == [1, 2, 3]
+    @test tbl.Column1 == [1, 2, 0]
     tbl2 = Tables.table(mat2) |> rowtable
     @test length(tbl2) == 3
-    @test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
+    @test map(x->x.Column1, tbl2) == [1.0, 2.0, 0.]
 
     mattbl = Tables.table(mat)
     @test Tables.istable(typeof(mattbl))
@@ -270,7 +270,7 @@ end
     @test Tables.rows(mattbl) === mattbl
     @test Tables.columnaccess(typeof(mattbl))
     @test Tables.columns(mattbl) === mattbl
-    @test mattbl.Column1 == [1,2,3]
+    @test mattbl.Column1 == [1,2,0]
     matrow = first(mattbl)
     @test eltype(mattbl) == typeof(matrow)
     @test matrow.Column1 == 1
