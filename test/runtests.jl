@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions
+using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
 
 @testset "utils.jl" begin
 
@@ -174,7 +174,7 @@ end
     @test Tables.buildcolumns(nothing, rt) == nt
 end
 
-@testset "Materializer" begin 
+@testset "Materializer" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
 
@@ -213,6 +213,46 @@ end
     @test !Tables.istable(mat2)
     @test !Tables.istable(typeof(mat2))
     mat3 = Tables.matrix(nt; transpose=true)
+    @test size(mat3) == (2, 3)
+    @test mat3[1, :] == nt.a
+    @test mat3[2, :] == nt.b
+
+    tbl = Tables.table(mat) |> columntable
+    @test keys(tbl) == (:Column1, :Column2, :Column3)
+    @test tbl.Column1 == [1, 2, 3]
+    tbl2 = Tables.table(mat2) |> rowtable
+    @test length(tbl2) == 3
+    @test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
+
+    mattbl = Tables.table(mat)
+    @test Tables.istable(typeof(mattbl))
+    @test Tables.rowaccess(typeof(mattbl))
+    @test Tables.rows(mattbl) === mattbl
+    @test Tables.columnaccess(typeof(mattbl))
+    @test Tables.columns(mattbl) === mattbl
+    @test mattbl.Column1 == [1,2,3]
+    matrow = first(mattbl)
+    @test eltype(mattbl) == typeof(matrow)
+    @test matrow.Column1 == 1
+    @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+end
+
+@testset "Sparse Matrix integration" begin
+    rt = [(a=1, b=4.0, c=7f0), (a=2, b=5.0, c=8f0), (a=3, b=6.0, c=9f0)]
+    nt = (a=sparse([1, 2, 3]), b=sparse([4., 5., 6.]))
+
+    mat = Tables.sparsematrix(rt)
+    @test nt.a == mat[:, 1]
+    @test size(mat) == (3, 3)
+    @test eltype(mat) == Float64
+    @test_throws ArgumentError Tables.rows(mat)
+    @test_throws ArgumentError Tables.columns(mat)
+    mat2 = Tables.sparsematrix(nt)
+    @test eltype(mat2) == Float64
+    @test mat2[:, 1] == nt.a
+    @test !Tables.istable(mat2)
+    @test !Tables.istable(typeof(mat2))
+    mat3 = Tables.sparsematrix(nt; transpose=true)
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
     @test mat3[2, :] == nt.b
