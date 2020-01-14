@@ -241,18 +241,18 @@ end
     rt = [(a=1, b=4.0, c=7f0), (a=2, b=0., c=8f0), (a=0, b=6.0, c=9f0)]
     nt = (a=sparse([1, 2, 0]), b=sparse([4., 0., 6.]))
 
-    mat = Tables.sparsematrix(rt)
+    mat = Tables.matrix(rt)
     @test nt.a == mat[:, 1]
     @test size(mat) == (3, 3)
     @test eltype(mat) == Float64
     @test_throws ArgumentError Tables.rows(mat)
     @test_throws ArgumentError Tables.columns(mat)
-    mat2 = Tables.sparsematrix(nt)
+    mat2 = Tables.matrix(nt)
     @test eltype(mat2) == Float64
     @test mat2[:, 1] == nt.a
     @test !Tables.istable(mat2)
     @test !Tables.istable(typeof(mat2))
-    mat3 = Tables.sparsematrix(nt; transpose=true)
+    mat3 = Tables.matrix(nt; transpose=true)
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
     @test mat3[2, :] == nt.b
