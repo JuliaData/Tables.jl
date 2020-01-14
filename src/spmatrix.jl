@@ -1,5 +1,4 @@
 istable(::Type{<:AbstractSparseMatrix}) = false
-istable(::AbstractSparseMatrix) = false
 
 rows(m::T) where {T <: AbstractSparseMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractSparseMatrix as a table"))
 columns(m::T) where {T <: AbstractSparseMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractSparseMatrix as a table"))
