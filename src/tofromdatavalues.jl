@@ -37,7 +37,7 @@ Base.size(rows::IteratorWrapper) = size(rows.x)
     x = iterate(rows.x)
     x === nothing && return nothing
     row, st = x
-    propertynames(row) === () && invalidtable(rows.x, row)
+    columnnames(row) === () && invalidtable(rows.x, row)
     return IteratorRow(row), st
 end
 
@@ -48,32 +48,22 @@ end
     return IteratorRow(row), st
 end
 
-struct IteratorRow{T}
+struct IteratorRow{T} <: AbstractRow
     row::T
 end
+
+getrow(r::IteratorRow) = getfield(r, :row)
 
 unwrap(::Type{T}, x) where {T} = convert(T, x)
 unwrap(::Type{Any}, x) = x.hasvalue ? x.value : missing
 
-function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm) where {T}
-    x = getproperty(getfield(d, 1), T, col, nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-function Base.getproperty(d::IteratorRow, nm::Symbol)
-    x = getproperty(getfield(d, 1), nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-function Base.getproperty(d::IteratorRow, nm::Int)
-    x = getproperty(getfield(d, 1), nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
+nondv(T) = DataValueInterfaces.nondatavaluetype(T)
+undatavalue(x::T) where {T} = T == nondv(T) ? x : unwrap(nondv(T), x)
+
+getcolumn(r::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T} = undatavalue(getcolumn(getrow(r), T, col, nm))
+getcolumn(r::IteratorRow, nm::Symbol) = undatavalue(getcolumn(getrow(r), nm))
+getcolumn(r::IteratorRow, i::Int) = undatavalue(getcolumn(getrow(r), i))
+columnnames(r::IteratorRow) = columnnames(getrow(r))
 
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
 struct DataValueRowIterator{NT, S}
@@ -94,7 +84,7 @@ Base.size(rows::DataValueRowIterator) = size(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
     if @generated
-        vals = Tuple(:(convert($(fieldtype(NT, i)), getproperty(row, $(DataValueInterfaces.nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        vals = Tuple(:(convert($(fieldtype(NT, i)), getcolumn(row, $(nondv(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -107,6 +97,6 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(convert(fieldtype(NT, i), getproperty(row, DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+        return NT(Tuple(convert(fieldtype(NT, i), getcolumn(row, nondv(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
     end
 end

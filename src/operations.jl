@@ -1,18 +1,23 @@
-struct TransformsRow{T, F}
+struct TransformsRow{T, F} <: AbstractRow
     row::T
     funcs::F
 end
 
-Base.getproperty(row::TransformsRow, nm::Symbol) = (getfunc(row, getfield(row, 2), nm))(getproperty(getfield(row, 1), nm))
-Base.propertynames(row::TransformsRow) = propertynames(getfield(row, 1))
+getrow(r::TransformsRow) = getfield(r, :row)
+getfuncs(r::TransformsRow) = getfield(r, :funcs)
 
-struct Transforms{C, T, F}
+getcolumn(row::TransformsRow, nm::Symbol) = (getfunc(row, getfuncs(row), nm))(getcolumn(getrow(row), nm))
+getcolumn(row::TransformsRow, i::Int) = (getfunc(row, getfuncs(row), i))(getcolumn(getrow(row), i))
+columnnames(row::TransformsRow) = columnnames(getrow(row))
+
+struct Transforms{C, T, F} <: AbstractColumns
     source::T
     funcs::F # NamedTuple of columnname=>transform function
 end
 
-Base.propertynames(t::Transforms{true}) = propertynames(getfield(t, 1))
-Base.getproperty(t::Transforms{true}, nm::Symbol) = Base.map(getfunc(t, getfield(t, 2), nm), getproperty(getfield(t, 1), nm))
+columnnames(t::Transforms{true}) = columnnames(getfield(t, 1))
+getcolumn(t::Transforms{true}, nm::Symbol) = Base.map(getfunc(t, getfield(t, 2), nm), getcolumn(getfield(t, 1), nm))
+getcolumn(t::Transforms{true}, i::Int) = Base.map(getfunc(t, getfield(t, 2), nm), getcolumn(getfield(t, 1), i))
 
 transform(funcs) = x->transform(x, funcs)
 transform(; kw...) = transform(kw.data)
@@ -22,10 +27,15 @@ function transform(src::T, funcs::F) where {T, F}
     return Transforms{C, typeof(x), F}(x, funcs)
 end
 
-getfunc(row, nt::NamedTuple, nm) = get(nt, nm, identity)
-getfunc(row, d::Dict{String, <:Base.Callable}, nm) = get(d, String(nm), identity)
-getfunc(row, d::Dict{Symbol, <:Base.Callable}, nm) = get(d, nm, identity)
-getfunc(row, d::Dict{Int, <:Base.Callable}, nm) = get(d, findfirst(isequal(nm), propertynames(row)), identity)
+getfunc(row, nt::NamedTuple, nm::Symbol) = get(nt, nm, identity)
+getfunc(row, d::Dict{String, <:Base.Callable}, nm::Symbol) = get(d, String(nm), identity)
+getfunc(row, d::Dict{Symbol, <:Base.Callable}, nm::Symbol) = get(d, nm, identity)
+getfunc(row, d::Dict{Int, <:Base.Callable}, nm::Symbol) = get(d, findfirst(isequal(nm), columnnames(row)), identity)
+
+getfunc(row, nt::NamedTuple, i::Int) = i > fieldcount(typeof(nt)) ? identity : getfield(nt, i)
+getfunc(row, d::Dict{String, <:Base.Callable}, i::Int) = get(d, String(columnnames(row)[i]), identity)
+getfunc(row, d::Dict{Symbol, <:Base.Callable}, i::Int) = get(d, columnnames(row)[i], identity)
+getfunc(row, d::Dict{Int, <:Base.Callable}, i::Int) = get(d, i, identity)
 
 istable(::Type{<:Transforms}) = true
 rowaccess(::Type{Transforms{C, T, F}}) where {C, T, F} = !C
@@ -48,7 +58,7 @@ Base.eltype(t::Transforms{false, T, F}) where {T, F} = TransformsRow{eltype(getf
 end
 
 # select
-struct Select{T, columnaccess, names}
+struct Select{T, columnaccess, names} <: AbstractColumns
     source::T
 end
 
@@ -90,8 +100,9 @@ function schema(s::Select{T, columnaccess, names}) where {T, columnaccess, names
 end
 
 # columns: make Select property-accessible
-Base.getproperty(s::Select{T, true, names}, nm::Symbol) where {T, names} = getproperty(getfield(s, 1), nm)
-Base.propertynames(s::Select{T, true, names}) where {T, names} = namesubset(propertynames(getfield(s, 1)), names)
+getcolumn(s::Select{T, true, names}, nm::Symbol) where {T, names} = getcolumn(getfield(s, 1), nm)
+getcolumn(s::Select{T, true, names}, i::Int) where {T, names} = getcolumn(getfield(s, 1), i)
+columnnames(s::Select{T, true, names}) where {T, names} = namesubset(columnnames(getfield(s, 1)), names)
 columnaccess(::Type{Select{T, C, names}}) where {T, C, names} = C
 columns(s::Select{T, true, names}) where {T, names} = s
 
@@ -104,18 +115,20 @@ rowaccess(::Type{Select{T, columnaccess, names}}) where {T, columnaccess, names}
 rows(s::Select{T, false, names}) where {T, names} = s
 
 # we need to iterate a "row view" in case the underlying source has unknown schema
-# to ensure each iterated row only has `names` propertynames
-struct SelectRow{T, names}
+# to ensure each iterated row only has `names` columnnames
+struct SelectRow{T, names} <: AbstractRow
     row::T
 end
 
-Base.getproperty(row::SelectRow, nm::Symbol) = getproperty(getfield(row, 1), nm)
+getcolumn(row::SelectRow, nm::Symbol) = getcolumn(getfield(row, 1), nm)
+getcolumn(row::SelectRow, i::Int) = getcolumn(getfield(row, 1), i)
+getcolumn(row::SelectRow, ::Type{T}, i::Int, nm::Symbol) where {T} = getcolumn(getfield(row, 1), T, i, nm)
 
 getprops(row, nms::NTuple{N, Symbol}) where {N} = nms
-getprops(row, inds::NTuple{N, Int}) where {N} = ntuple(i->propertynames(getfield(row, 1))[inds[i]], N)
+getprops(row, inds::NTuple{N, Int}) where {N} = ntuple(i->columnnames(getfield(row, 1))[inds[i]], N)
 getprops(row, ::Tuple{}) = ()
 
-Base.propertynames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)
+columnnames(row::SelectRow{T, names}) where {T, names} = getprops(row, names)
 
 @inline function Base.iterate(s::Select{T, false, names}) where {T, names}
     state = iterate(getfield(s, 1))

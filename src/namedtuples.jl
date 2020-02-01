@@ -1,12 +1,12 @@
 # Vector of NamedTuples
-const RowTable{T} = Vector{T} where {T <: NamedTuple}
+const RowTable{T} = AbstractVector{T} where {T <: NamedTuple}
 
 # interface implementation
 istable(::Type{<:RowTable}) = true
 rowaccess(::Type{<:RowTable}) = true
-# a Vector of NamedTuple iterates `Row`s itself
+# an AbstractVector of NamedTuple iterates `Row`s itself
 rows(x::RowTable) = x
-schema(x::Vector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
+schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
 materializer(x::RowTable) = rowtable
 
 # struct to transform `Row`s into NamedTuples
@@ -21,7 +21,7 @@ Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
 function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
     if @generated
-        vals = Tuple(:(getproperty(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
+        vals = Tuple(:(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
         return quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
@@ -32,7 +32,7 @@ function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getproperty(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
+        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getcolumn(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
     end
 end
 
@@ -41,8 +41,8 @@ function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
     x = iterate(rows.x, st...)
     x === nothing && return nothing
     row, st = x
-    names = Tuple(propertynames(row))
-    return NamedTuple{Base.map(Symbol, names)}(Tuple(getproperty(row, nm) for nm in names)), (st,)
+    names = Tuple(columnnames(row))
+    return NamedTuple{Base.map(Symbol, names)}(Tuple(getcolumn(row, nm) for nm in names)), (st,)
 end
 
 namedtupleiterator(::Type{T}, rows::S) where {T <: NamedTuple, S} = rows
@@ -68,27 +68,29 @@ istable(::Type{<:ColumnTable}) = true
 columnaccess(::Type{<:ColumnTable}) = true
 # a NamedTuple of AbstractVectors is itself a `Columns` object
 columns(x::ColumnTable) = x
-schema(x::T) where {T <: ColumnTable} = Schema(names(T), _types(T))
-materializer(x::ColumnTable) = columntable
 
 _eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
-Base.@pure function _types(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+Base.@pure function _eltypes(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
     return Tuple{Any[ _eltype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
 end
+
+schema(x::T) where {T <: ColumnTable} = Schema(names(T), _eltypes(T))
+materializer(x::ColumnTable) = columntable
 
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
 function columntable(sch::Schema{names, types}, cols) where {names, types}
     if @generated
-        vals = Tuple(:(getarray(getproperty(cols, $(fieldtype(types, i)), $i, $(quot(names[i]))))) for i = 1:fieldcount(types))
+        vals = Tuple(:(getarray(getcolumn(cols, $(fieldtype(types, i)), $i, $(quot(names[i]))))) for i = 1:fieldcount(types))
         return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
     else
-        return NamedTuple{Base.map(Symbol, names)}(Tuple(getarray(getproperty(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
+        return NamedTuple{Base.map(Symbol, names)}(Tuple(getarray(getcolumn(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
     end
 end
+
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, propertynames(cols)))}(Tuple(getarray(col) for col in eachcolumn(cols)))
+columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, columnnames(cols)))}(Tuple(getarray(col) for col in eachcolumn(cols)))
 
 function columntable(itr::T) where {T}
     cols = columns(itr)

@@ -1,10 +1,9 @@
 istable(::Type{<:AbstractMatrix}) = false
-istable(::AbstractMatrix) = false
 
 rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
 columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
 
-struct MatrixTable{T <: AbstractMatrix}
+struct MatrixTable{T <: AbstractMatrix} <: AbstractColumns
     names::Vector{Symbol}
     lookup::Dict{Symbol, Int}
     matrix::T
@@ -14,16 +13,18 @@ istable(::Type{<:MatrixTable}) = true
 names(m::MatrixTable) = getfield(m, :names)
 
 # row interface
-struct MatrixRow{T}
+struct MatrixRow{T} <: AbstractRow
     row::Int
     source::MatrixTable{T}
 end
 
-Base.getproperty(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
+getcolumn(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
-Base.getproperty(m::MatrixRow, nm::Symbol) =
+getcolumn(m::MatrixRow, i::Int) =
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), i]
+getcolumn(m::MatrixRow, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
-Base.propertynames(m::MatrixRow) = names(getfield(m, :source))
+columnnames(m::MatrixRow) = names(getfield(m, :source))
 
 rowaccess(::Type{<:MatrixTable}) = true
 schema(m::MatrixTable{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
@@ -31,17 +32,15 @@ rows(m::MatrixTable) = m
 Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
 Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
 
-function Base.iterate(m::MatrixTable, st=1)
-    st > length(m) && return nothing
-    return MatrixRow(st, m), st + 1
-end
+Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
 # column interface
 columnaccess(::Type{<:MatrixTable}) = true
 columns(m::MatrixTable) = m
-Base.getproperty(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
-Base.getproperty(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
-Base.propertynames(m::MatrixTable) = names(m)
+getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
+getcolumn(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
+getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
+columnnames(m::MatrixTable) = names(m)
 
 """
 Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])

@@ -28,8 +28,6 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.columntype(Tables.names(NT), Tables.types(NT), :i) == Union{}
 
     nt = (a=1, b=2, c=3)
-    @test getproperty(nt, Int, 1, :a) === 1
-
     NT = typeof(nt)
     output = [0, 0, 0]
     Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
