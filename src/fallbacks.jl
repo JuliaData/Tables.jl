@@ -83,7 +83,7 @@ function rows(x::T) where {T}
         cols = columns(x)
         return RowIterator(cols, Int(rowcount(cols)))
     # otherwise, if the input is at least iterable, we'll wrap it in an IteratorWrapper
-    # which will iterate the input, validating that it supports the AbstractRow interface
+    # which will iterate the input, validating that it supports the Row interface
     # and unwrapping any DataValues that are encountered
     elseif IteratorInterfaceExtensions.isiterable(x)
         return nondatavaluerows(x)
@@ -187,12 +187,16 @@ end
     return NamedTuple{Base.map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
 end
 
-# for some sinks, there's a concern about whether they can safely "own" columns from the input
-# to be safe, they should always copy input columns, to avoid unintended mutation.
-# when we've called buildcolumns, however, Tables.jl essentially built/owns the columns,
-# and it's happy to pass ownership to the sink. Thus, any built columns will be wrapped
-# in a CopiedColumns struct to signal to the sink that essentially "a copy has already been made"
-# and they're safe to assume ownership
+"""
+    Tables.CopiedColumns
+
+For some sinks, there's a concern about whether they can safely "own" columns from the input.
+To be safe, they should always copy input columns, to avoid unintended mutation.
+When we've called buildcolumns, however, Tables.jl essentially built/owns the columns,
+and it's happy to pass ownership to the sink. Thus, any built columns will be wrapped
+in a CopiedColumns struct to signal to the sink that essentially "a copy has already been made"
+and they're safe to assume ownership
+"""
 struct CopiedColumns{T} <: AbstractColumns
     x::T
 end
@@ -212,7 +216,7 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
 # here's our generic fallback Tables.columns definition
 @inline function columns(x::T) where {T}
     # because this method is being called, we know `x` didn't define it's own Tables.columns method
-    # first check if it supports row access, and if so, build up the desired columns
+    # first check if it explicitly supports row access, and if so, build up the desired columns
     if rowaccess(T)
         r = rows(x)
         return CopiedColumns(buildcolumns(schema(r), r))
@@ -220,7 +224,7 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return CopiedColumns(TableTraits.get_columns_copy_using_missing(x))
     # otherwise, if the source is at least iterable, we'll wrap it in an IteratorWrapper and
-    # build columns from that, which will check if the source correctly iterates AbstractRows
+    # build columns from that, which will check if the source correctly iterates valid Row objects
     # and unwraps DataValues for us
     elseif IteratorInterfaceExtensions.isiterable(x)
         iw = nondatavaluerows(x)

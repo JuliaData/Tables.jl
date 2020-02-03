@@ -11,7 +11,10 @@ end
 """
     Tables.AbstractColumns
 
-Abstract type provided to allow custom table types to inherit useful and required behavior.
+Abstract type provided to allow custom table types to inherit useful and required behavior. Note that this type
+is for convenience for table _source_ authors to provide useful default behavior to their `Columns` object,
+and not to be used or relied upon by sink authors to dispatch on; i.e. not all `Columns` objects will inherit
+from `Tables.AbstractColumns`.
 
 Interface definition:
 | Required Methods | Default Definition | Brief Description |
@@ -34,7 +37,10 @@ abstract type AbstractColumns end
 """
     Tables.AbstractRow
 
-Abstract type provided to allow custom row types to inherit useful and required behavior.
+Abstract type provided to allow custom row types to inherit useful and required behavior. Note that this type
+is for convenience for table _source_ authors to provide useful default behavior to their `Row` object,
+and not to be used or relied upon by sink authors to dispatch on; i.e. not all `Row` objects will inherit
+from `Tables.AbstractRow`.
 
 Interface definition:
 | Required Methods | Default Definition | Brief Description |
@@ -101,7 +107,7 @@ Base.values(r::AbstractColumns) = collect(r)
 Base.haskey(r::AbstractColumns, key::Union{Integer, Symbol}) = key in columnnames(r)
 Base.get(r::AbstractColumns, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
 Base.get(f::Base.Callable, r::AbstractColumns, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
-Base.@propagate_inbounds Base.iterate(r::AbstractColumns, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
+Base.iterate(r::AbstractColumns, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
 
 function Base.show(io::IO, x::T) where {T <: AbstractColumns}
     println(io, "$T:")
@@ -110,95 +116,79 @@ function Base.show(io::IO, x::T) where {T <: AbstractColumns}
     Base.print_matrix(io, hcat(names, values))
 end
 
-"""
-The Tables.jl package provides simple, yet powerful interface functions for working with all kinds of tabular data through predictable access patterns.
-
-```julia
-    Tables.rows(table) => Row iterator (also known as a Rows object)
-    Tables.columns(table) => Columns
-```
-Where `Row` and `Columns` are objects that support a common interface:
-  * `Tables.getcolumn(x, col::Union{Int, Symbol})`: Retrieve an entire column (`Columns`), or single column value (`Row`) by column index (as an `Int`), or by column name (as a `Symbol`)
-  * `Tables.columnnames(x)`: Retrieve the possible column names for a `Row` or `Columns` object
-
-In addition to these `Row` and `Columns` objects, it's useful to be able to query properties of these objects:
-* `Tables.schema(x::Union{Rows, Columns}) => Union{Tables.Schema, Nothing}`: returns a `Tables.Schema` object, or `nothing` if the table's schema is unknown
-* For the `Tables.Schema` object:
-  * column names can be accessed as a tuple of Symbols like `sch.names`
-  * column types can be accessed as a tuple of types like `sch.types`
-  * See `?Tables.Schema` for more details on this type
-
-A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
-This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly if so desired).
-
-With these simple definitions, powerful workflows are enabled:
-* A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
-* A tabular file format can have automatic integration with in-memory structures and translation to other file formats
-
-So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've already defined and the natural access patterns of your table:
-
-First:
-* `Tables.istable(::Type{<:MyTable}) = true`: this provides an explicit affirmation that your type implements the Tables interface
-
-To support `Rows`:
-* Define `Tables.rowaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports valid `Row`-iteration
-* Define `Tables.rows(x::MyTable)`: return a `Row`-iterator object (perhaps the table itself if already defined)
-* Define `Tables.schema(Tables.rows(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
-
-To support `Columns`:
-* Define `Tables.columnaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports returning a valid `Columns` object
-* Define `Tables.columns(x::MyTable)`: return a `Columns`, property-accessible object (perhaps the table itself if it naturally supports property-access to columns)
-* Define `Tables.schema(Tables.columns(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
-
-The final question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
-
-* Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTable`
-
-For example, if `MyTable` is a row-oriented format, I might define my "sink" function like:
-```julia
-function MyTable(x)
-    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
-    rows = Tables.rows(x)
-    sch = Tables.schema(rows)
-    names = sch.names
-    types = sch.types
-    # custom constructor that creates an "empty" MyTable according to given column names & types
-    # note that the "unknown" schema case should be considered, i.e. when `sch.types => nothing`
-    mytbl = MyTable(names, types)
-    for row in rows
-        # a convenience function provided in Tables.jl for "unrolling" access to each column/property of a `Row`
-        # it works by applying a provided function to each value; see `?Tables.eachcolumn` for more details
-        Tables.eachcolumn(sch, row) do val, col, name
-            push!(mytbl[col], val)
-        end
-    end
-    return mytbl
-end
-```
-
-Alternatively, if `MyTable` is column-oriented, perhaps my definition would be more like:
-```julia
-function MyTable(x)
-    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
-    cols = Tables.columns(x)
-    # here we use Tables.eachcolumn to iterate over each column in a `Columns` object
-    return MyTable(collect(propertynames(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
-end
-```
-
-Obviously every table type is different, but via a combination of `Tables.rows` and `Tables.columns` each table type should be able to construct an instance of itself.
-"""
-abstract type Table end
-
 # default definitions
+"""
+    Tables.istable(x) => Bool
+
+Check if an object has specifically defined that it is a table. Note that 
+not all valid tables will return true, since it's possible to satisfy the
+Tables.jl interface at "run-time", e.g. a Generator of NamedTuples iterates
+NamedTuples, which satisfies the Row interface, but there's no static way
+of knowing that the generator is a table.
+"""
+function istable end
+
 istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true
 istable(::Type{T}) where {T} = false
+
+"""
+    Tables.rowaccess(x) => Bool
+
+Check whether an object has specifically defined that it implements the `Tables.rows`
+function. Note that `Tables.rows` will work on any object that iterates Row-compatible
+objects, even if they don't define `rowaccess`, e.g. a Generator of NamedTuples. Also
+note that just because an object defines `rowaccess` doesn't mean a user should call
+`Tables.rows` on it; `Tables.columns` will also work, providing a valid `Columns`
+object from the rows. Hence, users should call `Tables.rows` or `Tables.columns`
+depending on what is most natural for them to *consume* instead of worrying about
+what and how the input produces.
+"""
+function rowaccess end
+
 rowaccess(x::T) where {T} = rowaccess(T)
 rowaccess(::Type{T}) where {T} = false
+
+"""
+    Tables.columnaccess(x) => Bool
+
+Check whether an object has specifically defined that it implements the `Tables.columns`
+function. Note that `Tables.columns` has generic fallbacks allowing it to produces `Columns`
+objects, even if the input doesn't define `columnaccess`. Also note that just because an
+object defines `columnaccess` doesn't mean a user should call `Tables.columns` on it;
+`Tables.rows` will also work, providing a valid `Row` iterator. Hence, users should call
+`Tables.rows` or `Tables.columns` depending on what is most natural for them to *consume*
+instead of worrying about what and how the input produces.
+"""
+function columnaccess end
+
 columnaccess(x::T) where {T} = columnaccess(T)
 columnaccess(::Type{T}) where {T} = false
+
+"""
+    Tables.schema(x) => Union{Nothing, Tables.Schema}
+
+Attempt to retrieve the schema of the object returned by `Tables.rows` or `Tables.columns`.
+If the `Row` iterator or `Columns` object can't determine its schema, `nothing` will be returned.
+Otherwise, a `Tables.Schema` object is returned, with the column names and types available for use.
+"""
+function schema end
+
 schema(x) = nothing
-materializer(x) = columntable
+
+"""
+    Tables.materializer(x) => Callable
+
+For a table input, return the "sink" function or "materializing" function that can take a
+Tables.jl-compatible table input and make an instance of the table type. This enables "transform"
+workflows that take table inputs, apply transformations, potentially converting the table to
+a different form, and end with producing a table of the same type as the original input. The
+default materializer is `Tables.columntable`, which converts any table input into a NamedTuple
+of Vectors.
+"""
+function materializer end
+
+materializer(x::T) where {T} = materializer(T)
+materializer(::Type{T}) where {T} = columntable
 
 # Schema implementation
 """

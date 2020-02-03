@@ -6,25 +6,32 @@
 The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data through predictable access patterns. At its core, it provides two simple functions for accessing a source table's data, regardless of its storage format or orientation:
 
 ```julia
-    Tables.rows(table) => Rows
+    Tables.rows(table) => Row iterator (aka Rows)
     Tables.columns(table) => Columns
 ```
-These two functions return objects that satisfy the `Rows` or `Columns` interfaces:
-* `Rows` is an iterator (i.e. implements `Base.iterate(x)`) of property-accessible objects (any type that supports `propertynames(row)` and `getproperty(row, nm::Symbol`)
-* `Columns` is a property-accessible object of iterators (i.e. each column can be retrieved via `getproperty` and is an iterator)
+These two functions return objects that satisfy the `Row` or `Columns` interfaces, which are:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(x, i::Int)` | getfield(x, i) | Retrieve an entire column (`Columns`) or single column value (`Row`) by index |
+| `Tables.getcolumn(x, nm::Symbol)` | getproperty(x, nm) | Retrieve an entire column (`Columns`) or single column value (`Row`) by name |
+| `Tables.columnnames(x)` | propertynames(x) | Return column names for `Columns` or a `Row` as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(x, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(x, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column or column value. Provides a type-stable or even constant-prop-able mechanism for efficiency.
 
 So `Rows` is any object that can be used like:
 ```julia
-for rows in table
-    for columnname in propertynames(row)
-        value = getproperty(row, columnname)
+rows = Tables.rows(x)
+for row in rows
+    for columnname in Tables.columnnames(row)
+        value = Tables.getcolumn(row, columnname)
     end
 end
 ```
 And `Columns` is any object that can be used like:
 ```julia
-for columnname in propertynames(table)
-    column = getproperty(table, columnname)
+columns = Tables.columns(x)
+for columnname in Tables.columnnames(columns)
+    column = Tables.getcolumn(columns, columnname)
 end
 ```
 
@@ -75,7 +82,6 @@ The answer is mostly straightforward: just use the interface functions. A note d
 
 ```julia
 function MyTable(x)
-    # Tables.istable(x) || throw(ArgumentError("input is not a table"))
     rows = Tables.rows(x)
     sch = Tables.schema(rows)
     names = sch.names
@@ -100,7 +106,7 @@ Alternatively, it may be more natural for `MyTable` to consume input data column
 function MyTable(x)
     cols = Tables.columns(x)
     # here we use Tables.eachcolumn to iterate over each column in `cols`, which satisfies the `Columns` interface
-    return MyTable(collect(propertynames(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
+    return MyTable(collect(Tables.columnnames(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
 end
 ```
 
@@ -114,7 +120,7 @@ function MyTable(x)
         return MyTable()
     end
     row, st = state
-    columnnames = propertynames(row)
+    columnnames = Tables.columnnames(row)
     # create a Tables.Schema manually w/ just the column names from the first row
     sch = Tables.Schema(columnnames, nothing)
     cols = length(columnnames)

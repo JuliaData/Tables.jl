@@ -31,7 +31,7 @@ Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)
 
-@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which don't satisfy the Tables.jl Row-iterator interface"))
+@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which doesn't satisfy the Tables.jl Row-iterator interface"))
 
 @inline function Base.iterate(rows::IteratorWrapper)
     x = iterate(rows.x)
