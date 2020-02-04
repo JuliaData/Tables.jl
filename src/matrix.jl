@@ -43,7 +43,7 @@ getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
 columnnames(m::MatrixTable) = names(m)
 
 """
-Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
+  Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
 
 Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies
 the Tables.jl interface. This allows accesing the matrix via `Tables.rows` and
@@ -57,7 +57,7 @@ function table(m::AbstractMatrix; header::Vector{Symbol}=[Symbol("Column$i") for
 end
 
 """
-Tables.matrix(table; transpose::Bool=false)
+  Tables.matrix(table; transpose::Bool=false)
 
 Materialize any table source input as a `Matrix`. If the table column types are not homogenous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are

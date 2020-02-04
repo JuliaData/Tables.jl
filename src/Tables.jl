@@ -9,6 +9,31 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
 end
 
 """
+    Columns
+
+An interface type defined as an ordered set of columns that support
+retrieval of individual columns by name or index. A retrieved column
+must be an indexable collection with known length, i.e. an object
+that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
+The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
+object from any input table source.
+
+Any object implements the `Columns` interface, by satisfying the following:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(table, i::Int)` | getfield(table, i) | Retrieve a column by index |
+| `Tables.getcolumn(table, nm::Symbol)` | getproperty(table, nm) | Retrieve a column by name |
+| `Tables.columnnames(table)` | propertynames(table) | Return column names for a table as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency.
+
+Note that table sources shouldn't subtype `Columns`, as it is purely an interface type
+to help document the Tables.jl API. See the [`Tables.AbstractColumns`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+"""
+abstract type Columns end
+
+"""
     Tables.AbstractColumns
 
 Abstract type provided to allow custom table types to inherit useful and required behavior. Note that this type
@@ -35,6 +60,28 @@ This allows a custom table type to behave as close as possible to a builtin `Nam
 abstract type AbstractColumns end
 
 """
+    Row
+
+An interface type that represents a single row of a table, with column values retrievable by name or index.
+The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
+iterator from any input table source.
+
+Any object implements the `Row` interface, by satisfying the following:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(row, i::Int)` | getfield(row, i) | Retrieve a column value by index |
+| `Tables.getcolumn(row, nm::Symbol)` | getproperty(row, nm) | Retrieve a column value by name |
+| `Tables.columnnames(row)` | propertynames(row) | Return column names for a row as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency.
+
+Note that custom row types shouldn't subtype `Row`, as it is purely an interface type
+to help document the Tables.jl API. See the [`Tables.AbstractRow`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+"""
+abstract type Row end
+
+"""
     Tables.AbstractRow
 
 Abstract type provided to allow custom row types to inherit useful and required behavior. Note that this type
@@ -58,7 +105,7 @@ While custom row types aren't required to subtype `Tables.AbstractRow`, benefits
   * A default `show` method
 This allows the custom row type to behave as close as possible to a builtin `NamedTuple` object.
 """
-abstract type AbstractRow <: AbstractColumns end
+abstract type AbstractRow end
 
 """
     Tables.getcolumn(::Columns, nm::Symbol) => Indexable collection with known length
@@ -93,23 +140,31 @@ function columnnames end
 
 columnnames(x) = propertynames(x)
 
-Base.IteratorSize(::Type{R}) where {R <: AbstractColumns} = Base.HasLength()
-Base.length(r::AbstractColumns) = length(columnnames(r))
-Base.firstindex(r::AbstractColumns) = 1
-Base.lastindex(r::AbstractColumns) = length(r)
-Base.getindex(r::AbstractColumns, i::Int) = getcolumn(r, i)
-Base.getindex(r::AbstractColumns, nm::Symbol) = getcolumn(r, nm)
-Base.getproperty(r::AbstractColumns, nm::Symbol) = getcolumn(r, nm)
-Base.getproperty(r::AbstractColumns, i::Int) = getcolumn(r, i)
-Base.propertynames(r::AbstractColumns) = columnnames(r)
-Base.keys(r::AbstractColumns) = columnnames(r)
-Base.values(r::AbstractColumns) = collect(r)
-Base.haskey(r::AbstractColumns, key::Union{Integer, Symbol}) = key in columnnames(r)
-Base.get(r::AbstractColumns, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
-Base.get(f::Base.Callable, r::AbstractColumns, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
-Base.iterate(r::AbstractColumns, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
+# default definitions for AbstractDict
+getcolumn(x::AbstractDict, i::Int) = x[i]
+getcolumn(x::AbstractDict, nm::Symbol) = x[nm]
+columnnames(x::AbstractDict) = collect(keys(x))
 
-function Base.show(io::IO, x::T) where {T <: AbstractColumns}
+# default definitions for AbstractRow, AbstractColumns
+const RorC = Union{AbstractRow, AbstractColumns}
+
+Base.IteratorSize(::Type{R}) where {R <: RorC} = Base.HasLength()
+Base.length(r::RorC) = length(columnnames(r))
+Base.firstindex(r::RorC) = 1
+Base.lastindex(r::RorC) = length(r)
+Base.getindex(r::RorC, i::Int) = getcolumn(r, i)
+Base.getindex(r::RorC, nm::Symbol) = getcolumn(r, nm)
+Base.getproperty(r::RorC, nm::Symbol) = getcolumn(r, nm)
+Base.getproperty(r::RorC, i::Int) = getcolumn(r, i)
+Base.propertynames(r::RorC) = columnnames(r)
+Base.keys(r::RorC) = columnnames(r)
+Base.values(r::RorC) = collect(r)
+Base.haskey(r::RorC, key::Union{Integer, Symbol}) = key in columnnames(r)
+Base.get(r::RorC, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
+Base.get(f::Base.Callable, r::RorC, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
+Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
+
+function Base.show(io::IO, x::T) where {T <: RorC}
     println(io, "$T:")
     names = collect(columnnames(x))
     values = [getcolumn(row, nm) for nm in names]
@@ -189,6 +244,41 @@ function materializer end
 
 materializer(x::T) where {T} = materializer(T)
 materializer(::Type{T}) where {T} = columntable
+
+"""
+    Tables.columns(x) => Columns-compatible object
+
+Accesses data of input table source `x` by returning a [`Columns`](@ref)-compatible
+object, which allows retrieving entire columns by name or index. A retrieved column
+is an object that is indexable and has a known length, i.e. supports 
+`length(col)` and `col[i]` for any `i = 1:length(col)`. Note that
+even if the input table source is row-oriented by nature, an efficient generic
+definition of `Tables.columns` is defined in Tables.jl to build a `Columns`-
+compatible object object from the input rows.
+
+The [`Tables.Schema`](@ref) of a `Columns` object can be queried via `Tables.schema(columns)`,
+which may return `nothing` if the schema is unknown.
+Column names can be queried by calling `Tables.columnnames(columns)`. And individual columns
+can be accessed by calling `Tables.getcolumn(columns, i::Int )` or `Tables.getcolumn(columns, nm::Symbol)`
+with a column index or name, respectively.
+"""
+function columns end
+
+"""
+    Tables.rows(x) => Row iterator
+
+Accesses data of input table source `x` row-by-row by returning a [`Row`](@ref) iterator.
+Note that even if the input table source is column-oriented by nature, an efficient generic
+definition of `Tables.rows` is defined in Tables.jl to return an iterator of row views into
+the columns of the input.
+
+The [`Tables.Schema`](@ref) of a `Row` iterator can be queried via `Tables.schema(rows)`,
+which may return `nothing` if the schema is unknown.
+Column names can be queried by calling `Tables.columnnames(row)` on an individual row.
+And row values can be accessed by calling `Tables.getcolumn(rows, i::Int )` or
+`Tables.getcolumn(rows, nm::Symbol)` with a column index or name, respectively.
+"""
+function rows end
 
 # Schema implementation
 """

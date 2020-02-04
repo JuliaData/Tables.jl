@@ -49,6 +49,21 @@ namedtupleiterator(::Type{T}, rows::S) where {T <: NamedTuple, S} = rows
 namedtupleiterator(::Type{T}, rows::S) where {T, S} = NamedTupleIterator{typeof(schema(rows)), S}(rows)
 
 # sink function
+"""
+    Tables.rowtable(x) => Vector{NamedTuple}
+    Tables.rowtable(rt, x) => rt
+
+Take any input table source, and produce a Vector of NamedTuples,
+also known as a "row table". A "row table" is a kind of default
+table type of sorts, since it satisfies the Tables.jl row interface
+naturally.
+
+The 2nd definition takes
+an existing row table and appends the input table source `x`
+to the existing row table.
+"""
+function rowtable end
+
 function rowtable(itr::T) where {T}
     r = rows(itr)
     return collect(namedtupleiterator(eltype(r), r))
@@ -79,6 +94,20 @@ materializer(x::ColumnTable) = columntable
 
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
+
+"""
+    Tables.columntable(x) => NamedTuple of Vectors
+    Tables.columntable(ct, x) => ct
+
+Takes any input table source `x` and returns a NamedTuple of Vectors,
+also known as a "column table". A "column table" is a kind of default
+table type of sorts, since it satisfies the Tables.jl column interface
+naturally.
+
+The 2nd definition takes an input table source `x` and appends it to an
+existing column table `ct`.
+"""
+function columntable end
 
 function columntable(sch::Schema{names, types}, cols) where {names, types}
     if @generated
