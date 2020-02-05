@@ -50,7 +50,6 @@ Base.size(nt::NamedTupleIterator) = (length(nt.x),)
     if @generated
         vals = Tuple(:(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
         return quote
-            Base.@inline_meta
             rows.st === nothing && return nothing
             row, st = rows.st
             return $(NamedTuple{Base.map(Symbol, names), T})(($(vals...),)), st
@@ -66,7 +65,6 @@ end
     if @generated
         vals = Tuple(:(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
         return quote
-            Base.@inline_meta
             x = iterate(rows.x, st)
             x === nothing && return nothing
             row, st = x
