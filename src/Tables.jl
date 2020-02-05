@@ -167,7 +167,7 @@ Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
 function Base.show(io::IO, x::T) where {T <: RorC}
     println(io, "$T:")
     names = collect(columnnames(x))
-    values = [getcolumn(row, nm) for nm in names]
+    values = [getcolumn(x, nm) for nm in names]
     Base.print_matrix(io, hcat(names, values))
 end
 

@@ -10,43 +10,88 @@ schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schem
 materializer(x::RowTable) = rowtable
 
 # struct to transform `Row`s into NamedTuples
-struct NamedTupleIterator{S, T}
+struct NamedTupleIterator{schema, T, S}
     x::T
+    st::S
 end
-Base.IteratorEltype(::Type{NamedTupleIterator{S, T}}) where {S, T} = S === Nothing ? Base.EltypeUnknown() : Base.HasEltype()
-Base.eltype(::Type{NamedTupleIterator{Schema{names, T}, S}}) where {names, T, S} = NamedTuple{Base.map(Symbol, names), T}
-Base.IteratorSize(::Type{NamedTupleIterator{S, T}}) where {S, T} = Base.IteratorSize(T)
+
+"""
+    Tables.namedtupleiterator(x)
+
+Pass any table input source and return a `NamedTuple` iterator
+"""
+function namedtupleiterator(x)
+    r = rows(x)
+    sch = schema(r)
+    st = iterate(r)
+    if st === nothing
+        # input was empty
+        return NamedTupleIterator{Schema((), ()), typeof(r), typeof(st)}(r, st)
+    end
+    row, state = st
+    if sch === nothing
+        s = Schema(columnnames(row), nothing)
+    else
+        s = sch
+    end
+    return NamedTupleIterator{typeof(s), typeof(r), typeof(st)}(r, st)
+end
+
+namedtupleiterator(::Type{T}, x) where {T <: NamedTuple} = x
+namedtupleiterator(T, x) = namedtupleiterator(x)
+
+Base.IteratorEltype(::Type{NamedTupleIterator{Schema{names, types}, T, S}}) where {names, types, T, S} = Base.HasEltype()
+Base.eltype(::Type{NamedTupleIterator{Schema{names, types}, T, S}}) where {names, types, T, S} = types === nothing ? NamedTuple{Base.map(Symbol, names)} : NamedTuple{Base.map(Symbol, names), types}
+Base.IteratorSize(::Type{NamedTupleIterator{sch, T, S}}) where {sch, T, S} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
-function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
+@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, T}, T1, T2}) where {names, T, T1, T2}
     if @generated
         vals = Tuple(:(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
         return quote
-            x = iterate(rows.x, st...)
-            x === nothing && return nothing
-            row, st = x
-            return $(NamedTuple{Base.map(Symbol, names), T})(($(vals...),)), (st,)
+            Base.@inline_meta
+            rows.st === nothing && return nothing
+            row, st = rows.st
+            return $(NamedTuple{Base.map(Symbol, names), T})(($(vals...),)), st
         end
     else
-        x = iterate(rows.x, st...)
-        x === nothing && return nothing
-        row, st = x
-        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getcolumn(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
+        rows.st === nothing && return nothing
+        row, st = rows.st
+        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getcolumn(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), st
     end
 end
 
-# unknown schema case
-function Base.iterate(rows::NamedTupleIterator{Nothing, T}, st=()) where {T}
-    x = iterate(rows.x, st...)
-    x === nothing && return nothing
-    row, st = x
-    names = Tuple(columnnames(row))
-    return NamedTuple{Base.map(Symbol, names)}(Tuple(getcolumn(row, nm) for nm in names)), (st,)
+@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st) where {names, T}
+    if @generated
+        vals = Tuple(:(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T))
+        return quote
+            Base.@inline_meta
+            x = iterate(rows.x, st)
+            x === nothing && return nothing
+            row, st = x
+            return $(NamedTuple{Base.map(Symbol, names), T})(($(vals...),)), st
+        end
+    else
+        x = iterate(rows.x, st)
+        x === nothing && return nothing
+        row, st = x
+        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getcolumn(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), st
+    end
 end
 
-namedtupleiterator(::Type{T}, rows::S) where {T <: NamedTuple, S} = rows
-namedtupleiterator(::Type{T}, rows::S) where {T, S} = NamedTupleIterator{typeof(schema(rows)), S}(rows)
+@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, nothing}}) where {names}
+    rows.st === nothing && return nothing
+    row, st = rows.st
+    return NamedTuple{names}(Tuple(getcolumn(row, nm) for nm in names)), st
+end
+
+@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, nothing}}, st) where {names}
+    x = iterate(rows.x, st)
+    x === nothing && return nothing
+    row, st = x
+    return NamedTuple{names}(Tuple(getcolumn(row, nm) for nm in names)), st
+end
 
 # sink function
 """

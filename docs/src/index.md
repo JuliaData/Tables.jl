@@ -188,6 +188,7 @@ break to highlight some useful utility functions provided by Tables.jl:
 ```@docs
 Tables.rowtable
 Tables.columntable
+Tables.namedtupleiterator
 Tables.datavaluerows
 Tables.nondatavaluerows
 Tables.table
