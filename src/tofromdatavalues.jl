@@ -16,10 +16,10 @@ end
 """
     Tables.nondatavaluerows(x)
 
-Takes any Queryverse-compatible NamedTuple iterator source and 
-converts to a Tables.jl-compatible Row iterator. Will automatically
+Takes any Queryverse-compatible `NamedTuple` iterator source and 
+converts to a Tables.jl-compatible `Row` iterator. Will automatically
 unwrap any `DataValue`s, replacing `NA` with `missing`.
-Useful for translating Query.jl results back to non-DataValue-based tables.
+Useful for translating Query.jl results back to non-`DataValue`-based tables.
 """
 nondatavaluerows(x) = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
 Tables.istable(::Type{<:IteratorWrapper}) = true
@@ -81,8 +81,8 @@ end
 """
     Tables.datavaluerows(x) => NamedTuple iterator
 
-Takes any table input `x` and returns a NamedTuple iterator
-that will replace missing values with DataValue-wrapped values;
+Takes any table input `x` and returns a `NamedTuple` iterator
+that will replace missing values with `DataValue`-wrapped values;
 this allows any table type to satisfy the TableTraits.jl 
 Queryverse integration interface by defining: 
 

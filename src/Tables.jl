@@ -9,7 +9,7 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
 end
 
 """
-    Columns
+    Tables.Columns
 
 An interface type defined as an ordered set of columns that support
 retrieval of individual columns by name or index. A retrieved column
@@ -60,7 +60,7 @@ This allows a custom table type to behave as close as possible to a builtin `Nam
 abstract type AbstractColumns end
 
 """
-    Row
+    Tables.Row
 
 An interface type that represents a single row of a table, with column values retrievable by name or index.
 The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
@@ -177,8 +177,8 @@ end
 
 Check if an object has specifically defined that it is a table. Note that 
 not all valid tables will return true, since it's possible to satisfy the
-Tables.jl interface at "run-time", e.g. a Generator of NamedTuples iterates
-NamedTuples, which satisfies the Row interface, but there's no static way
+Tables.jl interface at "run-time", e.g. a `Generator` of `NamedTuple`s iterates
+`NamedTuple`s, which satisfies the Row interface, but there's no static way
 of knowing that the generator is a table.
 """
 function istable end
@@ -190,8 +190,8 @@ istable(::Type{T}) where {T} = false
     Tables.rowaccess(x) => Bool
 
 Check whether an object has specifically defined that it implements the `Tables.rows`
-function. Note that `Tables.rows` will work on any object that iterates Row-compatible
-objects, even if they don't define `rowaccess`, e.g. a Generator of NamedTuples. Also
+function. Note that `Tables.rows` will work on any object that iterates `Row`-compatible
+objects, even if they don't define `rowaccess`, e.g. a `Generator` of `NamedTuple`s. Also
 note that just because an object defines `rowaccess` doesn't mean a user should call
 `Tables.rows` on it; `Tables.columns` will also work, providing a valid `Columns`
 object from the rows. Hence, users should call `Tables.rows` or `Tables.columns`
@@ -237,8 +237,8 @@ For a table input, return the "sink" function or "materializing" function that c
 Tables.jl-compatible table input and make an instance of the table type. This enables "transform"
 workflows that take table inputs, apply transformations, potentially converting the table to
 a different form, and end with producing a table of the same type as the original input. The
-default materializer is `Tables.columntable`, which converts any table input into a NamedTuple
-of Vectors.
+default materializer is `Tables.columntable`, which converts any table input into a `NamedTuple`
+of `Vector`s.
 """
 function materializer end
 

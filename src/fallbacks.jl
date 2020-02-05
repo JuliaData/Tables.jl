@@ -94,10 +94,10 @@ end
 # for Rows objects, we define a "collect"-like routine to build up columns from iterated rows
 
 """
-    Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) with size to hold `len` elements
+    Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually `AbstractVector`) with size to hold `len` elements
 
-    Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
-    Alternatively, and more generally, custom scalars can overload `DataAPI.defaultarray` to signal the default array type
+Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
+Alternatively, and more generally, custom scalars can overload `DataAPI.defaultarray` to signal the default array type.
 """
 allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 
@@ -192,10 +192,10 @@ end
 
 For some sinks, there's a concern about whether they can safely "own" columns from the input.
 To be safe, they should always copy input columns, to avoid unintended mutation.
-When we've called buildcolumns, however, Tables.jl essentially built/owns the columns,
+When we've called `buildcolumns`, however, Tables.jl essentially built/owns the columns,
 and it's happy to pass ownership to the sink. Thus, any built columns will be wrapped
-in a CopiedColumns struct to signal to the sink that essentially "a copy has already been made"
-and they're safe to assume ownership
+in a `CopiedColumns` struct to signal to the sink that essentially "a copy has already been made"
+and they're safe to assume ownership.
 """
 struct CopiedColumns{T} <: AbstractColumns
     x::T

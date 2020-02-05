@@ -17,7 +17,17 @@ end
 
 columnnames(t::Transforms{true}) = columnnames(getfield(t, 1))
 getcolumn(t::Transforms{true}, nm::Symbol) = Base.map(getfunc(t, getfield(t, 2), nm), getcolumn(getfield(t, 1), nm))
-getcolumn(t::Transforms{true}, i::Int) = Base.map(getfunc(t, getfield(t, 2), nm), getcolumn(getfield(t, 1), i))
+getcolumn(t::Transforms{true}, i::Int) = Base.map(getfunc(t, getfield(t, 2), i), getcolumn(getfield(t, 1), i))
+
+"""
+    Tables.transform(source, funcs) => Tables.Transforms
+    source |> Tables.transform(funcs) => Tables.Transform
+
+***EXPERIMENTAL - May be moved or removed in a future release***
+Given any Tables.jl-compatible source, apply a series of transformation functions, for the columns specified in `funcs`.
+The tranform functions can be a NamedTuple or Dict mapping column name (`String` or `Symbol` or `Integer` index) to Function.
+"""
+function transform end
 
 transform(funcs) = x->transform(x, funcs)
 transform(; kw...) = transform(kw.data)
@@ -61,6 +71,15 @@ end
 struct Select{T, columnaccess, names} <: AbstractColumns
     source::T
 end
+
+"""
+    Tables.select(source, columns...) => Tables.Select
+    source |> Tables.select(columns...) => Tables.Select
+
+***EXPERIMENTAL - May be moved or removed in a future release***
+Create a lazy wrapper that satisfies the Tables.jl interface and keeps only the columns given by the columns arguments, which can be `String`s, `Symbol`s, or `Integer`s
+"""
+function select end
 
 select(names::Symbol...) = x->select(x, names...)
 select(names::String...) = x->select(x, Base.map(Symbol, names)...)

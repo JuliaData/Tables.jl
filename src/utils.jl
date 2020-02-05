@@ -30,7 +30,7 @@ The first definition takes a function `f`, table schema `sch`, a `row` type (tha
 it generates calls to get the value for each column in the row (`Tables.getcolumn(row, nm)`) and then calls `f(val, col, name, args...)`, where `f` is the
 user-provided function, `val` is a row's column value, `col` is the column index as an `Int`, and `name` is the row's column name as a `Symbol`.
 
-While the first definition applies to an `Row` object, the last definition simply returns an AbstractColumn iterator for a `Columns` object.
+While the first definition applies to a `Row` object, the last definition simply returns an AbstractColumn iterator for a `Columns` object.
 For example, one could "collect" every column of a `Columns` object by doing:
 ```julia
 vectors = [collect(col) for col in Tables.eachcolumn(Tables.columns(x))]

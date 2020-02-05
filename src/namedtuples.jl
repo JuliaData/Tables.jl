@@ -53,7 +53,7 @@ namedtupleiterator(::Type{T}, rows::S) where {T, S} = NamedTupleIterator{typeof(
     Tables.rowtable(x) => Vector{NamedTuple}
     Tables.rowtable(rt, x) => rt
 
-Take any input table source, and produce a Vector of NamedTuples,
+Take any input table source, and produce a `Vector` of `NamedTuple`s,
 also known as a "row table". A "row table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl row interface
 naturally.
@@ -99,7 +99,7 @@ getarray(x) = collect(x)
     Tables.columntable(x) => NamedTuple of Vectors
     Tables.columntable(ct, x) => ct
 
-Takes any input table source `x` and returns a NamedTuple of Vectors,
+Takes any input table source `x` and returns a `NamedTuple` of `Vector`s,
 also known as a "column table". A "column table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl column interface
 naturally.

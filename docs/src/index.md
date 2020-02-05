@@ -51,7 +51,7 @@ Given these two powerful data access methods, let's walk through real, albeit so
 
 ### Tables.rows usage
 
-First up, let's take a look at the [SQLite.jl]() package and how it uses the Tables.jl interface to allow loading of generic table-like data into a sqlite relational table. Here's the code:
+First up, let's take a look at the [SQLite.jl](https://github.com/JuliaDatabases/SQLite.jl) package and how it uses the Tables.jl interface to allow loading of generic table-like data into a sqlite relational table. Here's the code:
 ```julia
 function load!(table, db::DB, tablename)
     # get input table rows
