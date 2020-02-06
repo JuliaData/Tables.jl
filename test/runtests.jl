@@ -151,15 +151,13 @@ end
     @test tt.a[2] === 2.0
     @test tt.a[3] === 3.0
 
-    sch = Tables.Schema((:a, :b, :c), nothing)
-    st = iterate(rt)
-    nti = Tables.NamedTupleIterator{typeof(sch), typeof(rt), typeof(st)}(rt, st)
-    @test Base.IteratorEltype(typeof(nti)) == Base.HasEltype()
+    nti = Tables.NamedTupleIterator{nothing, typeof(rt)}(rt)
+    @test Base.IteratorEltype(typeof(nti)) == Base.EltypeUnknown()
     @test Base.IteratorSize(typeof(nti)) == Base.HasShape{1}()
     @test length(nti) == 3
     nti2 = collect(nti)
     @test isequal(rt, nti2)
-    nti = Tables.NamedTupleIterator{typeof(Tables.Schema((:a, :b, :c), (Union{Int, Float64}, Union{Float64, Missing}, String))), typeof(rt), typeof(st)}(rt, st)
+    nti = Tables.NamedTupleIterator{typeof(Tables.Schema((:a, :b, :c), (Union{Int, Float64}, Union{Float64, Missing}, String))), typeof(rt)}(rt)
     @test eltype(typeof(nti)) == NamedTuple{(:a, :b, :c),Tuple{Union{Float64, Int},Union{Missing, Float64},String}}
 
     # test really wide tables

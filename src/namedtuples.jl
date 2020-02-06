@@ -54,7 +54,7 @@ Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 end
 
 function Base.iterate(rows::NamedTupleIterator{nothing})
-    x = iterate(rows.x, st...)
+    x = iterate(rows.x)
     x === nothing && return nothing
     row, st = x
     names = Tuple(columnnames(row))
