@@ -74,7 +74,7 @@ getcolumn(r::IteratorRow, i::Int) = undatavalue(getcolumn(getrow(r), i))
 columnnames(r::IteratorRow) = columnnames(getrow(r))
 
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
-struct DataValueRowIterator{NT, S}
+struct DataValueRowIterator{NT, sch, S}
     x::S
 end
 
@@ -94,22 +94,23 @@ function datavaluerows(x)
     r = Tables.rows(x)
     s = Tables.schema(r)
     s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
-    return DataValueRowIterator{datavaluenamedtuple(s), typeof(r)}(r)
+    return DataValueRowIterator{datavaluenamedtuple(s), typeof(s), typeof(r)}(r)
 end
 
-Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
+Base.eltype(rows::DataValueRowIterator{NT}) where {NT} = NT
+Base.IteratorSize(::Type{DataValueRowIterator{NT, sch, S}}) where {NT, sch, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
-function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
+function Base.iterate(rows::DataValueRowIterator{NamedTuple{names, dtypes}, Schema{names, rtypes}, S}, st=()) where {names, dtypes, rtypes, S}
     if @generated
-        vals = Tuple(:(convert($(fieldtype(NT, i)), getcolumn(row, $(nondv(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        vals = Any[ :(convert($(fieldtype(dtypes, i)), getcolumn(row, $(fieldtype(rtypes, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:length(names) ]
+        ret = Expr(:new, :(NamedTuple{names, dtypes}), vals...)
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return $NT(($(vals...),)), (st,)
+            return $ret, (st,)
         end
         # @show q
         return q
@@ -117,6 +118,6 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(convert(fieldtype(NT, i), getcolumn(row, nondv(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+        return NamedTuple{names, dtypes}(Tuple(convert(fieldtype(dtypes, i), getcolumn(row, fieldtype(rtypes, i), i, names[i])) for i = 1:length(names))), (st,)
     end
 end
