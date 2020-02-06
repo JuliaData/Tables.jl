@@ -151,7 +151,7 @@ end
     @test tt.a[2] === 2.0
     @test tt.a[3] === 3.0
 
-    nti = Tables.NamedTupleIterator{nothing, typeof(rt)}(rt)
+    nti = Tables.NamedTupleIterator{Nothing, typeof(rt)}(rt)
     @test Base.IteratorEltype(typeof(nti)) == Base.EltypeUnknown()
     @test Base.IteratorSize(typeof(nti)) == Base.HasShape{1}()
     @test length(nti) == 3
