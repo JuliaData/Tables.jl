@@ -29,7 +29,7 @@ namedtupleiterator(::Type{T}, x) where {T <: NamedTuple} = x
 namedtupleiterator(T, x) = namedtupleiterator(x)
 
 Base.IteratorEltype(::Type{NamedTupleIterator{Schema{names, types}, T}}) where {names, types, T} = Base.HasEltype()
-Base.IteratorEltype(::Type{NamedTupleIterator{nothing, T}}) where {T} = Base.EltypeUnknown()
+Base.IteratorEltype(::Type{NamedTupleIterator{Nothing, T}}) where {T} = Base.EltypeUnknown()
 Base.eltype(::Type{NamedTupleIterator{Schema{names, types}, T}}) where {names, types, T} = NamedTuple{Base.map(Symbol, names), types}
 Base.IteratorSize(::Type{NamedTupleIterator{sch, T}}) where {sch, T} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
@@ -53,7 +53,7 @@ Base.size(nt::NamedTupleIterator) = (length(nt.x),)
     end
 end
 
-function Base.iterate(rows::NamedTupleIterator{nothing})
+function Base.iterate(rows::NamedTupleIterator{Nothing})
     x = iterate(rows.x)
     x === nothing && return nothing
     row, st = x
@@ -61,7 +61,7 @@ function Base.iterate(rows::NamedTupleIterator{nothing})
     return NamedTuple{names}(Tuple(getcolumn(row, nm) for nm in names)), (Val(names), (st,))
 end
 
-function Base.iterate(rows::NamedTupleIterator{nothing}, state::Tuple{Val{names}, T}) where {names, T}
+function Base.iterate(rows::NamedTupleIterator{Nothing}, state::Tuple{Val{names}, T}) where {names, T}
     x = iterate(rows.x, state[2]...)
     x === nothing && return nothing
     row, st = x
