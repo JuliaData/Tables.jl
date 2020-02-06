@@ -24,13 +24,13 @@ function namedtupleiterator(x)
     r = rows(x)
     sch = schema(r)
     st = iterate(r)
-    if st === nothing
-        # input was empty
-        return NamedTupleIterator{Schema((), ()), typeof(r), typeof(st)}(r, st)
-    end
-    row, state = st
     if sch === nothing
-        s = Schema(columnnames(row), nothing)
+        if st !== nothing
+            row, state = st
+            s = Schema(columnnames(row), nothing)
+        else
+            s = Schema((), ())
+        end
     else
         s = sch
     end
