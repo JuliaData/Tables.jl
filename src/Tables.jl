@@ -140,10 +140,32 @@ function columnnames end
 
 columnnames(x) = propertynames(x)
 
-# default definitions for AbstractDict
+# default definitions for AbstractDict to act as Row
 getcolumn(x::AbstractDict, i::Int) = x[i]
 getcolumn(x::AbstractDict, nm::Symbol) = x[nm]
+getcolumn(x::AbstractDict, ::Type{T}, i::Int, nm::Symbol) where {T} = x[nm]
 columnnames(x::AbstractDict) = collect(keys(x))
+
+# Dict iterator as Rows
+const DictRows = AbstractVector{T} where {T <: AbstractDict}
+istable(::Type{<:DictRows}) = true
+rowaccess(::Type{<:DictRows}) = true
+rows(x::DictRows) = x
+# DictRows doesn't naturally lend itself to the `Tables.schema` requirement
+# we can't just look at the first row, because the types might change,
+# row-to-row (e.g. `missing`, then `1.1`, etc.). Therefore, the safest option
+# is to just return `nothing`
+schema(x::DictRows) = nothing
+
+# and as Columns
+const DictColumns = AbstractDict{K, V} where {K <: Union{Integer, Symbol, String}, V <: AbstractVector}
+istable(::Type{<:DictColumns}) = true
+columnaccess(::Type{<:AbstractDict}) = true
+columns(x::DictColumns) = x
+schema(x::DictColumns) = Schema(collect(keys(x)), eltype.(values(x)))
+
+# for other AbstractDict, let's throw an informative error
+columns(x::T) where {T <: AbstractDict} = error("to treat $T as a table, it must have a key type of `Integer`, `Symbol`, or `String`, and a value type `<: AbstractVector`")
 
 # default definitions for AbstractRow, AbstractColumns
 const RorC = Union{AbstractRow, AbstractColumns}
@@ -159,7 +181,8 @@ Base.getproperty(r::RorC, i::Int) = getcolumn(r, i)
 Base.propertynames(r::RorC) = columnnames(r)
 Base.keys(r::RorC) = columnnames(r)
 Base.values(r::RorC) = collect(r)
-Base.haskey(r::RorC, key::Union{Integer, Symbol}) = key in columnnames(r)
+Base.haskey(r::RorC, key::Symbol) = key in columnnames(r)
+Base.haskey(r::RorC, i::Int) = 0 < i < length(columnnames(r))
 Base.get(r::RorC, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
 Base.get(f::Base.Callable, r::RorC, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
 Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
@@ -170,6 +193,19 @@ function Base.show(io::IO, x::T) where {T <: RorC}
     values = [getcolumn(x, nm) for nm in names]
     Base.print_matrix(io, hcat(names, values))
 end
+
+# AbstractRow AbstractVector as Rows
+const AbstractRowTable = AbstractVector{T} where {T <: AbstractRow}
+istable(::Type{<:AbstractRowTable}) = true
+rowaccess(::Type{<:AbstractRowTable}) = true
+rows(x::AbstractRowTable) = x
+schema(x::AbstractRowTable) = nothing
+
+# AbstractColumns as Columns
+istable(::Type{<:AbstractColumns}) = true
+columnaccess(::Type{<:AbstractColumns}) = true
+columns(x::AbstractColumns) = x
+schema(x::AbstractColumns) = nothing
 
 # default definitions
 """

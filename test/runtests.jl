@@ -2,6 +2,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
 @testset "utils.jl" begin
 
+    @test getproperty((1, 2), 1) == 1
+
     NT = NamedTuple{(), Tuple{}}
     @test Tables.names(NT) === ()
     @test Tables.types(NT) === Tuple{}
@@ -72,6 +74,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.schema(rows) == Tables.Schema((:a, :b), (Int, Int))
     row = first(rows)
     @test row.a == 1
+    @test Tables.getcolumn(row, :a) == 1
+    @test Tables.getcolumn(row, 1) == 1
     @test Tables.istable(rows)
     @test Tables.rowaccess(rows)
     @test Tables.rows(rows) === rows
@@ -93,6 +97,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     c = Tables.CopiedColumns(nt)
     @test Tables.columns(c) === c
     @test Tables.materializer(c) == Tables.materializer(nt)
+    @test Tables.getcolumn(c, :a) == [1,2,3]
+    @test Tables.getcolumn(c, 1) == [1,2,3]
 
     @test_throws ArgumentError Tables.columntable([1,2,3])
 
@@ -229,9 +235,13 @@ end
     @test Tables.columnaccess(typeof(mattbl))
     @test Tables.columns(mattbl) === mattbl
     @test mattbl.Column1 == [1,2,3]
+    @test Tables.getcolumn(mattbl, :Column1) == [1,2,3]
+    @test Tables.getcolumn(mattbl, 1) == [1,2,3]
     matrow = first(mattbl)
     @test eltype(mattbl) == typeof(matrow)
     @test matrow.Column1 == 1
+    @test Tables.getcolumn(matrow, :Column1) == 1
+    @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 end
 
@@ -370,6 +380,8 @@ tran = ctable |> Tables.transform(C=Symbol)
 @test Tables.columns(tran) === tran
 @test IteratorInterfaceExtensions.isiterable(tran)
 @test typeof(IteratorInterfaceExtensions.getiterator(tran)) <: Tables.DataValueRowIterator
+@test isequal(Tables.getcolumn(tran, :A), [1,missing,3])
+@test isequal(Tables.getcolumn(tran, 1), [1,missing,3])
 
 tran2 = rtable |> Tables.transform(C=Symbol)
 @test Tables.istable(typeof(tran2))
@@ -383,6 +395,8 @@ trow = first(tran2)
 @test trow.A === 1
 @test trow.B === 1.0
 @test trow.C == :hey
+@test Tables.getcolumn(trow, 1) == 1
+@test Tables.getcolumn(trow, :A) == 1
 ctable2 = Tables.columntable(tran2)
 @test isequal(ctable2.A, ctable.A)
 @test ctable2.C == map(Symbol, ctable.C)
@@ -453,6 +467,8 @@ sel = Tables.select(ctable)
 @test Tables.columnaccess(typeof(sel))
 @test Tables.columns(sel) === sel
 @test propertynames(sel) == ()
+@test isequal(Tables.getcolumn(sel, 1), [1, missing, 3])
+@test isequal(Tables.getcolumn(sel, :A), [1, missing, 3])
 @test Tables.columntable(sel) == NamedTuple()
 @test Tables.rowtable(sel) == NamedTuple{(), Tuple{}}[]
 
@@ -512,6 +528,8 @@ sel = rtable |> Tables.select(1)
 @test isequal(Tables.rowtable(sel), [(A=1,), (A=missing,), (A=3,)])
 srow = first(sel)
 @test propertynames(srow) == (:A,)
+@test Tables.getcolumn(srow, 1) == 1
+@test Tables.getcolumn(srow, :A) == 1
 
 table = ctable |> Tables.select(:A) |> Tables.columntable
 @test length(table) == 1
@@ -618,4 +636,116 @@ end
 
     # DataValue{Any}
     @test isequal(Tables.columntable(Tables.nondatavaluerows([(a=DataValue{Any}(), b=DataValue{Int}())])), (a = Any[missing], b = Union{Missing, Int64}[missing]))
+end
+
+@testset "AbstractDict" begin
+
+    d = Dict(:a => 1, :b => missing, :c => "7")
+    n = (a=1, b=missing, c="7")
+    drt = [d, d, d]
+    rt = [n, n, n]
+    dct = Dict(:a => [1, 1, 1], :b => [missing, missing, missing], :c => ["7", "7", "7"])
+    ct = (a = [1, 1, 1], b = [missing, missing, missing], c = ["7", "7", "7"])
+    @test Tables.istable(drt)
+    @test Tables.rowaccess(drt)
+    @test Tables.rows(drt) === drt
+    @test Tables.schema(drt) === nothing
+    @test isequal(Tables.rowtable(drt), rt)
+    @test isequal(Tables.columntable(drt), ct)
+
+    @test Tables.istable(dct)
+    @test Tables.columnaccess(dct)
+    @test Tables.columns(dct) === dct
+    @test Tables.schema(dct) == Tables.Schema((:a, :b, :c), Tuple{Int, Missing, String})
+    @test isequal(Tables.rowtable(dct), rt)
+    @test isequal(Tables.columntable(dct), ct)
+
+    # a Dict w/ scalar values isn't a table
+    @test_throws Exception Tables.columns(d)
+    @test_throws Exception Tables.rows(d)
+end
+
+struct Row <: Tables.AbstractRow
+    a::Int
+    b::Union{Float64, Missing}
+    c::String
+end
+
+Tables.getcolumn(r::Row, i::Int) = getfield(r, i)
+Tables.getcolumn(r::Row, nm::Symbol) = getfield(r, nm)
+Tables.getcolumn(r::Row, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
+Tables.columnnames(r::Row) = fieldnames(Row)
+
+@testset "AbstractRow" begin
+
+    row = Row(1, missing, "hey")
+    row2 = Row(2, 3.14, "ho")
+
+    @test Base.IteratorSize(typeof(row)) == Base.HasLength()
+    @test length(row) == 3
+    @test firstindex(row) == 1
+    @test lastindex(row) == 3
+    @test isequal((row[1], row[2], row[3]), (1, missing, "hey"))
+    @test isequal((row[:a], row[:b], row[:c]), (1, missing, "hey"))
+    @test isequal((row.a, row.b, row.c), (1, missing, "hey"))
+    @test isequal((getproperty(row, 1), getproperty(row, 2), getproperty(row, 3)), (1, missing, "hey"))
+    @test propertynames(row) == (:a, :b, :c)
+    @test keys(row) == (:a, :b, :c)
+    @test isequal(values(row), [1, missing, "hey"])
+    @test haskey(row, :a)
+    @test haskey(row, 1)
+    @test get(row, 1, 0) == get(row, :a, 0) == 1
+    @test get(() -> 0, row, 1) == get(() -> 0, row, :a) == 1
+    @test isequal(collect(row), [1, missing, "hey"])
+    show(row)
+
+    art = [row, row2]
+    ct = (a=[1, 2], b=[missing, 3.14], c=["hey", "ho"])
+    @test Tables.istable(art)
+    @test Tables.rowaccess(art)
+    @test Tables.rows(art) === art
+    @test Tables.schema(art) === nothing
+    @test isequal(Tables.columntable(art), ct)
+
+end
+
+struct Columns <: Tables.AbstractColumns
+    a::Vector{Int}
+    b::Vector{Union{Float64, Missing}}
+    c::Vector{String}
+end
+
+Tables.getcolumn(r::Columns, i::Int) = getfield(r, i)
+Tables.getcolumn(r::Columns, nm::Symbol) = getfield(r, nm)
+Tables.getcolumn(r::Columns, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
+Tables.columnnames(r::Columns) = fieldnames(Columns)
+
+@testset "AbstractColumns" begin
+
+    col = Columns([1, 2], [missing, 3.14], ["hey", "ho"])
+
+    @test Base.IteratorSize(typeof(col)) == Base.HasLength()
+    @test length(col) == 3
+    @test firstindex(col) == 1
+    @test lastindex(col) == 3
+    @test isequal((col[1], col[2], col[3]), ([1,2], [missing,3.14], ["hey","ho"]))
+    @test isequal((col[:a], col[:b], col[:c]), ([1,2], [missing,3.14], ["hey","ho"]))
+    @test isequal((col.a, col.b, col.c), ([1,2], [missing,3.14], ["hey","ho"]))
+    @test isequal((getproperty(col, 1), getproperty(col, 2), getproperty(col, 3)), ([1,2], [missing,3.14], ["hey","ho"]))
+    @test propertynames(col) == (:a, :b, :c)
+    @test keys(col) == (:a, :b, :c)
+    @test isequal(values(col), [[1,2], [missing,3.14], ["hey","ho"]])
+    @test haskey(col, :a)
+    @test haskey(col, 1)
+    @test get(col, 1, 0) == get(col, :a, 0) == [1,2]
+    @test get(() -> 0, col, 1) == get(() -> 0, col, :a) == [1,2]
+    @test isequal(collect(col), [[1,2], [missing,3.14], ["hey","ho"]])
+    show(col)
+
+    ct = (a=[1, 2], b=[missing, 3.14], c=["hey", "ho"])
+    @test Tables.istable(col)
+    @test Tables.columnaccess(col)
+    @test Tables.columns(col) === col
+    @test Tables.schema(col) === nothing
+    @test isequal(Tables.columntable(col), ct)
 end

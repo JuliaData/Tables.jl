@@ -10,7 +10,7 @@ getcolumn(row::TransformsRow, nm::Symbol) = (getfunc(row, getfuncs(row), nm))(ge
 getcolumn(row::TransformsRow, i::Int) = (getfunc(row, getfuncs(row), i))(getcolumn(getrow(row), i))
 columnnames(row::TransformsRow) = columnnames(getrow(row))
 
-struct Transforms{C, T, F} <: AbstractColumns
+struct Transforms{C, T, F}
     source::T
     funcs::F # NamedTuple of columnname=>transform function
 end
@@ -42,7 +42,7 @@ getfunc(row, d::Dict{String, <:Base.Callable}, nm::Symbol) = get(d, String(nm), 
 getfunc(row, d::Dict{Symbol, <:Base.Callable}, nm::Symbol) = get(d, nm, identity)
 getfunc(row, d::Dict{Int, <:Base.Callable}, nm::Symbol) = get(d, findfirst(isequal(nm), columnnames(row)), identity)
 
-getfunc(row, nt::NamedTuple, i::Int) = i > fieldcount(typeof(nt)) ? identity : getfield(nt, i)
+getfunc(row, nt::NamedTuple, i::Int) = get(nt, columnnames(row)[i], identity)
 getfunc(row, d::Dict{String, <:Base.Callable}, i::Int) = get(d, String(columnnames(row)[i]), identity)
 getfunc(row, d::Dict{Symbol, <:Base.Callable}, i::Int) = get(d, columnnames(row)[i], identity)
 getfunc(row, d::Dict{Int, <:Base.Callable}, i::Int) = get(d, i, identity)
@@ -68,7 +68,7 @@ Base.eltype(t::Transforms{false, T, F}) where {T, F} = TransformsRow{eltype(getf
 end
 
 # select
-struct Select{T, columnaccess, names} <: AbstractColumns
+struct Select{T, columnaccess, names}
     source::T
 end
 
