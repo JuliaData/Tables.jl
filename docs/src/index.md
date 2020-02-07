@@ -201,3 +201,120 @@ Tables.columntype
 
 ## Implementing the Interface (i.e. becoming a Tables.jl source)
 
+Now that we've seen how one _uses_ the Tables.jl interface, let's walk-through how to implement it; i.e. how can I
+make my custom type valid for Tables.jl consumers?
+
+The interface to becoming a proper table is straightforward:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.istable(table)` |  | Declare that your table type implements the interface |
+| One of: | | |
+| `Tables.rowaccess(table)` |  | Declare that your table type defines a `Tables.rows(table)` method |
+| `Tables.rows(table)` |  | Return a `Row` iterator from your table |
+| Or: | | |
+| `Tables.columnaccess(table)` |  | Declare that your table type defines a `Tables.columns(table)` method |
+| `Tables.columns(table)` |  | Return a `Columns`-compatible object from your table |
+| Optional methods | | |
+| `Tables.schema(x)` | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Row` iterator or `Columns` object; or `nothing` for unknown schema |
+| `Tables.materializer(table)` | `Tables.columntable` | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
+
+Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Row` iterator
+or `Columns` object satisfies the respective interface:
+```@docs
+Tables.Row
+Tables.Columns
+```
+
+Though the strict requirements for `Row` and `Columns` are minimal (just `getcolumn` and `columnnames`), you may desire
+additional behavior for your row or columns types (and you're implementing them yourself). For convenience, Tables.jl
+defines the `Tables.AbstractRow` and `Tables.AbstractColumns` abstract types, to allow subtyped custom types to
+inherit convenient behavior, such as indexing, iteration, and property access, all defined in terms of `getcolumn` and `columnnames`.
+```@docs
+Tables.AbstractRow
+Tables.AbstractColumns
+```
+
+As an extended example, let's take a look at some code defined in Tables.jl for treating `AbstractMatrix`s as tables.
+
+First, we define a special `MatrixTable` type that will wrap an `AbstractMatrix`, and allow easy overloading for the 
+Tables.jl interface.
+```julia
+struct MatrixTable{T <: AbstractMatrix} <: Tables.AbstractColumns
+    names::Vector{Symbol}
+    lookup::Dict{Symbol, Int}
+    matrix::T
+end
+# declare that MatrixTable is a table
+Tables.istable(::Type{<:MatrixTable}) = true
+# getter method on stored column names
+names(m::MatrixTable) = getfield(m, :names)
+# schema is column names and types
+Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype(T), size(getfield(m, :matrix), 2)))
+```
+Here we defined `Tables.istable` for all `MatrixTable` types, signaling that my type implements the Tables.jl interfaces.
+We also defined `Tables.schema` by pulling the column names out that we stored, and since `AbstractMatrix` have a single
+`eltype`, we repeat it for each column. Note that defining `Tables.schema` is optional on tables; by default, `nothing`
+is returned and Tables.jl consumers should account for both known and unknown schema cases. It tends to allow consumers
+to have certain optimizations when they can know the types of all columns upfront (and if the # of columns isn't too large)
+to generate more efficient code.
+
+Now, in this example, we're actually going to have `MatrixTable` implement _both_ `Tables.rows` and `Tables.columns`
+methods itself, i.e. it's going to return itself from those functions, so here's first how we make our `MatrixTable` a
+valid `Columns` object:
+```julia
+# column interface
+Tables.columnaccess(::Type{<:MatrixTable}) = true
+Tables.columns(m::MatrixTable) = m
+# required Columns object methods
+Tables.getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
+Tables.getcolumn(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
+Tables.getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
+Tables.columnnames(m::MatrixTable) = names(m)
+```
+We define `columnaccess` for our type, then `columns` just returns the `MatrixTable` itself, and then we define
+the three `getcolumn` methods and `columnnames`. Note the use of a `lookup` Dict that maps column name to column index
+so we can figure out which column to return from the matrix. We're also storing the column names in our `names` field
+so the `columnnames` implementation is trivial. And that's it! Literally! It can now be written out to a csv file,
+stored in a sqlite or other database, converted to DataFrame or JuliaDB table, etc. Pretty fun.
+
+And now for the `Tables.rows` implementation:
+```julia
+# declare that any MatrixTable defines its own `Tables.rows` method
+rowaccess(::Type{<:MatrixTable}) = true
+# just return itself, which means MatrixTable must iterate `Row`-compatible objects
+rows(m::MatrixTable) = m
+# the iteration interface, at a minimum, requires `eltype`, `length`, and `iterate`
+# for `MatrixTable` `eltype`, we're going to provide a custom row type
+Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
+Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
+
+Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
+
+# a custom Row type; acts as a "view" into a row of an AbstractMatrix
+struct MatrixRow{T} <: Tables.AbstractRow
+    row::Int
+    source::MatrixTable{T}
+end
+# required `Row` interface methods (same as for `Columns` object before)
+getcolumn(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
+getcolumn(m::MatrixRow, i::Int) =
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), i]
+getcolumn(m::MatrixRow, nm::Symbol) =
+    getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
+columnnames(m::MatrixRow) = names(getfield(m, :source))
+```
+Here we start by defining `Tables.rowaccess` and `Tables.rows`, and then the iteration interface methods,
+since we declared that a `MatrixTable` itself is an iterator of `Row`-compatible objects. For `eltype`,
+we say that a `MatrixTable` iterates our own custom row type, `MatrixRow`. `MatrixRow` subtypes
+`Tables.AbstractRow`, which has the same required interface as a `Row` object, but also provides interface
+implementations for several useful behaviors (indexing, iteration, property-access, etc.); essentially it
+makes our custom `MatrixRow` type more convenient to work with.
+
+Implementing the `Row`/`Tables.AbstractRow` interface is straightfoward, and very similar to our implementation
+of `Columns` previously (i.e. the same methods for `getcolumn` and `columnnames`).
+
+And that's it. Our `MatrixTable` type is now a fully fledged, valid Tables.jl source and can be used throughout
+the ecosystem. Now, this is obviously not a lot of code; but then again, the actual Tables.jl interface
+implementations tend to be fairly simple, given the other behaviors that are already defined for table types
+(i.e. table types tend to already have a `getcolumn` like function defined).
