@@ -18,6 +18,9 @@ end
 columnnames(t::Transforms{true}) = columnnames(getfield(t, 1))
 getcolumn(t::Transforms{true}, nm::Symbol) = Base.map(getfunc(t, getfield(t, 2), nm), getcolumn(getfield(t, 1), nm))
 getcolumn(t::Transforms{true}, i::Int) = Base.map(getfunc(t, getfield(t, 2), i), getcolumn(getfield(t, 1), i))
+# for backwards compat
+Base.propertynames(t::Transforms{true}) = columnnames(t)
+Base.getproperty(t::Transforms{true}, nm::Symbol) = getcolumn(t, nm)
 
 """
     Tables.transform(source, funcs) => Tables.Transforms
@@ -124,6 +127,9 @@ getcolumn(s::Select{T, true, names}, i::Int) where {T, names} = getcolumn(getfie
 columnnames(s::Select{T, true, names}) where {T, names} = namesubset(columnnames(getfield(s, 1)), names)
 columnaccess(::Type{Select{T, C, names}}) where {T, C, names} = C
 columns(s::Select{T, true, names}) where {T, names} = s
+# for backwards compat
+Base.propertynames(s::Select{T, true, names}) where {T, names} = columnnames(s)
+Base.getproperty(s::Select{T, true, names}, nm::Symbol) where {T, names} = getcolumn(s, nm)
 
 # rows: implement Iterator interface
 Base.IteratorSize(::Type{Select{T, false, names}}) where {T, names} = Base.IteratorSize(T)
