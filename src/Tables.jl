@@ -8,98 +8,313 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
     Base.getproperty(t::Tuple, i::Int) = t[i]
 end
 
-"Abstract row type with a simple required interface: row values are accessible via `getproperty(row, field)`; for example, a NamedTuple like `nt = (a=1, b=2, c=3)` can access its value for `a` like `nt.a` which turns into a call to the function `getproperty(nt, :a)`"
+"""
+    Tables.Columns
+
+An interface type defined as an ordered set of columns that support
+retrieval of individual columns by name or index. A retrieved column
+must be an indexable collection with known length, i.e. an object
+that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
+The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
+object from any input table source.
+
+Any object implements the `Columns` interface, by satisfying the following:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(table, i::Int)` | getfield(table, i) | Retrieve a column by index |
+| `Tables.getcolumn(table, nm::Symbol)` | getproperty(table, nm) | Retrieve a column by name |
+| `Tables.columnnames(table)` | propertynames(table) | Return column names for a table as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency.
+
+Note that table sources shouldn't subtype `Columns`, as it is purely an interface type
+to help document the Tables.jl API. See the [`Tables.AbstractColumns`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+"""
+abstract type Columns end
+
+"""
+    Tables.AbstractColumns
+
+Abstract type provided to allow custom table types to inherit useful and required behavior. Note that this type
+is for convenience for table _source_ authors to provide useful default behavior to their `Columns` object,
+and not to be used or relied upon by sink authors to dispatch on; i.e. not all `Columns` objects will inherit
+from `Tables.AbstractColumns`.
+
+Interface definition:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(table, i::Int)` | getfield(table, i) | Retrieve a column by index |
+| `Tables.getcolumn(table, nm::Symbol)` | getproperty(table, nm) | Retrieve a column by name |
+| `Tables.columnnames(table)` | propertynames(table) | Return column names for a table as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency.
+
+While custom table types aren't required to subtype `Tables.AbstractColumns`, benefits of doing so include:
+  * Indexing interface defined (using `getcolumn`); i.e. `tbl[i]` will retrieve the column at index `i`
+  * Property access interface defined (using `columnnames` and `getcolumn`); i.e. `tbl.col1` will retrieve column named `col1`
+  * Iteration interface defined; i.e. `for col in table` will iterate each column in the table
+  * A default `show` method
+This allows a custom table type to behave as close as possible to a builtin `NamedTuple` of vectors object.
+"""
+abstract type AbstractColumns end
+
+"""
+    Tables.Row
+
+An interface type that represents a single row of a table, with column values retrievable by name or index.
+The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
+iterator from any input table source.
+
+Any object implements the `Row` interface, by satisfying the following:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(row, i::Int)` | getfield(row, i) | Retrieve a column value by index |
+| `Tables.getcolumn(row, nm::Symbol)` | getproperty(row, nm) | Retrieve a column value by name |
+| `Tables.columnnames(row)` | propertynames(row) | Return column names for a row as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency.
+
+Note that custom row types shouldn't subtype `Row`, as it is purely an interface type
+to help document the Tables.jl API. See the [`Tables.AbstractRow`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+"""
 abstract type Row end
 
 """
-The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data through predictable access patterns.
+    Tables.AbstractRow
 
-```julia
-    Tables.rows(table) => Rows
-    Tables.columns(table) => Columns
-```
-Where `Rows` and `Columns` are the duals of each other:
-* `Rows` is an iterator of property-accessible objects (any type that supports `propertynames(row)` and `getproperty(row, nm::Symbol`)
-* `Columns` is a property-accessible object of iterators (i.e. each column is an iterator)
+Abstract type provided to allow custom row types to inherit useful and required behavior. Note that this type
+is for convenience for table _source_ authors to provide useful default behavior to their `Row` object,
+and not to be used or relied upon by sink authors to dispatch on; i.e. not all `Row` objects will inherit
+from `Tables.AbstractRow`.
 
-In addition to these `Rows` and `Columns` objects, it's useful to be able to query properties of these objects:
-* `Tables.schema(x::Union{Rows, Columns}) => Union{Tables.Schema, Nothing}`: returns a `Tables.Schema` object, or `nothing` if the table's schema is unknown
-* For the `Tables.Schema` object:
-  * column names can be accessed as a tuple of Symbols like `sch.names`
-  * column types can be accessed as a tuple of types like `sch.types`
-  * See `?Tables.Schema` for more details on this type
+Interface definition:
+| Required Methods | Default Definition | Brief Description |
+| ---------------- | ------------------ | ----------------- |
+| `Tables.getcolumn(row, i::Int)` | getfield(row, i) | Retrieve a column value by index |
+| `Tables.getcolumn(row, nm::Symbol)` | getproperty(row, nm) | Retrieve a column value by name |
+| `Tables.columnnames(row)` | propertynames(row) | Return column names for a row as an indexable collection |
+| Optional methods | | |
+| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency.
 
-A big part of the power in these simple interface functions is that each (`Tables.rows` & `Tables.columns`) is defined for any table type, even if the table type only explicitly implements one interface function or the other.
-This is accomplished by providing performant, generic fallback definitions in Tables.jl itself (though obviously nothing prevents a table type from implementing each interface function directly).
-
-With these simple definitions, powerful workflows are enabled:
-* A package providing data cleansing, manipulation, visualization, or analysis can automatically handle any number of decoupled input table types
-* A tabular file format can have automatic integration with in-memory structures and translation to other file formats
-
-So how does one go about satisfying the Tables.jl interface functions? It mainly depends on what you've already defined and the natural access patterns of your table:
-
-First:
-* `Tables.istable(::Type{<:MyTable}) = true`: this provides an explicit affirmation that your type implements the Tables interface
-
-To support `Rows`:
-* Define `Tables.rowaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports valid `Row`-iteration
-* Define `Tables.rows(x::MyTable)`: return a `Row`-iterator object (perhaps the table itself if already defined)
-* Define `Tables.schema(Tables.rows(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
-
-To support `Columns`:
-* Define `Tables.columnaccess(::Type{<:MyTable}) = true`: this signals to other types that `MyTable` supports returning a valid `Columns` object
-* Define `Tables.columns(x::MyTable)`: return a `Columns`, property-accessible object (perhaps the table itself if it naturally supports property-access to columns)
-* Define `Tables.schema(Tables.columns(x::MyTable))` to either return a `Tables.Schema` object, or `nothing` if the schema is unknown or non-inferrable for some reason
-
-The final question is how `MyTable` can be a "sink" for any other table type. The answer is quite simple: use the interface functions!
-
-* Define a function or constructor that takes, at a minimum, a single, untyped argument and then calls `Tables.rows` or `Tables.columns` on that argument to construct an instance of `MyTable`
-
-For example, if `MyTable` is a row-oriented format, I might define my "sink" function like:
-```julia
-function MyTable(x)
-    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
-    rows = Tables.rows(x)
-    sch = Tables.schema(rows)
-    names = sch.names
-    types = sch.types
-    # custom constructor that creates an "empty" MyTable according to given column names & types
-    # note that the "unknown" schema case should be considered, i.e. when `sch.types => nothing`
-    mytbl = MyTable(names, types)
-    for row in rows
-        # a convenience function provided in Tables.jl for "unrolling" access to each column/property of a `Row`
-        # it works by applying a provided function to each value; see `?Tables.eachcolumn` for more details
-        Tables.eachcolumn(sch, row) do val, col, name
-            push!(mytbl[col], val)
-        end
-    end
-    return mytbl
-end
-```
-
-Alternatively, if `MyTable` is column-oriented, perhaps my definition would be more like:
-```julia
-function MyTable(x)
-    Tables.istable(x) || throw(ArgumentError("MyTable requires a table input"))
-    cols = Tables.columns(x)
-    # here we use Tables.eachcolumn to iterate over each column in a `Columns` object
-    return MyTable(collect(propertynames(cols)), [collect(col) for col in Tables.eachcolumn(cols)])
-end
-```
-
-Obviously every table type is different, but via a combination of `Tables.rows` and `Tables.columns` each table type should be able to construct an instance of itself.
+While custom row types aren't required to subtype `Tables.AbstractRow`, benefits of doing so include:
+  * Indexing interface defined (using `getcolumn`); i.e. `row[i]` will return the column value at index `i`
+  * Property access interface defined (using `columnnames` and `getcolumn`); i.e. `row.col1` will retrieve the value for the column named `col1`
+  * Iteration interface defined; i.e. `for x in row` will iterate each column value in the row
+  * A default `show` method
+This allows the custom row type to behave as close as possible to a builtin `NamedTuple` object.
 """
-abstract type Table end
+abstract type AbstractRow end
+
+"""
+    Tables.getcolumn(::Columns, nm::Symbol) => Indexable collection with known length
+    Tables.getcolumn(::Columns, i::Int) => Indexable collection with known length
+    Tables.getcolumn(::Columns, T, i::Int, nm::Symbol) => Indexable collection with known length
+
+    Tables.getcolumn(::Row, nm::Symbol) => Column value
+    Tables.getcolumn(::Row, i::Int) => Column value
+    Tables.getcolumn(::Row, T, i::Int, nm::Symbol) => Column value
+
+Retrieve an entire column (`Columns`) or single row column value (`Row`) by column name (`nm`), index (`i`),
+or if desired, by column type (`T`), index (`i`), and name (`nm`). When called on a `Columns` interface object,
+a `Column` is returned, which is an indexable collection with known length. When called on a `Row` interface
+object, it returns the single column value. The methods taking a single `Symbol` or `Int` are both required
+for the `AbstractColumns` and `AbstractRow` interfaces; the third method is optional if type stability is possible.
+The default definition of `Tables.getcolumn(x, i::Int)` is `getfield(x, i)`. The default definition of
+`Tables.getcolumn(x, nm::Symbol)` is `getproperty(x, nm)`.
+"""
+function getcolumn end
+
+getcolumn(x, i::Int) = getfield(x, i)
+getcolumn(x, nm::Symbol) = getproperty(x, nm)
+getcolumn(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getcolumn(x, nm)
+getcolumn(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {names, types, T} = Core.getfield(x, i)
+
+"""
+    Tables.columnnames(::Union{Columns, Row}) => Indexable collection
+
+Retrieves the list of column names as an indexable collection (like a `Tuple` or `Vector`) for a `Columns` or `Row` interface object. The default definition calls `propertynames(x)`.
+"""
+function columnnames end
+
+columnnames(x) = propertynames(x)
+
+# default definitions for AbstractDict to act as Row
+getcolumn(x::AbstractDict, i::Int) = x[i]
+getcolumn(x::AbstractDict, nm::Symbol) = x[nm]
+getcolumn(x::AbstractDict, ::Type{T}, i::Int, nm::Symbol) where {T} = x[nm]
+columnnames(x::AbstractDict) = collect(keys(x))
+
+# Dict iterator as Rows
+const DictRows = AbstractVector{T} where {T <: AbstractDict}
+istable(::Type{<:DictRows}) = true
+rowaccess(::Type{<:DictRows}) = true
+rows(x::DictRows) = x
+# DictRows doesn't naturally lend itself to the `Tables.schema` requirement
+# we can't just look at the first row, because the types might change,
+# row-to-row (e.g. `missing`, then `1.1`, etc.). Therefore, the safest option
+# is to just return `nothing`
+schema(x::DictRows) = nothing
+
+# and as Columns
+const DictColumns = AbstractDict{K, V} where {K <: Union{Integer, Symbol, String}, V <: AbstractVector}
+istable(::Type{<:DictColumns}) = true
+columnaccess(::Type{<:AbstractDict}) = true
+columns(x::DictColumns) = x
+schema(x::DictColumns) = Schema(collect(keys(x)), eltype.(values(x)))
+
+# for other AbstractDict, let's throw an informative error
+columns(x::T) where {T <: AbstractDict} = error("to treat $T as a table, it must have a key type of `Integer`, `Symbol`, or `String`, and a value type `<: AbstractVector`")
+
+# default definitions for AbstractRow, AbstractColumns
+const RorC = Union{AbstractRow, AbstractColumns}
+
+Base.IteratorSize(::Type{R}) where {R <: RorC} = Base.HasLength()
+Base.length(r::RorC) = length(columnnames(r))
+Base.firstindex(r::RorC) = 1
+Base.lastindex(r::RorC) = length(r)
+Base.getindex(r::RorC, i::Int) = getcolumn(r, i)
+Base.getindex(r::RorC, nm::Symbol) = getcolumn(r, nm)
+Base.getproperty(r::RorC, nm::Symbol) = getcolumn(r, nm)
+Base.getproperty(r::RorC, i::Int) = getcolumn(r, i)
+Base.propertynames(r::RorC) = columnnames(r)
+Base.keys(r::RorC) = columnnames(r)
+Base.values(r::RorC) = collect(r)
+Base.haskey(r::RorC, key::Symbol) = key in columnnames(r)
+Base.haskey(r::RorC, i::Int) = 0 < i < length(columnnames(r))
+Base.get(r::RorC, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
+Base.get(f::Base.Callable, r::RorC, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
+Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
+
+function Base.show(io::IO, x::T) where {T <: RorC}
+    println(io, "$T:")
+    names = collect(columnnames(x))
+    values = [getcolumn(x, nm) for nm in names]
+    Base.print_matrix(io, hcat(names, values))
+end
+
+# AbstractRow AbstractVector as Rows
+const AbstractRowTable = AbstractVector{T} where {T <: AbstractRow}
+istable(::Type{<:AbstractRowTable}) = true
+rowaccess(::Type{<:AbstractRowTable}) = true
+rows(x::AbstractRowTable) = x
+schema(x::AbstractRowTable) = nothing
+
+# AbstractColumns as Columns
+istable(::Type{<:AbstractColumns}) = true
+columnaccess(::Type{<:AbstractColumns}) = true
+columns(x::AbstractColumns) = x
+schema(x::AbstractColumns) = nothing
 
 # default definitions
+"""
+    Tables.istable(x) => Bool
+
+Check if an object has specifically defined that it is a table. Note that 
+not all valid tables will return true, since it's possible to satisfy the
+Tables.jl interface at "run-time", e.g. a `Generator` of `NamedTuple`s iterates
+`NamedTuple`s, which satisfies the Row interface, but there's no static way
+of knowing that the generator is a table.
+"""
+function istable end
+
 istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true
 istable(::Type{T}) where {T} = false
+
+"""
+    Tables.rowaccess(x) => Bool
+
+Check whether an object has specifically defined that it implements the `Tables.rows`
+function. Note that `Tables.rows` will work on any object that iterates `Row`-compatible
+objects, even if they don't define `rowaccess`, e.g. a `Generator` of `NamedTuple`s. Also
+note that just because an object defines `rowaccess` doesn't mean a user should call
+`Tables.rows` on it; `Tables.columns` will also work, providing a valid `Columns`
+object from the rows. Hence, users should call `Tables.rows` or `Tables.columns`
+depending on what is most natural for them to *consume* instead of worrying about
+what and how the input produces.
+"""
+function rowaccess end
+
 rowaccess(x::T) where {T} = rowaccess(T)
 rowaccess(::Type{T}) where {T} = false
+
+"""
+    Tables.columnaccess(x) => Bool
+
+Check whether an object has specifically defined that it implements the `Tables.columns`
+function. Note that `Tables.columns` has generic fallbacks allowing it to produces `Columns`
+objects, even if the input doesn't define `columnaccess`. Also note that just because an
+object defines `columnaccess` doesn't mean a user should call `Tables.columns` on it;
+`Tables.rows` will also work, providing a valid `Row` iterator. Hence, users should call
+`Tables.rows` or `Tables.columns` depending on what is most natural for them to *consume*
+instead of worrying about what and how the input produces.
+"""
+function columnaccess end
+
 columnaccess(x::T) where {T} = columnaccess(T)
 columnaccess(::Type{T}) where {T} = false
+
+"""
+    Tables.schema(x) => Union{Nothing, Tables.Schema}
+
+Attempt to retrieve the schema of the object returned by `Tables.rows` or `Tables.columns`.
+If the `Row` iterator or `Columns` object can't determine its schema, `nothing` will be returned.
+Otherwise, a `Tables.Schema` object is returned, with the column names and types available for use.
+"""
+function schema end
+
 schema(x) = nothing
-materializer(x) = columntable
+
+"""
+    Tables.materializer(x) => Callable
+
+For a table input, return the "sink" function or "materializing" function that can take a
+Tables.jl-compatible table input and make an instance of the table type. This enables "transform"
+workflows that take table inputs, apply transformations, potentially converting the table to
+a different form, and end with producing a table of the same type as the original input. The
+default materializer is `Tables.columntable`, which converts any table input into a `NamedTuple`
+of `Vector`s.
+"""
+function materializer end
+
+materializer(x::T) where {T} = materializer(T)
+materializer(::Type{T}) where {T} = columntable
+
+"""
+    Tables.columns(x) => Columns-compatible object
+
+Accesses data of input table source `x` by returning a [`Columns`](@ref)-compatible
+object, which allows retrieving entire columns by name or index. A retrieved column
+is an object that is indexable and has a known length, i.e. supports 
+`length(col)` and `col[i]` for any `i = 1:length(col)`. Note that
+even if the input table source is row-oriented by nature, an efficient generic
+definition of `Tables.columns` is defined in Tables.jl to build a `Columns`-
+compatible object object from the input rows.
+
+The [`Tables.Schema`](@ref) of a `Columns` object can be queried via `Tables.schema(columns)`,
+which may return `nothing` if the schema is unknown.
+Column names can be queried by calling `Tables.columnnames(columns)`. And individual columns
+can be accessed by calling `Tables.getcolumn(columns, i::Int )` or `Tables.getcolumn(columns, nm::Symbol)`
+with a column index or name, respectively.
+"""
+function columns end
+
+"""
+    Tables.rows(x) => Row iterator
+
+Accesses data of input table source `x` row-by-row by returning a [`Row`](@ref) iterator.
+Note that even if the input table source is column-oriented by nature, an efficient generic
+definition of `Tables.rows` is defined in Tables.jl to return an iterator of row views into
+the columns of the input.
+
+The [`Tables.Schema`](@ref) of a `Row` iterator can be queried via `Tables.schema(rows)`,
+which may return `nothing` if the schema is unknown.
+Column names can be queried by calling `Tables.columnnames(row)` on an individual row.
+And row values can be accessed by calling `Tables.getcolumn(rows, i::Int )` or
+`Tables.getcolumn(rows, nm::Symbol)` with a column index or name, respectively.
+"""
+function rows end
 
 # Schema implementation
 """
@@ -173,7 +388,7 @@ include("operations.jl")
 include("matrix.jl")
 
 "Return the column index (1-based) of a `colname` in a table with a known schema; returns 0 if `colname` doesn't exist in table"
-columnindex(table, colname) = columnindex(schema(table).names, colname)
+columnindex(table, colname) = columnindex(schema(table), colname)
 
 "Return the column type of a `colname` in a table with a known schema; returns Union{} if `colname` doesn't exist in table"
 columntype(table, colname) = columntype(schema(table), colname)

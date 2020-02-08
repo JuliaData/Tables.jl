@@ -1,23 +1,30 @@
 ## generic `Tables.rows` and `Tables.columns` fallbacks
 ## if a table provides Tables.rows or Tables.columns,
-## we'll provide a default implementation of the dual
+## we'll provide a default implementation of the other
 
-# generic row iteration of columns
+# for Columns objects, we define a generic RowIterator wrapper to turn any Columns into a Rows
+
+# get the number of rows in the incoming table
 function rowcount(cols)
-    props = propertynames(cols)
-    isempty(props) && return 0
-    return length(getproperty(cols, props[1]))
+    names = columnnames(cols)
+    isempty(names) && return 0
+    return length(getcolumn(cols, names[1]))
 end
 
-struct ColumnsRow{T}
+# a lazy row view into a Columns object
+struct ColumnsRow{T} <: AbstractRow
     columns::T # a `Columns` object
-    row::Int
+    row::Int # row number
 end
 
-Base.getproperty(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getproperty(getfield(c, 1), T, col, nm)[getfield(c, 2)]
-Base.getproperty(c::ColumnsRow, nm::Int) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
-Base.getproperty(c::ColumnsRow, nm::Symbol) = getproperty(getfield(c, 1), nm)[getfield(c, 2)]
-Base.propertynames(c::ColumnsRow) = propertynames(getfield(c, 1))
+getcolumns(c::ColumnsRow) = getfield(c, :columns)
+getrow(c::ColumnsRow) = getfield(c, :row)
+
+# AbstractRow interface
+Base.@propagate_inbounds getcolumn(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getcolumn(getcolumns(c), T, col, nm)[getrow(c)]
+Base.@propagate_inbounds getcolumn(c::ColumnsRow, i::Int) = getcolumn(getcolumns(c), i)[getrow(c)]
+Base.@propagate_inbounds getcolumn(c::ColumnsRow, nm::Symbol) = getcolumn(getcolumns(c), nm)[getrow(c)]
+columnnames(c::ColumnsRow) = columnnames(getcolumns(c))
 
 @generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
     exprs = Expr[]
@@ -46,16 +53,19 @@ end
     Expr(:block, exprs...)
 end
 
+# RowIterator wraps a Columns object and provides row iteration via lazy row views
 struct RowIterator{T}
     columns::T
     len::Int
 end
+
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
 istable(::Type{<:RowIterator}) = true
 rowaccess(::Type{<:RowIterator}) = true
 rows(x::RowIterator) = x
-columnaccess(::Type{<:RowIterator{T}}) where T = columnaccess(T)
+
+columnaccess(::Type{<:RowIterator}) = true
 columns(x::RowIterator) = x.columns
 materializer(x::RowIterator) = materializer(x.columns)
 schema(x::RowIterator) = schema(x.columns)
@@ -65,21 +75,29 @@ function Base.iterate(rows::RowIterator, st=1)
     return ColumnsRow(rows.columns, st), st + 1
 end
 
+# this is our generic Tables.rows fallback definition
 function rows(x::T) where {T}
+    # because this method is being called, we know `x` didn't define it's own Tables.rows
+    # first check if it supports column access, and if so, wrap it in a RowIterator
     if columnaccess(T)
         cols = columns(x)
         return RowIterator(cols, Int(rowcount(cols)))
+    # otherwise, if the input is at least iterable, we'll wrap it in an IteratorWrapper
+    # which will iterate the input, validating that it supports the Row interface
+    # and unwrapping any DataValues that are encountered
     elseif IteratorInterfaceExtensions.isiterable(x)
         return nondatavaluerows(x)
     end
     throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
 end
 
-# build columns from rows
-"""
-    Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually AbstractVector) w/ size to hold `len` elements
+# for Rows objects, we define a "collect"-like routine to build up columns from iterated rows
 
-    Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
+"""
+    Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually `AbstractVector`) with size to hold `len` elements
+
+Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
+Alternatively, and more generally, custom scalars can overload `DataAPI.defaultarray` to signal the default array type.
 """
 allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 
@@ -131,11 +149,20 @@ function __buildcolumns(rowitr, st, sch, columns, rownbr, updated)
         row, st = state
         rownbr += 1
         eachcolumns(add_or_widen!, sch, row, columns, rownbr, updated, Base.IteratorSize(rowitr))
+        # little explanation here: we just called add_or_widen! for each column value of our row
+        # note that when a column's type is widened, `updated` is set w/ the new set of columns
+        # we then check if our current `columns` isn't the same object as our `updated` ref
+        # if it isn't, we're going to call __buildcolumns again, passing our new updated ref as
+        # columns, which allows __buildcolumns to specialize (i.e. recompile) based on the new types
+        # of updated. So a new __buildcolumns will be compiled for each widening event.
         columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated)
     end
     return updated
 end
 
+# for the schema-less case, we do one extra step of initializing each column as an `EmptyVector`
+# and doing an initial widening for each column in _buildcolumns, before passing the widened
+# set of columns on to __buildcolumns
 struct EmptyVector <: AbstractVector{Union{}}
     len::Int
 end
@@ -153,14 +180,24 @@ end
     state = iterate(rowitr)
     state === nothing && return NamedTuple()
     row, st = state
-    names = Tuple(propertynames(row))
+    names = Tuple(columnnames(row))
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = Tuple(EmptyVector(len) for _ = 1:length(names))
     return NamedTuple{Base.map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
 end
 
-struct CopiedColumns{T}
+"""
+    Tables.CopiedColumns
+
+For some sinks, there's a concern about whether they can safely "own" columns from the input.
+To be safe, they should always copy input columns, to avoid unintended mutation.
+When we've called `buildcolumns`, however, Tables.jl essentially built/owns the columns,
+and it's happy to pass ownership to the sink. Thus, any built columns will be wrapped
+in a `CopiedColumns` struct to signal to the sink that essentially "a copy has already been made"
+and they're safe to assume ownership.
+"""
+struct CopiedColumns{T} <: AbstractColumns
     x::T
 end
 
@@ -170,15 +207,25 @@ columnaccess(::Type{<:CopiedColumns}) = true
 columns(x::CopiedColumns) = x
 schema(x::CopiedColumns) = schema(source(x))
 materializer(x::CopiedColumns) = materializer(source(x))
-Base.propertynames(x::CopiedColumns) = propertynames(source(x))
-Base.getproperty(x::CopiedColumns, nm::Symbol) = getproperty(source(x), nm)
 
+getcolumn(x::CopiedColumns, ::Type{T}, col::Int, nm::Symbol) where {T} = getcolumn(source(x), T, col, nm)
+getcolumn(x::CopiedColumns, i::Int) = getcolumn(source(x), i)
+getcolumn(x::CopiedColumns, nm::Symbol) = getcolumn(source(x), nm)
+columnnames(x::CopiedColumns) = columnnames(source(x))
+
+# here's our generic fallback Tables.columns definition
 @inline function columns(x::T) where {T}
+    # because this method is being called, we know `x` didn't define it's own Tables.columns method
+    # first check if it explicitly supports row access, and if so, build up the desired columns
     if rowaccess(T)
         r = rows(x)
         return CopiedColumns(buildcolumns(schema(r), r))
+    # though not widely supported, if a source supports the TableTraits column interface, use it
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return CopiedColumns(TableTraits.get_columns_copy_using_missing(x))
+    # otherwise, if the source is at least iterable, we'll wrap it in an IteratorWrapper and
+    # build columns from that, which will check if the source correctly iterates valid Row objects
+    # and unwraps DataValues for us
     elseif IteratorInterfaceExtensions.isiterable(x)
         iw = nondatavaluerows(x)
         return CopiedColumns(buildcolumns(schema(iw), iw))

@@ -13,6 +13,14 @@ struct IteratorWrapper{S}
     x::S
 end
 
+"""
+    Tables.nondatavaluerows(x)
+
+Takes any Queryverse-compatible `NamedTuple` iterator source and 
+converts to a Tables.jl-compatible `Row` iterator. Will automatically
+unwrap any `DataValue`s, replacing `NA` with `missing`.
+Useful for translating Query.jl results back to non-`DataValue`-based tables.
+"""
 nondatavaluerows(x) = IteratorWrapper(IteratorInterfaceExtensions.getiterator(x))
 Tables.istable(::Type{<:IteratorWrapper}) = true
 Tables.rowaccess(::Type{<:IteratorWrapper}) = true
@@ -31,13 +39,13 @@ Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)
 
-@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which don't satisfy the Tables.jl Row-iterator interface"))
+@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which doesn't satisfy the Tables.jl Row-iterator interface"))
 
 @inline function Base.iterate(rows::IteratorWrapper)
     x = iterate(rows.x)
     x === nothing && return nothing
     row, st = x
-    propertynames(row) === () && invalidtable(rows.x, row)
+    columnnames(row) === () && invalidtable(rows.x, row)
     return IteratorRow(row), st
 end
 
@@ -48,58 +56,61 @@ end
     return IteratorRow(row), st
 end
 
-struct IteratorRow{T}
+struct IteratorRow{T} <: AbstractRow
     row::T
 end
+
+getrow(r::IteratorRow) = getfield(r, :row)
 
 unwrap(::Type{T}, x) where {T} = convert(T, x)
 unwrap(::Type{Any}, x) = x.hasvalue ? x.value : missing
 
-function Base.getproperty(d::IteratorRow, ::Type{T}, col::Int, nm) where {T}
-    x = getproperty(getfield(d, 1), T, col, nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-function Base.getproperty(d::IteratorRow, nm::Symbol)
-    x = getproperty(getfield(d, 1), nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-function Base.getproperty(d::IteratorRow, nm::Int)
-    x = getproperty(getfield(d, 1), nm)
-    TT = typeof(x)
-    TTT = DataValueInterfaces.nondatavaluetype(TT)
-    return TT == TTT ? x : unwrap(TTT, x)
-end
-Base.propertynames(d::IteratorRow) = propertynames(getfield(d, 1))
+nondv(T) = DataValueInterfaces.nondatavaluetype(T)
+undatavalue(x::T) where {T} = T == nondv(T) ? x : unwrap(nondv(T), x)
+
+getcolumn(r::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T} = undatavalue(getcolumn(getrow(r), T, col, nm))
+getcolumn(r::IteratorRow, nm::Symbol) = undatavalue(getcolumn(getrow(r), nm))
+getcolumn(r::IteratorRow, i::Int) = undatavalue(getcolumn(getrow(r), i))
+columnnames(r::IteratorRow) = columnnames(getrow(r))
 
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
-struct DataValueRowIterator{NT, S}
+struct DataValueRowIterator{NT, sch, S}
     x::S
 end
 
+"""
+    Tables.datavaluerows(x) => NamedTuple iterator
+
+Takes any table input `x` and returns a `NamedTuple` iterator
+that will replace missing values with `DataValue`-wrapped values;
+this allows any table type to satisfy the TableTraits.jl 
+Queryverse integration interface by defining: 
+
+```
+IteratorInterfaceExtensions.getiterator(x::MyTable) = Tables.datavaluerows(x)
+```
+"""
 function datavaluerows(x)
     r = Tables.rows(x)
     s = Tables.schema(r)
     s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
-    return DataValueRowIterator{datavaluenamedtuple(s), typeof(r)}(r)
+    return DataValueRowIterator{datavaluenamedtuple(s), typeof(s), typeof(r)}(r)
 end
 
-Base.eltype(rows::DataValueRowIterator{NT, S}) where {NT, S} = NT
-Base.IteratorSize(::Type{DataValueRowIterator{NT, S}}) where {NT, S} = Base.IteratorSize(S)
+Base.eltype(rows::DataValueRowIterator{NT}) where {NT} = NT
+Base.IteratorSize(::Type{DataValueRowIterator{NT, sch, S}}) where {NT, sch, S} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
-function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: NamedTuple{names}, S} where {names}
+function Base.iterate(rows::DataValueRowIterator{NamedTuple{names, dtypes}, Schema{names, rtypes}, S}, st=()) where {names, dtypes, rtypes, S}
     if @generated
-        vals = Tuple(:(convert($(fieldtype(NT, i)), getproperty(row, $(DataValueInterfaces.nondatavaluetype(fieldtype(NT, i))), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:fieldcount(NT))
+        vals = Any[ :(convert($(fieldtype(dtypes, i)), getcolumn(row, $(fieldtype(rtypes, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:length(names) ]
+        ret = Expr(:new, :(NamedTuple{names, dtypes}), vals...)
         q = quote
             x = iterate(rows.x, st...)
             x === nothing && return nothing
             row, st = x
-            return $NT(($(vals...),)), (st,)
+            return $ret, (st,)
         end
         # @show q
         return q
@@ -107,6 +118,6 @@ function Base.iterate(rows::DataValueRowIterator{NT, S}, st=()) where {NT <: Nam
         x = iterate(rows.x, st...)
         x === nothing && return nothing
         row, st = x
-        return NT(Tuple(convert(fieldtype(NT, i), getproperty(row, DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)), i, names[i])) for i = 1:fieldcount(NT))), (st,)
+        return NamedTuple{names, dtypes}(Tuple(convert(fieldtype(dtypes, i), getcolumn(row, fieldtype(rtypes, i), i, names[i])) for i = 1:length(names))), (st,)
     end
 end
