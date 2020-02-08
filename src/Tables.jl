@@ -226,13 +226,15 @@ istable(::Type{T}) where {T} = false
     Tables.rowaccess(x) => Bool
 
 Check whether an object has specifically defined that it implements the `Tables.rows`
-function. Note that `Tables.rows` will work on any object that iterates `Row`-compatible
-objects, even if they don't define `rowaccess`, e.g. a `Generator` of `NamedTuple`s. Also
-note that just because an object defines `rowaccess` doesn't mean a user should call
-`Tables.rows` on it; `Tables.columns` will also work, providing a valid `Columns`
-object from the rows. Hence, users should call `Tables.rows` or `Tables.columns`
-depending on what is most natural for them to *consume* instead of worrying about
-what and how the input produces.
+function that does _not_ copy table data.  That is to say, `Tables.rows(x)` must be done
+with O(1) time and space complexity when `Tables.rowaccess(x) == true`.  Note that
+`Tables.rows` will work on any object that iterates `Row`-compatible objects, even if
+they don't define `rowaccess`, e.g. a `Generator` of `NamedTuple`s.  However, this
+generic fallback may copy the data from input table `x`.  Also note that just because
+an object defines `rowaccess` doesn't mean a user should call `Tables.rows` on it;
+`Tables.columns` will also work, providing a valid `Columns` object from the rows.
+Hence, users should call `Tables.rows` or `Tables.columns` depending on what is most
+natural for them to *consume* instead of worrying about what and how the input produces.
 """
 function rowaccess end
 
@@ -243,12 +245,15 @@ rowaccess(::Type{T}) where {T} = false
     Tables.columnaccess(x) => Bool
 
 Check whether an object has specifically defined that it implements the `Tables.columns`
-function. Note that `Tables.columns` has generic fallbacks allowing it to produces `Columns`
-objects, even if the input doesn't define `columnaccess`. Also note that just because an
-object defines `columnaccess` doesn't mean a user should call `Tables.columns` on it;
-`Tables.rows` will also work, providing a valid `Row` iterator. Hence, users should call
-`Tables.rows` or `Tables.columns` depending on what is most natural for them to *consume*
-instead of worrying about what and how the input produces.
+function that does _not_ copy table data.  That is to say, `Tables.columns(x)` must be done
+with O(1) time and space complexity when `Tables.columnaccess(x) == true`.  Note that
+`Tables.columns` has generic fallbacks allowing it to produces `Columns` objects, even if
+the input doesn't define `columnaccess`.  However, this generic fallback may copy the data
+from input table `x`.  Also note that just because an object defines `columnaccess` doesn't
+mean a user should call `Tables.columns` on it; `Tables.rows` will also work, providing a
+valid `Row` iterator. Hence, users should call `Tables.rows` or `Tables.columns` depending
+on what is most natural for them to *consume* instead of worrying about what and how the
+input produces.
 """
 function columnaccess end
 
