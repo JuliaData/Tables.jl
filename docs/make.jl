@@ -1,8 +1,8 @@
-using Documenter, Tables
+using Documenter, Tables, DocumenterMarkdown
 
 makedocs(;
     modules=[Tables],
-    format=Documenter.HTML(),
+    format=Markdown(),
     pages=[
         "Home" => "index.md",
     ],
