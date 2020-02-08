@@ -741,3 +741,24 @@ Tables.columnnames(r::Columns) = fieldnames(Columns)
     @test Tables.schema(col) === nothing
     @test isequal(Tables.columntable(col), ct)
 end
+
+struct IsRowTable
+    rows::Vector{NamedTuple}
+end
+
+Base.iterate(x::IsRowTable) = iterate(x.rows)
+Base.iterate(x::IsRowTable, st) = iterate(x.rows, st)
+Base.length(x::IsRowTable) = length(x.rows)
+
+Tables.isrowtable(::Type{IsRowTable}) = true
+
+@testset "Tables.isrowtable" begin
+
+    nt = (a=1, b=3.14, c="hey")
+    rt = IsRowTable([nt, nt, nt])
+    @test Tables.istable(rt)
+    @test Tables.rowaccess(rt)
+    @test Tables.rows(rt) === rt
+    @test Tables.columntable(rt) == Tables.columntable([nt, nt, nt])
+
+end
