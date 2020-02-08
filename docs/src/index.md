@@ -49,7 +49,7 @@ Tables.columns
 
 Given these two powerful data access methods, let's walk through real, albeit somewhat simplified versions of how packages actually use these methods.
 
-### Tables.rows usage
+### `Tables.rows` usage
 
 First up, let's take a look at the [SQLite.jl](https://github.com/JuliaDatabases/SQLite.jl) package and how it uses the Tables.jl interface to allow loading of generic table-like data into a sqlite relational table. Here's the code:
 ```julia
@@ -73,7 +73,7 @@ function load!(table, db::DB, tablename)
             # it's called with a schema and row, and applies
             # a user-provided function to the column `val`, index `i`
             # and column name `nm`. Here, we bind the row values
-            # to our parameterized SQl INSERT statement and then
+            # to our parameterized SQL INSERT statement and then
             # call `sqlite3_step` to execute the INSERT statement.
             Tables.eachcolumn(sch, row) do val, i, nm
                 bind!(stmt, i, val)
@@ -137,7 +137,7 @@ The strategy taken here is to start iterating the input source, and using the fi
 as a guide, we make a `Tables.Schema` object with just the column names, which we can
 then still pass to `Tables.eachcolumn` to apply our `bind!` function to each row value.
 
-### Tables.columns usage
+### `Tables.columns` usage
 
 Ok, now let's take a look at a case utlizing `Tables.columns`.
 The following code is taken from the [DataFrames.jl](https://github.com/JuliaData/DataFrames.jl/blob/master/src/other/tables.jl)
@@ -177,7 +177,7 @@ in `Vector{AbstractVector}`s by calling `Tables.getcolumn(x, nm)` for each colum
 A final note is the call to `getvector` on each column, which ensures each column is materialized
 as an `AbstractVector`, as is required by the DataFrame constructor.
 
-Note in the both the rows and columns usages, we didn't need to worry about the natural orientation
+Note in both the rows and columns usages, we didn't need to worry about the natural orientation
 of the input data; we just called `Tables.rows` or `Tables.columns` as was most natural for
 the table-specific use-case, knowing that it will Just Work™️.
 
@@ -205,18 +205,18 @@ Now that we've seen how one _uses_ the Tables.jl interface, let's walk-through h
 make my custom type valid for Tables.jl consumers?
 
 The interface to becoming a proper table is straightforward:
-| Required Methods | Default Definition | Brief Description |
-| ---------------- | ------------------ | ----------------- |
-| `Tables.istable(table)` |  | Declare that your table type implements the interface |
-| One of: | | |
-| `Tables.rowaccess(table)` |  | Declare that your table type defines a `Tables.rows(table)` method |
-| `Tables.rows(table)` |  | Return a `Row` iterator from your table |
-| Or: | | |
-| `Tables.columnaccess(table)` |  | Declare that your table type defines a `Tables.columns(table)` method |
-| `Tables.columns(table)` |  | Return a `Columns`-compatible object from your table |
-| Optional methods | | |
-| `Tables.schema(x)` | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Row` iterator or `Columns` object; or `nothing` for unknown schema |
-| `Tables.materializer(table)` | `Tables.columntable` | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
+| Required Methods             | Default Definition           | Brief Description                                                                                                               |
+|------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `Tables.istable(table)`      |                              | Declare that your table type implements the interface                                                                           |
+|  **One of:**                 |                              |                                                                                                                                 |
+| `Tables.rowaccess(table)`    |                              | Declare that your table type defines a `Tables.rows(table)` method                                                              |
+| `Tables.rows(table)`         |                              | Return a `Row` iterator from your table                                                                                         |
+| **Or:**                      |                              |                                                                                                                                 |
+| `Tables.columnaccess(table)` |                              | Declare that your table type defines a `Tables.columns(table)` method                                                           |
+| `Tables.columns(table)`      |                              | Return a `Columns`-compatible object from your table                                                                            |
+| **Optional methods**         |                              |                                                                                                                                 |
+| `Tables.schema(x)`           | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Row` iterator or `Columns` object; or `nothing` for unknown schema                   |
+| `Tables.materializer(table)` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Row` iterator
 or `Columns` object satisfies the respective interface:

@@ -75,7 +75,9 @@ end
 Take any input table source, and produce a `Vector` of `NamedTuple`s,
 also known as a "row table". A "row table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl row interface
-naturally.
+naturally, i.e. a `Vector` naturally iterates its elements, and
+`NamedTuple` satisifes the `Row` interface by default (allows
+indexing value by index, name, and getting all names).
 """
 function rowtable end
 
