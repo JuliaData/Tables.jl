@@ -205,6 +205,7 @@ Now that we've seen how one _uses_ the Tables.jl interface, let's walk-through h
 make my custom type valid for Tables.jl consumers?
 
 The interface to becoming a proper table is straightforward:
+
 | Required Methods             | Default Definition           | Brief Description                                                                                                               |
 |------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.istable(table)`      |                              | Declare that your table type implements the interface                                                                           |

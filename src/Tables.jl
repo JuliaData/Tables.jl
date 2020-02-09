@@ -42,6 +42,7 @@ and not to be used or relied upon by sink authors to dispatch on; i.e. not all `
 from `Tables.AbstractColumns`.
 
 Interface definition:
+
 | Required Methods                                         | Default Definition          | Brief Description                                                                                                                                            |
 |----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
@@ -90,6 +91,7 @@ and not to be used or relied upon by sink authors to dispatch on; i.e. not all `
 from `Tables.AbstractRow`.
 
 Interface definition:
+
 | Required Methods                                       | Default Definition        | Brief Description                                                                                                                                                |
 |--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
