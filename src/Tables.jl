@@ -62,22 +62,6 @@ abstract type AbstractColumns end
 """
     Tables.Row
 
-An interface type that represents a single row of a table, with column values retrievable by name or index.
-The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
-iterator from any input table source.
-
-Any object implements the `Row` interface, by satisfying the following:
-| Required Methods                                       | Default Definition        | Brief Description                                                                                                                                                |
-|--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
-| `Tables.getcolumn(row, nm::Symbol)`                    | getproperty(row, nm)      | Retrieve a column value by name                                                                                                                                  |
-| `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
-| **Optional methods**                                   |                           |                                                                                                                                                                  |
-| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
-
-Note that custom row types shouldn't subtype `Row`, as it is purely an interface type
-to help document the Tables.jl API. See the [`Tables.AbstractRow`](@ref) type
-for a type to potentially subtype to gain useful default behaviors.
 """
 abstract type Row end
 
@@ -308,7 +292,7 @@ function columns end
 """
     Tables.rows(x) => Row iterator
 
-Accesses data of input table source `x` row-by-row by returning a [`Row`](@ref) iterator.
+Accesses data of input table source `x` row-by-row by returning a [`Row`](@ref Row) iterator.
 Note that even if the input table source is column-oriented by nature, an efficient generic
 definition of `Tables.rows` is defined in Tables.jl to return an iterator of row views into
 the columns of the input.
