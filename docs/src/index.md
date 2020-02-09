@@ -228,6 +228,7 @@ The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
 iterator from any input table source.
 
 Any object implements the `Row` interface, by satisfying the following:
+
 | Required Methods                                       | Default Definition        | Brief Description                                                                                                                                                |
 |--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
@@ -249,6 +250,7 @@ The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
 object from any input table source.
 
 Any object implements the `Columns` interface, by satisfying the following:
+
 | Required Methods                                         | Default Definition          | Brief Description                                                                                                                                            |
 |----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
