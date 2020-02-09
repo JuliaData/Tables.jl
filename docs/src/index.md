@@ -236,8 +236,7 @@ Any object implements the `Row` interface, by satisfying the following:
 | **Optional methods**                                   |                           |                                                                                                                                                                  |
 | `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
-Note that custom row types shouldn't subtype `Row`, as it is purely an interface type
-to help document the Tables.jl API. See the [`Tables.AbstractRow`](@ref) type
+Note that there are not actual type `Row`. See the [`Tables.AbstractRow`](@ref) type
 for a type to potentially subtype to gain useful default behaviors.
 
 ### `Columns`
@@ -258,8 +257,7 @@ Any object implements the `Columns` interface, by satisfying the following:
 | **Optional methods**                                     |                             |                                                                                                                                                              |
 | `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
-Note that table sources shouldn't subtype `Columns`, as it is purely an interface type
-to help document the Tables.jl API. See the [`Tables.AbstractColumns`](@ref) type
+Note that there are no actual type `Columns`. See the [`Tables.AbstractColumns`](@ref) type
 for a type to potentially subtype to gain useful default behaviors.
 
 ### Abstract `Row` and `Columns` types
