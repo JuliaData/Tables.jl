@@ -9,7 +9,7 @@ struct MatrixTable{T <: AbstractMatrix} <: AbstractColumns
     matrix::T
 end
 
-istable(::Type{<:MatrixTable}) = true
+isrowtable(::Type{<:MatrixTable}) = true
 names(m::MatrixTable) = getfield(m, :names)
 
 # row interface
@@ -26,9 +26,7 @@ getcolumn(m::MatrixRow, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
 columnnames(m::MatrixRow) = names(getfield(m, :source))
 
-rowaccess(::Type{<:MatrixTable}) = true
 schema(m::MatrixTable{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
-rows(m::MatrixTable) = m
 Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
 Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
 
