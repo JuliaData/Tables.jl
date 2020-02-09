@@ -2,10 +2,7 @@
 const RowTable{T} = AbstractVector{T} where {T <: NamedTuple}
 
 # interface implementation
-istable(::Type{<:RowTable}) = true
-rowaccess(::Type{<:RowTable}) = true
-# an AbstractVector of NamedTuple iterates `Row`s itself
-rows(x::RowTable) = x
+isrowtable(::Type{<:RowTable}) = true
 schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
 materializer(x::RowTable) = rowtable
 

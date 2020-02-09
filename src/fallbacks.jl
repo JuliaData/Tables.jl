@@ -61,9 +61,7 @@ end
 
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
-istable(::Type{<:RowIterator}) = true
-rowaccess(::Type{<:RowIterator}) = true
-rows(x::RowIterator) = x
+isrowtable(::Type{<:RowIterator}) = true
 
 columnaccess(::Type{<:RowIterator}) = true
 columns(x::RowIterator) = x.columns
