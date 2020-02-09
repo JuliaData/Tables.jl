@@ -221,10 +221,49 @@ The interface to becoming a proper table is straightforward:
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Row` iterator
 or `Columns` object satisfies the respective interface:
-```@docs
-Tables.Row
-Tables.Columns
-```
+
+### `Row`
+
+An interface type that represents a single row of a table, with column values retrievable by name or index.
+The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
+iterator from any input table source.
+
+Any object implements the `Row` interface, by satisfying the following:
+
+| Required Methods                                       | Default Definition        | Brief Description                                                                                                                                                |
+|--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
+| `Tables.getcolumn(row, nm::Symbol)`                    | getproperty(row, nm)      | Retrieve a column value by name                                                                                                                                  |
+| `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
+| **Optional methods**                                   |                           |                                                                                                                                                                  |
+| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+
+Note that there are not actual type `Row`. See the [`Tables.AbstractRow`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+
+### `Columns`
+
+An interface type defined as an ordered set of columns that support
+retrieval of individual columns by name or index. A retrieved column
+must be an indexable collection with known length, i.e. an object
+that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
+The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
+object from any input table source.
+
+Any object implements the `Columns` interface, by satisfying the following:
+
+| Required Methods                                         | Default Definition          | Brief Description                                                                                                                                            |
+|----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
+| `Tables.getcolumn(table, nm::Symbol)`                    | getproperty(table, nm)      | Retrieve a column by name                                                                                                                                    |
+| `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as an indexable collection                                                                                                   |
+| **Optional methods**                                     |                             |                                                                                                                                                              |
+| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+
+Note that there are no actual type `Columns`. See the [`Tables.AbstractColumns`](@ref) type
+for a type to potentially subtype to gain useful default behaviors.
+
+### Abstract `Row` and `Columns` types
 
 Though the strict requirements for `Row` and `Columns` are minimal (just `getcolumn` and `columnnames`), you may desire
 additional behavior for your row or columns types (and you're implementing them yourself). For convenience, Tables.jl
