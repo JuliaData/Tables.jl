@@ -9,31 +9,6 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
 end
 
 """
-    Tables.Columns
-
-An interface type defined as an ordered set of columns that support
-retrieval of individual columns by name or index. A retrieved column
-must be an indexable collection with known length, i.e. an object
-that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
-The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
-object from any input table source.
-
-Any object implements the `Columns` interface, by satisfying the following:
-| Required Methods                                         | Default Definition          | Brief Description                                                                                                                                            |
-|----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
-| `Tables.getcolumn(table, nm::Symbol)`                    | getproperty(table, nm)      | Retrieve a column by name                                                                                                                                    |
-| `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as an indexable collection                                                                                                   |
-| **Optional methods**                                     |                             |                                                                                                                                                              |
-| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
-
-Note that table sources shouldn't subtype `Columns`, as it is purely an interface type
-to help document the Tables.jl API. See the [`Tables.AbstractColumns`](@ref) type
-for a type to potentially subtype to gain useful default behaviors.
-"""
-abstract type Columns end
-
-"""
     Tables.AbstractColumns
 
 Abstract type provided to allow custom table types to inherit useful and required behavior. Note that this type
@@ -58,12 +33,6 @@ While custom table types aren't required to subtype `Tables.AbstractColumns`, be
 This allows a custom table type to behave as close as possible to a builtin `NamedTuple` of vectors object.
 """
 abstract type AbstractColumns end
-
-"""
-    Tables.Row
-
-"""
-abstract type Row end
 
 """
     Tables.AbstractRow
@@ -273,7 +242,7 @@ materializer(::Type{T}) where {T} = columntable
 """
     Tables.columns(x) => Columns-compatible object
 
-Accesses data of input table source `x` by returning a [`Columns`](@ref)-compatible
+Accesses data of input table source `x` by returning a [`Columns`](@ref Columns)-compatible
 object, which allows retrieving entire columns by name or index. A retrieved column
 is an object that is indexable and has a known length, i.e. supports 
 `length(col)` and `col[i]` for any `i = 1:length(col)`. Note that
