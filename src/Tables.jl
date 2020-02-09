@@ -162,7 +162,27 @@ columnaccess(::Type{<:AbstractColumns}) = true
 columns(x::AbstractColumns) = x
 schema(x::AbstractColumns) = nothing
 
-# default definitions
+"""
+    Tables.isrowtable(x) => Bool
+
+For convenience, some table objects that are naturally "row oriented" can
+define `Tables.isrowtable(::Type{TableType}) = true` to simplify satisfying the
+Tables.jl interface. Requirements for defining `isrowtable` include:
+  * `Tables.rows(x) === x`, i.e. the table object itself is a `Row` iterator
+  * If the table object is mutable, it should support:
+    * `push!(x, row)`: allow pushing a single row onto table
+    * `append!(x, rows)`: allow appending set of rows onto table
+  * If table object is mutable and indexable, it should support:
+    * `x[i] = row`: allow replacing of a row with another row by index
+
+A table object that defines `Tables.isrowtable` will have definitions for
+`Tables.istable`, `Tables.rowaccess`, and `Tables.rows` automatically defined.
+"""
+function isrowtable end
+
+isrowtable(::T) where {T} = isrowtable(T)
+isrowtable(::Type{T}) where {T} = false
+
 """
     Tables.istable(x) => Bool
 
@@ -175,7 +195,7 @@ of knowing that the generator is a table.
 function istable end
 
 istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true
-istable(::Type{T}) where {T} = false
+istable(::Type{T}) where {T} = isrowtable(T)
 
 """
     Tables.rowaccess(x) => Bool
@@ -194,7 +214,7 @@ natural for them to *consume* instead of worrying about what and how the input p
 function rowaccess end
 
 rowaccess(x::T) where {T} = rowaccess(T)
-rowaccess(::Type{T}) where {T} = false
+rowaccess(::Type{T}) where {T} = isrowtable(T)
 
 """
     Tables.columnaccess(x) => Bool

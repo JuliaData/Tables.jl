@@ -358,3 +358,11 @@ And that's it. Our `MatrixTable` type is now a fully fledged, valid Tables.jl so
 the ecosystem. Now, this is obviously not a lot of code; but then again, the actual Tables.jl interface
 implementations tend to be fairly simple, given the other behaviors that are already defined for table types
 (i.e. table types tend to already have a `getcolumn` like function defined).
+
+### `Tables.isrowtable`
+
+One option for certain table types is to define `Tables.isrowtable` to automatically satisfy the Tables.jl interface.
+This can be convenient for "natural" table types that have row elements, along with other required properties.
+```@docs
+Tables.isrowtable
+```

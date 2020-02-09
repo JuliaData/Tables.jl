@@ -61,9 +61,7 @@ end
 
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = x.len
-istable(::Type{<:RowIterator}) = true
-rowaccess(::Type{<:RowIterator}) = true
-rows(x::RowIterator) = x
+isrowtable(::Type{<:RowIterator}) = true
 
 columnaccess(::Type{<:RowIterator}) = true
 columns(x::RowIterator) = x.columns
@@ -77,6 +75,7 @@ end
 
 # this is our generic Tables.rows fallback definition
 function rows(x::T) where {T}
+    isrowtable(x) && return x
     # because this method is being called, we know `x` didn't define it's own Tables.rows
     # first check if it supports column access, and if so, wrap it in a RowIterator
     if columnaccess(T)
