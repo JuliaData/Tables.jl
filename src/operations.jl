@@ -175,6 +175,15 @@ struct Filter{F, T}
     x::T
 end
 
+"""
+    Tables.filter(f, source) => Tables.Filter
+    source |> Tables.filter(f) => Tables.Filter
+
+***EXPERIMENTAL - May be moved or removed in a future release***
+Create a lazy wrapper that satisfies the Tables.jl interface and keeps the rows where `f(row)` is true.
+"""
+function filter end
+
 function filter(f::F, x) where {F <: Base.Callable}
     r = rows(x)
     return Filter{F, typeof(r)}(f, r)
