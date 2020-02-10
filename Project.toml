@@ -15,6 +15,7 @@ DataValueInterfaces = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
 QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 julia = "1"
@@ -22,4 +23,4 @@ IteratorInterfaceExtensions = "0.1.1, 1"
 TableTraits = "0.4.1, 1"
 
 [targets]
-test = ["Test", "DataValues", "QueryOperators"]
+test = ["Test", "DataValues", "QueryOperators", "SparseArrays"]

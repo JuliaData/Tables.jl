@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions
+using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
 
 @testset "utils.jl" begin
 
@@ -212,6 +212,9 @@ end
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
     @test mat3[2, :] == nt.b
+    sp = Tables.table(sparse(mat[:, 1:2]))
+    @test Tables.columnnames(sp) == [:Column1, :Column2]
+    @test Tables.getcolumn(sp, 1) == [1, 2, 3]
 
     tbl = Tables.table(mat) |> columntable
     @test keys(tbl) == (:Column1, :Column2, :Column3)
@@ -235,6 +238,7 @@ end
     @test Tables.getcolumn(matrow, :Column1) == 1
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+
 end
 
 import Base: ==
