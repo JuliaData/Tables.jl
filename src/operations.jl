@@ -168,3 +168,44 @@ end
     row, st = state
     return SelectRow{typeof(row), names}(row), st
 end
+
+# filter
+struct Filter{F, T}
+    f::F
+    x::T
+end
+
+function filter(f::F, x) where {F <: Base.Callable}
+    r = rows(x)
+    return Filter{F, typeof(r)}(f, r)
+end
+filter(f::Base.Callable) = x->filter(f, x)
+
+istable(::Type{<:Filter}) = true
+rowaccess(::Type{<:Filter}) = true
+rows(f::Filter) = f
+schema(f::Filter) = schema(f.x)
+
+Base.IteratorSize(::Type{Filter{F, T}}) where {F, T} = Base.SizeUnknown()
+Base.IteratorEltype(::Type{Filter{F, T}}) where {F, T} = Base.IteratorEltype(T)
+Base.eltype(f::Filter) = eltype(f.x)
+
+ @inline function Base.iterate(f::Filter)
+    state = iterate(f.x)
+    state === nothing && return nothing
+    while !f.f(state[1])
+        state = iterate(f.x, state[2])
+        state === nothing && return nothing
+    end
+    return state
+end
+
+ @inline function Base.iterate(f::Filter, st)
+    state = iterate(f.x, st)
+    state === nothing && return nothing
+    while !f.f(state[1])
+        state = iterate(f.x, state[2])
+        state === nothing && return nothing
+    end
+    return state
+end
