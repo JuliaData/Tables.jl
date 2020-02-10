@@ -361,9 +361,6 @@ include("fallbacks.jl")
 # allow any valid iterator to be a table
 include("tofromdatavalues.jl")
 
-# simple table operations on table inputs
-include("operations.jl")
-
 # matrix integration
 include("matrix.jl")
 
