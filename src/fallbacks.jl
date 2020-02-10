@@ -68,7 +68,7 @@ columns(x::RowIterator) = x.columns
 materializer(x::RowIterator) = materializer(x.columns)
 schema(x::RowIterator) = schema(x.columns)
 
-function Base.iterate(rows::RowIterator, st=1)
+@inline function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
     return ColumnsRow(rows.columns, st), st + 1
 end
