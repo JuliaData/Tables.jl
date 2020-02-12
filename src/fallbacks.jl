@@ -2,7 +2,7 @@
 ## if a table provides Tables.rows or Tables.columns,
 ## we'll provide a default implementation of the other
 
-# for Columns objects, we define a generic RowIterator wrapper to turn any Columns into a Rows
+# Turn any AbstractColumns into an AbstractRow iterator
 
 # get the number of rows in the incoming table
 function rowcount(cols)
@@ -11,9 +11,9 @@ function rowcount(cols)
     return length(getcolumn(cols, names[1]))
 end
 
-# a lazy row view into a Columns object
+# a lazy row view into a AbstractColumns object
 struct ColumnsRow{T} <: AbstractRow
-    columns::T # a `Columns` object
+    columns::T # an `AbstractColumns`-compatible object
     row::Int # row number
 end
 
@@ -53,7 +53,7 @@ end
     Expr(:block, exprs...)
 end
 
-# RowIterator wraps a Columns object and provides row iteration via lazy row views
+# RowIterator wraps an AbstractColumns object and provides row iteration via lazy row views
 struct RowIterator{T}
     columns::T
     len::Int
@@ -82,7 +82,7 @@ function rows(x::T) where {T}
         cols = columns(x)
         return RowIterator(cols, Int(rowcount(cols)))
     # otherwise, if the input is at least iterable, we'll wrap it in an IteratorWrapper
-    # which will iterate the input, validating that it supports the Row interface
+    # which will iterate the input, validating that elements support the AbstractRow interface
     # and unwrapping any DataValues that are encountered
     elseif IteratorInterfaceExtensions.isiterable(x)
         return nondatavaluerows(x)
@@ -90,7 +90,7 @@ function rows(x::T) where {T}
     throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
 end
 
-# for Rows objects, we define a "collect"-like routine to build up columns from iterated rows
+# for AbstractRow iterators, we define a "collect"-like routine to build up columns from iterated rows
 
 """
     Tables.allocatecolumn(::Type{T}, len) => returns a column type (usually `AbstractVector`) with size to hold `len` elements
@@ -190,7 +190,8 @@ end
     Tables.CopiedColumns
 
 For some sinks, there's a concern about whether they can safely "own" columns from the input.
-To be safe, they should always copy input columns, to avoid unintended mutation.
+If mutation will be allowed, to be safe, they should always copy input columns, to avoid unintended mutation
+to the original source.
 When we've called `buildcolumns`, however, Tables.jl essentially built/owns the columns,
 and it's happy to pass ownership to the sink. Thus, any built columns will be wrapped
 in a `CopiedColumns` struct to signal to the sink that essentially "a copy has already been made"
@@ -223,7 +224,7 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
     elseif TableTraits.supports_get_columns_copy_using_missing(x)
         return CopiedColumns(TableTraits.get_columns_copy_using_missing(x))
     # otherwise, if the source is at least iterable, we'll wrap it in an IteratorWrapper and
-    # build columns from that, which will check if the source correctly iterates valid Row objects
+    # build columns from that, which will check if the source correctly iterates valid AbstractRow objects
     # and unwraps DataValues for us
     elseif IteratorInterfaceExtensions.isiterable(x)
         iw = nondatavaluerows(x)

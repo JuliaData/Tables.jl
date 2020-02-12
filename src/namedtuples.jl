@@ -73,7 +73,7 @@ Take any input table source, and produce a `Vector` of `NamedTuple`s,
 also known as a "row table". A "row table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl row interface
 naturally, i.e. a `Vector` naturally iterates its elements, and
-`NamedTuple` satisifes the `Row` interface by default (allows
+`NamedTuple` satisifes the `AbstractRow` interface by default (allows
 indexing value by index, name, and getting all names).
 """
 function rowtable end
@@ -97,6 +97,9 @@ _eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
 Base.@pure function _eltypes(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
     return Tuple{Any[ _eltype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
 end
+
+names(::Type{NamedTuple{nms, T}}) where {nms, T} = nms
+types(::Type{NamedTuple{nms, T}}) where {nms, T} = T
 
 schema(x::T) where {T <: ColumnTable} = Schema(names(T), _eltypes(T))
 materializer(x::ColumnTable) = columntable
@@ -124,7 +127,7 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
 end
 
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, columnnames(cols)))}(Tuple(getarray(col) for col in eachcolumn(cols)))
+columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, columnnames(cols)))}(Tuple(getarray(getcolumn(cols, col)) for col in columnnames(cols)))
 
 function columntable(itr::T) where {T}
     cols = columns(itr)

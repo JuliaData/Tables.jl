@@ -3,31 +3,37 @@
 This guide provides documentation around the powerful tables interfaces in the Tables.jl package.
 Note that the package, and hence, documentation, are geared towards package and library developers
 who intend to implement and consume the interfaces. Users, on the other hand, benefit from these
-other packages that provide useful access to table data in various formats or workflows.
+other packages that provide useful access to table data in various formats or workflows. While everyone
+is encouraged to understand the interfaces and the functionality they allow, just note that most users
+don't need to use Tables.jl directly.
 
 With that said, don't hesitate to [open a new issue](https://github.com/JuliaData/Tables.jl/issues/new), even
 just for a question, or come chat with us on the [#data](https://julialang.slack.com/messages/data/) slack
-channel with question, concerns, or clarifications.
+channel with questions, concerns, or clarifications.
 
 ```@contents
+Depth = 3
 ```
 
-## Using the Interface (i.e. consuming Tables.jl sources)
+## Using the Interface (i.e. consuming Tables.jl-compatible sources)
 
-We start by discussing _usage_ of the Tables.jl interfaces, since that can help contextualize _implementing_ them.
+We start by discussing _usage_ of the Tables.jl interface functions, since that can help contextualize _implementing_ them for custom table types.
 
 At a high level, Tables.jl provides two powerful APIs for predictably accessing data from any table-like source:
 ```julia
 # access data of input table `x` row-by-row
+# Tables.rows must return a row iterator
 rows = Tables.rows(x)
 
+# we can iterate through each row
 for row in rows
     # example of getting all values in the row
-    # there are other ways to more efficiently process rows
+    # don't worry, there are other ways to more efficiently process rows
     rowvalues = [Tables.getcolumn(row, col) for col in Tables.columnnames(row)]
 end
 
 # access data of input table `x` column-by-column
+# Tables.columns returns an object where individul, entire columns can be accessed
 columns = Tables.columns(x)
 
 # iterate through each column name in table
@@ -40,7 +46,7 @@ for col in Tables.columnnames(columns)
 end
 ```
 
-So we see two high-level functions here, `Tables.rows`, and `Tables.columns`.
+So we see two high-level functions here, [`Tables.rows`](@ref), and [`Tables.columns`](@ref).
 
 ```@docs
 Tables.rows
@@ -53,12 +59,12 @@ Given these two powerful data access methods, let's walk through real, albeit so
 
 First up, let's take a look at the [SQLite.jl](https://github.com/JuliaDatabases/SQLite.jl) package and how it uses the Tables.jl interface to allow loading of generic table-like data into a sqlite relational table. Here's the code:
 ```julia
-function load!(table, db::DB, tablename)
+function load!(table, db::SQLite.DB, tablename)
     # get input table rows
     rows = Tables.rows(table)
     # query for schema of data
     sch = Tables.schema(rows)
-    # create table using tablename and data schema
+    # create table using tablename and schema from input table
     createtable!(db, tablename, sch)
     # build insert statement
     params = chop(repeat("?,", length(sch.names)))
@@ -71,7 +77,7 @@ function load!(table, db::DB, tablename)
             # Tables.eachcolumn, which allows efficiently
             # applying a function to each column value in a row
             # it's called with a schema and row, and applies
-            # a user-provided function to the column `val`, index `i`
+            # a user-provided function to the column value `val`, index `i`
             # and column name `nm`. Here, we bind the row values
             # to our parameterized SQL INSERT statement and then
             # call `sqlite3_step` to execute the INSERT statement.
@@ -86,17 +92,20 @@ function load!(table, db::DB, tablename)
 end
 ```
 
-This is pretty straightforward usage: it calls `Tables.rows` on the input table source,
-and since we need the schema to setup the database table, we query it via `Tables.schema`.
+This is pretty straightforward usage: it calls [`Tables.rows`](@ref) on the input table source,
+and since we need the schema to setup the database table, we query it via [`Tables.schema`](@ref).
 We then iterate the rows in our table via `for row in rows`, and use the convenient
-`Tables.eachcolumn` to efficiently apply a function to each value in the row. Note that
-we didn't call `Tables.columnnames` or `Tables.getcolumn` at all, since they're utilized
-by `Tables.eachcolumn` itself.
+[`Tables.eachcolumn`](@ref) to efficiently apply a function to each value in the row. Note that
+we didn't call [`Tables.columnnames`](@ref) or [`Tables.getcolumn`](@ref) at all, since they're utilized
+by [`Tables.eachcolumn`](@ref) itself. [`Tables.eachcolumn`](@ref) is optimized to provide type-stable, and even
+constant-propagation of column index, name, and type in some cases to allow for efficient
+consumption of row values.
 
 One wrinkle to consider is the "unknown schema" case; i.e. what if our [`Tables.schema`](@ref)
-call had returned `nothing`.
+call had returned `nothing` (this can be the case for exotic table sources like lazily mapped
+transformations over rows in a table):
 ```julia
-function load!(sch::Nothing, rows, db::DB, tablename)
+function load!(sch::Nothing, rows, db::SQLite.DB, tablename)
     # sch is nothing === unknown schema
     # start iteration on input table rows
     state = iterate(rows)
@@ -135,11 +144,11 @@ end
 
 The strategy taken here is to start iterating the input source, and using the first row
 as a guide, we make a `Tables.Schema` object with just the column names, which we can
-then still pass to `Tables.eachcolumn` to apply our `bind!` function to each row value.
+then still pass to [`Tables.eachcolumn`](@ref) to apply our `bind!` function to each row value.
 
 ### `Tables.columns` usage
 
-Ok, now let's take a look at a case utlizing `Tables.columns`.
+Ok, now let's take a look at a case utlizing [`Tables.columns`](@ref).
 The following code is taken from the [DataFrames.jl](https://github.com/JuliaData/DataFrames.jl/blob/master/src/other/tables.jl)
 Tables.jl implementation:
 ```julia
@@ -167,18 +176,18 @@ end
 ```
 
 So here we have a generic `DataFrame` constructor that takes a single, untyped argument,
-calls `Tables.columns` on it, then `Tables.columnnames` to get the column names.
-It then passes the `Columns`-compatible object to an internal function `fromcolumns`,
-which dispatches on a special kind of `Columns` object called a [`Tables.CopiedColumns`](@ref),
-which wraps any `Columns` object that has already had copies of its columns made, and are thus
-safe for the columns-consumer to assume ownership of (this is because DataFrames.jl, by default
-makes copies of all columns upon construction). In both cases, individual columns are collected
-in `Vector{AbstractVector}`s by calling `Tables.getcolumn(x, nm)` for each column name.
+calls [`Tables.columns`](@ref) on it, then [`Tables.columnnames`](@ref) to get the column names.
+It then passes the [`Tables.AbstractColumns`](@ref)-compatible object to an internal function `fromcolumns`,
+which dispatches on a special kind of `Tables.AbstractColumns` object called a [`Tables.CopiedColumns`](@ref),
+which wraps any `Tables.AbstractColumns`-compatible object that has already had copies of its
+columns made, and are thus safe for the columns-consumer to assume ownership of (this is because
+DataFrames.jl, by default makes copies of all columns upon construction). In both cases, individual
+columns are collected in `Vector{AbstractVector}`s by calling `Tables.getcolumn(x, nm)` for each column name.
 A final note is the call to `getvector` on each column, which ensures each column is materialized
 as an `AbstractVector`, as is required by the DataFrame constructor.
 
 Note in both the rows and columns usages, we didn't need to worry about the natural orientation
-of the input data; we just called `Tables.rows` or `Tables.columns` as was most natural for
+of the input data; we just called [`Tables.rows`](@ref) or [`Tables.columns`](@ref) as was most natural for
 the table-specific use-case, knowing that it will Just Work™️.
 
 ### Tables.jl Utilities
@@ -197,6 +206,8 @@ Tables.eachcolumn
 Tables.materializer
 Tables.columnindex
 Tables.columntype
+Tables.Row
+Tables.Columns
 ```
 
 ## Implementing the Interface (i.e. becoming a Tables.jl source)
@@ -211,73 +222,35 @@ The interface to becoming a proper table is straightforward:
 | `Tables.istable(table)`      |                              | Declare that your table type implements the interface                                                                           |
 |  **One of:**                 |                              |                                                                                                                                 |
 | `Tables.rowaccess(table)`    |                              | Declare that your table type defines a `Tables.rows(table)` method                                                              |
-| `Tables.rows(table)`         |                              | Return a `Row` iterator from your table                                                                                         |
+| `Tables.rows(table)`         |                              | Return an `Tables.AbstractRow`-compatible iterator from your table                                                              |
 | **Or:**                      |                              |                                                                                                                                 |
 | `Tables.columnaccess(table)` |                              | Declare that your table type defines a `Tables.columns(table)` method                                                           |
-| `Tables.columns(table)`      |                              | Return a `Columns`-compatible object from your table                                                                            |
+| `Tables.columns(table)`      |                              | Return an `Tables.AbstractColumns`-compatible object from your table                                                            |
 | **Optional methods**         |                              |                                                                                                                                 |
-| `Tables.schema(x)`           | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Row` iterator or `Columns` object; or `nothing` for unknown schema                   |
+| `Tables.schema(x)`           | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
 | `Tables.materializer(table)` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
 
-Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Row` iterator
-or `Columns` object satisfies the respective interface:
+Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Tables.AbstractRow` iterator
+or `Tables.AbstractColumns` object satisfies the respective interface:
 
-### `Row`
+### `Tables.AbstractRow`
 
-An interface type that represents a single row of a table, with column values retrievable by name or index.
-The high-level [`Tables.rows`](@ref) function returns a `Row`-compatible
-iterator from any input table source.
-
-Any object implements the `Row` interface, by satisfying the following:
-
-| Required Methods                                       | Default Definition        | Brief Description                                                                                                                                                |
-|--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
-| `Tables.getcolumn(row, nm::Symbol)`                    | getproperty(row, nm)      | Retrieve a column value by name                                                                                                                                  |
-| `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
-| **Optional methods**                                   |                           |                                                                                                                                                                  |
-| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
-
-Note that there are not actual type `Row`. See the [`Tables.AbstractRow`](@ref) type
-for a type to potentially subtype to gain useful default behaviors.
-
-### `Columns`
-
-An interface type defined as an ordered set of columns that support
-retrieval of individual columns by name or index. A retrieved column
-must be an indexable collection with known length, i.e. an object
-that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
-The high-level [`Tables.columns`](@ref) function returns a `Columns`-compatible
-object from any input table source.
-
-Any object implements the `Columns` interface, by satisfying the following:
-
-| Required Methods                                         | Default Definition          | Brief Description                                                                                                                                            |
-|----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
-| `Tables.getcolumn(table, nm::Symbol)`                    | getproperty(table, nm)      | Retrieve a column by name                                                                                                                                    |
-| `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as an indexable collection                                                                                                   |
-| **Optional methods**                                     |                             |                                                                                                                                                              |
-| `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
-
-Note that there are no actual type `Columns`. See the [`Tables.AbstractColumns`](@ref) type
-for a type to potentially subtype to gain useful default behaviors.
-
-### Abstract `Row` and `Columns` types
-
-Though the strict requirements for `Row` and `Columns` are minimal (just `getcolumn` and `columnnames`), you may desire
-additional behavior for your row or columns types (and you're implementing them yourself). For convenience, Tables.jl
-defines the `Tables.AbstractRow` and `Tables.AbstractColumns` abstract types, to allow subtyped custom types to
-inherit convenient behavior, such as indexing, iteration, and property access, all defined in terms of `getcolumn` and `columnnames`.
 ```@docs
 Tables.AbstractRow
+```
+
+### `Tables.AbstractColumns`
+
+```@docs
 Tables.AbstractColumns
 ```
 
+### Implementation Example
 As an extended example, let's take a look at some code defined in Tables.jl for treating `AbstractMatrix`s as tables.
 
 First, we define a special `MatrixTable` type that will wrap an `AbstractMatrix`, and allow easy overloading for the 
 Tables.jl interface.
+
 ```julia
 struct MatrixTable{T <: AbstractMatrix} <: Tables.AbstractColumns
     names::Vector{Symbol}
@@ -286,33 +259,38 @@ struct MatrixTable{T <: AbstractMatrix} <: Tables.AbstractColumns
 end
 # declare that MatrixTable is a table
 Tables.istable(::Type{<:MatrixTable}) = true
-# getter method on stored column names
+# getter methods to avoid getproperty clash
 names(m::MatrixTable) = getfield(m, :names)
+mat(m::MatrixTable) = getfield(m, :matrix)
+lookup(m::MatrixTable) = getfield(m, :lookup)
 # schema is column names and types
-Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype(T), size(getfield(m, :matrix), 2)))
+Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype(T), size(mat(m), 2)))
 ```
-Here we defined `Tables.istable` for all `MatrixTable` types, signaling that my type implements the Tables.jl interfaces.
+
+Here we defined `Tables.istable` for all `MatrixTable` types, signaling that they implement the Tables.jl interfaces.
 We also defined `Tables.schema` by pulling the column names out that we stored, and since `AbstractMatrix` have a single
-`eltype`, we repeat it for each column. Note that defining `Tables.schema` is optional on tables; by default, `nothing`
-is returned and Tables.jl consumers should account for both known and unknown schema cases. It tends to allow consumers
+`eltype`, we repeat it for each column (the call to `fill`). Note that defining `Tables.schema` is optional on tables; by default, `nothing`
+is returned and Tables.jl consumers should account for both known and unknown schema cases. Returning a schema when possible allows consumers
 to have certain optimizations when they can know the types of all columns upfront (and if the # of columns isn't too large)
 to generate more efficient code.
 
 Now, in this example, we're actually going to have `MatrixTable` implement _both_ `Tables.rows` and `Tables.columns`
 methods itself, i.e. it's going to return itself from those functions, so here's first how we make our `MatrixTable` a
-valid `Columns` object:
+valid `Tables.AbstractColumns` object:
+
 ```julia
 # column interface
 Tables.columnaccess(::Type{<:MatrixTable}) = true
 Tables.columns(m::MatrixTable) = m
-# required Columns object methods
-Tables.getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
-Tables.getcolumn(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
-Tables.getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
+# required Tables.AbstractColumns object methods
+Tables.getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = mat(m)[:, col]
+Tables.getcolumn(m::MatrixTable, nm::Symbol) = mat(m)[:, lookup(m)[nm]]
+Tables.getcolumn(m::MatrixTable, i::Int) = mat(m)[:, i]
 Tables.columnnames(m::MatrixTable) = names(m)
 ```
+
 We define `columnaccess` for our type, then `columns` just returns the `MatrixTable` itself, and then we define
-the three `getcolumn` methods and `columnnames`. Note the use of a `lookup` Dict that maps column name to column index
+the three `getcolumn` methods and `columnnames`. Note the use of a `lookup` `Dict` that maps column name to column index
 so we can figure out which column to return from the matrix. We're also storing the column names in our `names` field
 so the `columnnames` implementation is trivial. And that's it! Literally! It can now be written out to a csv file,
 stored in a sqlite or other database, converted to DataFrame or JuliaDB table, etc. Pretty fun.
@@ -321,21 +299,22 @@ And now for the `Tables.rows` implementation:
 ```julia
 # declare that any MatrixTable defines its own `Tables.rows` method
 rowaccess(::Type{<:MatrixTable}) = true
-# just return itself, which means MatrixTable must iterate `Row`-compatible objects
+# just return itself, which means MatrixTable must iterate `Tables.AbstractRow`-compatible objects
 rows(m::MatrixTable) = m
 # the iteration interface, at a minimum, requires `eltype`, `length`, and `iterate`
 # for `MatrixTable` `eltype`, we're going to provide a custom row type
 Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
-Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
+Base.length(m::MatrixTable) = size(mat(m), 1)
 
 Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
-# a custom Row type; acts as a "view" into a row of an AbstractMatrix
+# a custom row type; acts as a "view" into a row of an AbstractMatrix
 struct MatrixRow{T} <: Tables.AbstractRow
     row::Int
     source::MatrixTable{T}
 end
-# required `Row` interface methods (same as for `Columns` object before)
+# required `Tables.AbstractRow` interface methods (same as for `Tables.AbstractColumns` object before)
+# but this time, on our custom row type
 getcolumn(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
 getcolumn(m::MatrixRow, i::Int) =
@@ -345,14 +324,13 @@ getcolumn(m::MatrixRow, nm::Symbol) =
 columnnames(m::MatrixRow) = names(getfield(m, :source))
 ```
 Here we start by defining `Tables.rowaccess` and `Tables.rows`, and then the iteration interface methods,
-since we declared that a `MatrixTable` itself is an iterator of `Row`-compatible objects. For `eltype`,
+since we declared that a `MatrixTable` itself is an iterator of `Tables.AbstractRow`-compatible objects. For `eltype`,
 we say that a `MatrixTable` iterates our own custom row type, `MatrixRow`. `MatrixRow` subtypes
-`Tables.AbstractRow`, which has the same required interface as a `Row` object, but also provides interface
-implementations for several useful behaviors (indexing, iteration, property-access, etc.); essentially it
-makes our custom `MatrixRow` type more convenient to work with.
+`Tables.AbstractRow`, which provides interface implementations for several useful behaviors (indexing,
+iteration, property-access, etc.); essentially it makes our custom `MatrixRow` type more convenient to work with.
 
-Implementing the `Row`/`Tables.AbstractRow` interface is straightfoward, and very similar to our implementation
-of `Columns` previously (i.e. the same methods for `getcolumn` and `columnnames`).
+Implementing the `Tables.AbstractRow` interface is straightfoward, and very similar to our implementation
+of `Tables.AbstractColumns` previously (i.e. the same methods for `getcolumn` and `columnnames`).
 
 And that's it. Our `MatrixTable` type is now a fully fledged, valid Tables.jl source and can be used throughout
 the ecosystem. Now, this is obviously not a lot of code; but then again, the actual Tables.jl interface
@@ -362,7 +340,84 @@ implementations tend to be fairly simple, given the other behaviors that are alr
 ### `Tables.isrowtable`
 
 One option for certain table types is to define `Tables.isrowtable` to automatically satisfy the Tables.jl interface.
-This can be convenient for "natural" table types that have row elements, along with other required properties.
+This can be convenient for "natural" table types that already iterate rows.
 ```@docs
 Tables.isrowtable
+```
+
+### Testing Tables.jl Implementations
+
+One question that comes up is what the best strategies are for testing a Tables.jl implementation. Continuing with
+our `MatrixTable` example, let's see some useful ways to test that things are working as expected.
+
+```julia
+mat = [1 4.0 "7"; 2 5.0 "8"; 3 6.0 "9"]
+```
+
+First, we define a matrix literal with three columns of various differently typed values.
+
+```julia
+# first, create a MatrixTable from our matrix input
+mattbl = Tables.table(mat)
+# test that the MatrixTable `istable`
+@test Tables.istable(typeof(mattbl))
+# test that it defines row access
+@test Tables.rowaccess(typeof(mattbl))
+@test Tables.rows(mattbl) === mattbl
+# test that it defines column access
+@test Tables.columnaccess(typeof(mattbl))
+@test Tables.columns(mattbl) === mattbl
+# test that we can access the first "column" of our matrix table by column name
+@test mattbl.Column1 == [1,2,3]
+# test our `Tables.AbstractColumns` interface methods
+@test Tables.getcolumn(mattbl, :Column1) == [1,2,3]
+@test Tables.getcolumn(mattbl, 1) == [1,2,3]
+@test Tables.columnnames(mattbl) == [:Column1, :Column2, :Column3]
+# now let's iterate our MatrixTable to get our first MatrixRow
+matrow = first(mattbl)
+@test eltype(mattbl) == typeof(matrow)
+# now we can test our `Tables.AbstractRow` interface methods on our MatrixRow
+@test matrow.Column1 == 1
+@test Tables.getcolumn(matrow, :Column1) == 1
+@test Tables.getcolumn(matrow, 1) == 1
+@test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+```
+
+So, it looks like our `MatrixTable` type is looking good. It's doing everything we'd expect with regards to accessing
+its rows or columns via the Tables.jl API methods. Testing a table source like this is fairly straightforward since
+we're really just testing that our interface methods are doing what we expect them to do.
+
+Now, while we didn't go over a "sink" function for matrices in our walkthrough, there does indeed exist a `Tables.matrix` function that allows converting any table input source into a plain Julia `Matrix` object.
+
+Having both Tables.jl "source" and "sink" implementations (i.e. a type that is a Tables.jl-compatible source,
+as well as a way to _consume_ other tables), allows us to do some additional "round trip" testing: 
+
+```julia
+rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+ct = (a=[1,2,3], b=[4.0, 5.0, 6.0])
+```
+
+In addition to our `mat` object earlier, we can define a couple simple "tables"; in this case `rt` is a kind of default "row table" as a `Vector` of `NamedTuple`s, while `ct` is a default "column table" as a `NamedTuple` of `Vector`s. Notice that they contain mostly the same data as our matrix literal earlier, yet in slightly different storage formats. These default "row" and "column" tables are supported by default in Tables.jl due do their natural table representations, and hence can be excellent tools in testing table integrations.
+
+```julia
+# let's turn our row table into a plain Julia Matrix object
+mat = Tables.matrix(rt)
+# test that our matrix came out like we expected
+@test mat[:, 1] == [1, 2, 3]
+@test size(mat) == (3, 3)
+@test eltype(mat) == Any
+# so we successfully consumed a row-oriented table,
+# now let's try with a column-oriented table
+mat2 = Tables.matrix(ct)
+@test eltype(mat2) == Float64
+@test mat2[:, 1] == ct.a
+
+# now let's take our matrix input, and make a column table out of it
+tbl = Tables.table(mat) |> columntable
+@test keys(tbl) == (:Column1, :Column2, :Column3)
+@test tbl.Column1 == [1, 2, 3]
+# and same for a row table
+tbl2 = Tables.table(mat2) |> rowtable
+@test length(tbl2) == 3
+@test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
 ```

@@ -17,7 +17,7 @@ end
     Tables.nondatavaluerows(x)
 
 Takes any Queryverse-compatible `NamedTuple` iterator source and 
-converts to a Tables.jl-compatible `Row` iterator. Will automatically
+converts to a Tables.jl-compatible `AbstractRow` iterator. Will automatically
 unwrap any `DataValue`s, replacing `NA` with `missing`.
 Useful for translating Query.jl results back to non-`DataValue`-based tables.
 """
@@ -39,7 +39,7 @@ Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)
 
-@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which doesn't satisfy the Tables.jl Row-iterator interface"))
+@noinline invalidtable(::T, ::S) where {T, S} = throw(ArgumentError("'$T' iterates '$S' values, which doesn't satisfy the Tables.jl `AbstractRow` interface"))
 
 @inline function Base.iterate(rows::IteratorWrapper)
     x = iterate(rows.x)
