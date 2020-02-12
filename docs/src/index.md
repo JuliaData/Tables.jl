@@ -344,3 +344,80 @@ This can be convenient for "natural" table types that already iterate rows.
 ```@docs
 Tables.isrowtable
 ```
+
+### Testing Tables.jl Implementations
+
+One question that comes up is what the best strategies are for testing a Tables.jl implementation. Continuing with
+our `MatrixTable` example, let's see some useful ways to test that things are working as expected.
+
+```julia
+mat = [1 4.0 "7"; 2 5.0 "8"; 3 6.0 "9"]
+```
+
+First, we define a matrix literal with three columns of various differently typed values.
+
+```julia
+# first, create a MatrixTable from our matrix input
+mattbl = Tables.table(mat)
+# test that the MatrixTable `istable`
+@test Tables.istable(typeof(mattbl))
+# test that it defines row access
+@test Tables.rowaccess(typeof(mattbl))
+@test Tables.rows(mattbl) === mattbl
+# test that it defines column access
+@test Tables.columnaccess(typeof(mattbl))
+@test Tables.columns(mattbl) === mattbl
+# test that we can access the first "column" of our matrix table by column name
+@test mattbl.Column1 == [1,2,3]
+# test our `Tables.AbstractColumns` interface methods
+@test Tables.getcolumn(mattbl, :Column1) == [1,2,3]
+@test Tables.getcolumn(mattbl, 1) == [1,2,3]
+@test Tables.columnnames(mattbl) == [:Column1, :Column2, :Column3]
+# now let's iterate our MatrixTable to get our first MatrixRow
+matrow = first(mattbl)
+@test eltype(mattbl) == typeof(matrow)
+# now we can test our `Tables.AbstractRow` interface methods on our MatrixRow
+@test matrow.Column1 == 1
+@test Tables.getcolumn(matrow, :Column1) == 1
+@test Tables.getcolumn(matrow, 1) == 1
+@test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+```
+
+So, it looks like our `MatrixTable` type is looking good. It's doing everything we'd expect with regards to accessing
+its rows or columns via the Tables.jl API methods. Testing a table source like this is fairly straightforward since
+we're really just testing that our interface methods are doing what we expect them to do.
+
+Now, while we didn't go over a "sink" function for matrices in our walkthrough, there does indeed exist a `Tables.matrix` function that allows converting any table input source into a plain Julia `Matrix` object.
+
+Having both Tables.jl "source" and "sink" implementations (i.e. a type that is a Tables.jl-compatible source,
+as well as a way to _consume_ other tables), allows us to do some additional "round trip" testing: 
+
+```julia
+rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+ct = (a=[1,2,3], b=[4.0, 5.0, 6.0])
+```
+
+In addition to our `mat` object earlier, we can define a couple simple "tables"; in this case `rt` is a kind of default "row table" as a `Vector` of `NamedTuple`s, while `ct` is a default "column table" as a `NamedTuple` of `Vector`s. Notice that they contain mostly the same data as our matrix literal earlier, yet in slightly different storage formats. These default "row" and "column" tables are supported by default in Tables.jl due do their natural table representations, and hence can be excellent tools in testing table integrations.
+
+```julia
+# let's turn our row table into a plain Julia Matrix object
+mat = Tables.matrix(rt)
+# test that our matrix came out like we expected
+@test mat[:, 1] == [1, 2, 3]
+@test size(mat) == (3, 3)
+@test eltype(mat) == Any
+# so we successfully consumed a row-oriented table,
+# now let's try with a column-oriented table
+mat2 = Tables.matrix(ct)
+@test eltype(mat2) == Float64
+@test mat2[:, 1] == ct.a
+
+# now let's take our matrix input, and make a column table out of it
+tbl = Tables.table(mat) |> columntable
+@test keys(tbl) == (:Column1, :Column2, :Column3)
+@test tbl.Column1 == [1, 2, 3]
+# and same for a row table
+tbl2 = Tables.table(mat2) |> rowtable
+@test length(tbl2) == 3
+@test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
+```
