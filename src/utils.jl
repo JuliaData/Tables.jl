@@ -1,6 +1,3 @@
-names(::Type{NamedTuple{nms, T}}) where {nms, T} = nms
-types(::Type{NamedTuple{nms, T}}) where {nms, T} = T
-
 "helper function to calculate a run-length encoding of a tuple type"
 Base.@pure function runlength(::Type{T}) where {T <: Tuple}
     rle = Tuple{Type, Int}[]
@@ -23,31 +20,55 @@ Base.@pure function runlength(::Type{T}) where {T <: Tuple}
 end
 
 """
-    Tables.eachcolumn(f, sch, row, args...)
-    Tables.eachcolumn(Tables.columns(x))
+    Tables.eachcolumn(f, sch::Tables.Schema{names, types}, x::Union{Tables.AbstractRow, Tables.AbstractColumns})
+    Tables.eachcolumn(f, sch::Tables.Schema{names, nothing}, x::Union{Tables.AbstractRow, Tables.AbstractColumns})
 
-The first definition takes a function `f`, table schema `sch`, a `row` object (that satisfies the `Row` interface), and any other `args...`;
-it generates calls to get the value for each column in the row (`Tables.getcolumn(row, nm)`) and then calls `f(val, col, name, args...)`, where `f` is the
-user-provided function, `val` is a row's column value, `col` is the column index as an `Int`, and `name` is the row's column name as a `Symbol`.
+Takes a function `f`, table schema `sch`, `x`, which is an object that satisfies the `AbstractRow` or `AbstractColumns` interfaces;
+it generates calls to get the value for each column (`Tables.getcolumn(x, nm)`) and then calls `f(val, index, name)`, where `f` is the
+user-provided function, `val` is the column value (`AbstractRow`) or entire column (`AbstractColumns`), `index` is the column index as an `Int`,
+and `name` is the column name as a `Symbol`.
 
-While the first definition applies to a `Row` object, the 2nd definition applies to a `Columns` object, which simply iterates each column.
-For example, one could get every column of a `Columns` object by doing:
+An example using `Tables.eachcolumn` is:
 ```julia
-vectors = [col for col in Tables.eachcolumn(Tables.columns(x))]
+rows = Tables.rows(tbl)
+sch = Tables.schema(rows)
+if sch === nothing
+    state = iterate(rows)
+    state === nothing && return
+    row, st = state
+    sch = Tables.schema(Tables.columnnames(row), nothing)
+    while state !== nothing
+        Tables.eachcolumn(sch, row) do val, i, nm
+            bind!(stmt, i, val)
+        end
+        state = iterate(rows, st)
+        state === nothing && return
+        row, st = state
+    end
+else
+    for row in rows
+        Tables.eachcolumn(sch, row) do val, i, nm
+            bind!(stmt, i, val)
+        end
+    end
+end
 ```
+Note in this example we account for the input table potentially returning `nothing` from `Tables.schema(rows)`; in that case, we start
+iterating the rows, and build a partial schema using the column names from the first row `sch = Tables.schema(Tables.columnnames(row), nothing)`,
+which is valid to pass to `Tables.eachcolumn`.
 """
 function eachcolumn end
 
 quot(s::Symbol) = Meta.QuoteNode(s)
 quot(x::Int) = x
 
-@inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row, args...) where {names, types}
+@inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row) where {names, types}
     if @generated
         if length(names) < 101
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), args...)
+                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])))
                 end)
             end
             return block
@@ -59,7 +80,7 @@ quot(x::Int) = x
             for (T, len) in rle
                 push!(block.args, quote
                     for j = 0:$(len-1)
-                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], args...)
+                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j])
                     end
                 end)
                 i += len
@@ -69,7 +90,7 @@ quot(x::Int) = x
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, args...)
+                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm)
                 end
                 return
             end
@@ -78,19 +99,19 @@ quot(x::Int) = x
         return b
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, args...)
+            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm)
         end
         return
     end
 end
 
-@inline function eachcolumn(f::Base.Callable, sch::Schema{names, nothing}, row, args...) where {names}
+@inline function eachcolumn(f::Base.Callable, sch::Schema{names, nothing}, row) where {names}
     if @generated
         if length(names) < 100
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), args...)
+                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])))
                 end)
             end
             return block
@@ -98,7 +119,7 @@ end
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, nm), i, nm, args...)
+                    f(getcolumn(row, nm), i, nm)
                 end
                 return
             end
@@ -106,7 +127,7 @@ end
         end
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, nm), i, nm, args...)
+            f(getcolumn(row, nm), i, nm)
         end
         return
     end
@@ -114,13 +135,13 @@ end
 
 # these are specialized `eachcolumn`s where we also want
 # the indexing of `columns` to be constant propagated, so it needs to be returned from the generated function
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns, args...) where {names, types}
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns) where {names, types}
     if @generated
         if length(names) < 101
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
+                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i])
                 end)
             end
             return block
@@ -132,7 +153,7 @@ end
             for (T, len) in rle
                 push!(block.args, quote
                     for j = 0:$(len-1)
-                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j], args...)
+                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j])
                     end
                 end)
                 i += len
@@ -142,7 +163,7 @@ end
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
+                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i])
                 end
                 return
             end
@@ -151,19 +172,19 @@ end
         return b
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
+            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i])
         end
         return
     end
 end
 
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns, args...) where {names}
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns) where {names}
     if @generated
         if length(names) < 100
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
+                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i])
                 end)
             end
             return block
@@ -171,7 +192,7 @@ end
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, nm), i, nm, columns[i], args...)
+                    f(getcolumn(row, nm), i, nm, columns[i])
                 end
                 return
             end
@@ -179,47 +200,8 @@ end
         end
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, nm), i, nm, columns[i], args...)
+            f(getcolumn(row, nm), i, nm, columns[i])
         end
         return
     end
-end
-
-# iterator over a `Columns`' properties
-struct EachColumn{T}
-    source::T
-end
-
-Base.length(e::EachColumn) = length(columnnames(e.source))
-Base.IteratorEltype(::Type{<:EachColumn}) = Base.EltypeUnknown()
-
-function Base.iterate(e::EachColumn, (idx, props)=(1, columnnames(e.source)))
-    idx > length(props) && return nothing
-    return getcolumn(e.source, props[idx]), (idx + 1, props)
-end
-
-eachcolumn(c) = EachColumn(c)
-
-Base.@pure columnindex(::Schema{names, types}, name::Symbol) where {names, types} = columnindex(names, name)
-
-"given names and a Symbol `name`, compute the index (1-based) of the name in names"
-Base.@pure function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
-    i = 1
-    for nm in names
-        nm === name && return i
-        i += 1
-    end
-    return 0
-end
-
-Base.@pure columntype(::Schema{names, types}, name::Symbol) where {names, types} = columntype(names, types, name)
-
-"given tuple type and a Symbol `name`, compute the type of the name in the tuples types"
-Base.@pure function columntype(names::Tuple{Vararg{Symbol}}, ::Type{types}, name::Symbol) where {types <: Tuple}
-    i = 1
-    for nm in names
-        nm === name && return fieldtype(types, i)
-        i += 1
-    end
-    return Union{}
 end
