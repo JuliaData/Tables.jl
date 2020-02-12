@@ -32,8 +32,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     nt = (a=1, b=2, c=3)
     NT = typeof(nt)
     output = [0, 0, 0]
-    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
-        out[col] = val
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt) do val, col, nm
+        output[col] = val
     end
     @test output == [1, 2, 3]
 
@@ -41,8 +41,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     NT = typeof(nt)
     @test Tables.runlength(Tables.types(NT)) == [(Int, 101)]
     output = zeros(Int, 101)
-    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
-        out[col] = val
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt) do val, col, nm
+        output[col] = val
     end
     @test output == [i for i = 1:101]
 
@@ -50,8 +50,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     NT = typeof(nt)
     @test Tables.runlength(Tables.types(NT)) == [i % 2 == 0 ? (Int, 1) : (String, 1) for i = 1:101]
     output = Vector{Any}(undef, 101)
-    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt, output) do val, col, nm, out
-        out[col] = val
+    Tables.eachcolumn(Tables.Schema(Tables.names(NT), Tables.types(NT)), nt) do val, col, nm
+        output[col] = val
     end
     @test output == [i % 2 == 0 ? i : "$i" for i = 1:101]
 
@@ -63,7 +63,6 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test nt.b[] == 2
 
     nt = (a=[1,2,3], b=[4,5,6])
-    @test collect(Tables.eachcolumn(nt)) == [[1,2,3], [4,5,6]]
     @test Tables.columnindex(nt, :i) == 0
     @test Tables.columnindex(nt, :a) == 1
     @test Tables.columntype(nt, :a) == Int

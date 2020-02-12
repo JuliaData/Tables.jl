@@ -127,7 +127,7 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
 end
 
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, columnnames(cols)))}(Tuple(getarray(col) for col in eachcolumn(cols)))
+columntable(::Nothing, cols) = NamedTuple{Tuple(Base.map(Symbol, columnnames(cols)))}(Tuple(getarray(getcolumn(cols, col)) for col in columnnames(cols)))
 
 function columntable(itr::T) where {T}
     cols = columns(itr)

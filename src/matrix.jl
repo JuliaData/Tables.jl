@@ -63,18 +63,18 @@ ignored in the conversion. By default, input table columns will be materialized 
 matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows.
 """
 function matrix(table; transpose::Bool=false)
-    cols = Tables.columns(table)
+    cols = columns(table)
     types = schema(cols).types
     T = reduce(promote_type, types)
     n, p = rowcount(cols), length(types)
     if !transpose
         mat = Matrix{T}(undef, n, p)
-        for (i, col) in enumerate(Tables.eachcolumn(cols))
+        for (i, col) in enumerate(Columns(cols))
             mat[:, i] = col
         end
     else
         mat = Matrix{T}(undef, p, n)
-        for (i, col) in enumerate(Tables.eachcolumn(cols))
+        for (i, col) in enumerate(Columns(cols))
             mat[i, :] = col
         end
     end

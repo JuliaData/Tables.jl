@@ -135,13 +135,13 @@ end
 
 # these are specialized `eachcolumn`s where we also want
 # the indexing of `columns` to be constant propagated, so it needs to be returned from the generated function
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns) where {names, types}
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns, args...) where {names, types}
     if @generated
         if length(names) < 101
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i])
+                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
                 end)
             end
             return block
@@ -153,7 +153,7 @@ end
             for (T, len) in rle
                 push!(block.args, quote
                     for j = 0:$(len-1)
-                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j])
+                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j], args...)
                     end
                 end)
                 i += len
@@ -163,7 +163,7 @@ end
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i])
+                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
                 end
                 return
             end
@@ -172,19 +172,19 @@ end
         return b
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i])
+            f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
         end
         return
     end
 end
 
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns) where {names}
+@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns, args...) where {names}
     if @generated
         if length(names) < 100
             block = Expr(:block, Expr(:meta, :inline))
             for i = 1:length(names)
                 push!(block.args, quote
-                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i])
+                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
                 end)
             end
             return block
@@ -192,7 +192,7 @@ end
             b = quote
                 $(Expr(:meta, :inline))
                 for (i, nm) in enumerate(names)
-                    f(getcolumn(row, nm), i, nm, columns[i])
+                    f(getcolumn(row, nm), i, nm, columns[i], args...)
                 end
                 return
             end
@@ -200,7 +200,7 @@ end
         end
     else
         for (i, nm) in enumerate(names)
-            f(getcolumn(row, nm), i, nm, columns[i])
+            f(getcolumn(row, nm), i, nm, columns[i], args...)
         end
         return
     end
