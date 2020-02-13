@@ -413,18 +413,18 @@ include("tofromdatavalues.jl")
 include("matrix.jl")
 
 """
-    Tables.columnindex(table, name)
+    Tables.columnindex(table, name::Symbol)
 
 Return the column index (1-based) of a column by `name` in a table with a known schema; returns 0 if `name` doesn't exist in table
 """
-columnindex(table, colname) = columnindex(schema(table), colname)
+columnindex(table, colname::Symbol) = columnindex(schema(table), colname)
 
 """
-    Tables.columntype(table, name)
+    Tables.columntype(table, name::Symbol)
 
 Return the column type of a column by `name` in a table with a known schema; returns Union{} if `name` doesn't exist in table
 """
-columntype(table, colname) = columntype(schema(table), colname)
+columntype(table, colname::Symbol) = columntype(schema(table), colname)
 
 Base.@pure columnindex(::Schema{names, types}, name::Symbol) where {names, types} = columnindex(names, name)
 
