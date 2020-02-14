@@ -60,17 +60,23 @@ struct RowIterator{T}
 end
 
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
-Base.length(x::RowIterator) = x.len
+Base.length(x::RowIterator) = getfield(x, :len)
+Base.getproperty(x::RowIterator, nm::Symbol) = getcolumn(x, nm)
+Base.getproperty(x::RowIterator, i::Int) = getcolumn(x, i)
+Base.propertynames(x::RowIterator) = columnnames(x)
 isrowtable(::Type{<:RowIterator}) = true
 
 columnaccess(::Type{<:RowIterator}) = true
-columns(x::RowIterator) = x.columns
-materializer(x::RowIterator) = materializer(x.columns)
-schema(x::RowIterator) = schema(x.columns)
+columns(x::RowIterator) = getfield(x, :columns)
+columnnames(x::RowIterator) = columnnames(columns(x))
+getcolumn(x::RowIterator, nm::Symbol) = getcolumn(columns(x), nm)
+getcolumn(x::RowIterator, i::Int) = getcolumn(columns(x), i)
+materializer(x::RowIterator) = materializer(columns(x))
+schema(x::RowIterator) = schema(columns(x))
 
 @inline function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
-    return ColumnsRow(rows.columns, st), st + 1
+    return ColumnsRow(columns(rows), st), st + 1
 end
 
 # this is our generic Tables.rows fallback definition

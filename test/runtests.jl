@@ -71,6 +71,8 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     rows = Tables.rows(nt)
     @test eltype(rows) == Tables.ColumnsRow{typeof(nt)}
     @test Tables.schema(rows) == Tables.Schema((:a, :b), (Int, Int))
+    @test rows.a == [1,2,3]
+    @test propertynames(rows) == Tables.columnnames(rows) == (:a, :b)
     row = first(rows)
     @test row.a == 1
     @test Tables.getcolumn(row, :a) == 1
