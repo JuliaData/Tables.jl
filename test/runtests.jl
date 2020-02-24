@@ -238,6 +238,10 @@ end
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 
+    # #155
+    T = Tables.table(hcat([1,2,3],[1,2,3]))
+    M = Tables.matrix(T)
+    @test M[:, 1] == [1, 2, 3]
 end
 
 import Base: ==
