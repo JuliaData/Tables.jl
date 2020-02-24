@@ -33,7 +33,7 @@ Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
 Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
 # column interface
-Columns(m::MatrixTable) = Columns(m)
+Columns(m::T) where {T <: MatrixTable} = Columns{T}(m)
 columnaccess(::Type{<:MatrixTable}) = true
 columns(m::MatrixTable) = m
 getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
