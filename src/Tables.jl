@@ -170,6 +170,12 @@ Base.haskey(r::RorC, i::Int) = 0 < i < length(columnnames(r))
 Base.get(r::RorC, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
 Base.get(f::Base.Callable, r::RorC, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
 Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
+Base.isempty(r::RorC) = length(r) == 0
+
+function Base.NamedTuple(r::RorC)
+    names = columnnames(r)
+    return NamedTuple{names}(Tuple(getcolumn(r, nm) for nm in names))
+end
 
 function Base.show(io::IO, x::T) where {T <: RorC}
     println(io, "$T:")

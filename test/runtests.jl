@@ -468,6 +468,8 @@ Tables.columnnames(r::Row) = fieldnames(Row)
     @test get(row, 1, 0) == get(row, :a, 0) == 1
     @test get(() -> 0, row, 1) == get(() -> 0, row, :a) == 1
     @test isequal(collect(row), [1, missing, "hey"])
+    @test !isempty(row)
+    @test isequal(NamedTuple(row), (a=1, b=missing, c="hey"))
     show(row)
 
     art = [row, row2]
