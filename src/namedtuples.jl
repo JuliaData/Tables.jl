@@ -105,7 +105,7 @@ schema(x::T) where {T <: ColumnTable} = Schema(names(T), _eltypes(T))
 materializer(x::ColumnTable) = columntable
 
 getarray(x::AbstractArray) = x
-getarray(x) = collect(x)
+getarray(x) = [col[i] for i in eachindex(c)]
 
 """
     Tables.columntable(x) => NamedTuple of Vectors

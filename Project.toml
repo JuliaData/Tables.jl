@@ -16,6 +16,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
 QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 
 [compat]
 julia = "1"

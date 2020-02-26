@@ -21,9 +21,18 @@ getcolumns(c::ColumnsRow) = getfield(c, :columns)
 getrow(c::ColumnsRow) = getfield(c, :row)
 
 # AbstractRow interface
-Base.@propagate_inbounds getcolumn(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getcolumn(getcolumns(c), T, col, nm)[getrow(c)]
-Base.@propagate_inbounds getcolumn(c::ColumnsRow, i::Int) = getcolumn(getcolumns(c), i)[getrow(c)]
-Base.@propagate_inbounds getcolumn(c::ColumnsRow, nm::Symbol) = getcolumn(getcolumns(c), nm)[getrow(c)]
+Base.@propagate_inbounds function getcolumn(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T}
+     column = getcolumn(getcolumns(c), T, col, nm)
+     return column[eachindex(column)[getrow(c)]]
+end
+Base.@propagate_inbounds function getcolumn(c::ColumnsRow, i::Int)
+     column = getcolumn(getcolumns(c), i)
+     return column[eachindex(column)[getrow(c)]]
+end
+Base.@propagate_inbounds function getcolumn(c::ColumnsRow, nm::Symbol)
+     column = getcolumn(getcolumns(c), nm)
+     return column[eachindex(column)[getrow(c)]]
+end
 columnnames(c::ColumnsRow) = columnnames(getcolumns(c))
 
 @generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names

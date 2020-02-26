@@ -14,7 +14,7 @@ end
 An interface type defined as an ordered set of columns that support
 retrieval of individual columns by name or index. A retrieved column
 must be an indexable collection with known length, i.e. an object
-that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
+that supports `length(col)` and `col[i]` for any `i in eachindex(col)`.
 `Tables.columns` must return an object that satisfies the `Tables.AbstractColumns` interface.
 While `Tables.AbstractColumns` is an abstract type that custom "columns" types may subtype for
 useful default behavior (indexing, iteration, property-access, etc.), users should not use it
@@ -314,7 +314,7 @@ materializer(::Type{T}) where {T} = columntable
 Accesses data of input table source `x` by returning an [`AbstractColumns`](@ref)-compatible
 object, which allows retrieving entire columns by name or index. A retrieved column
 is an object that is indexable and has a known length, i.e. supports 
-`length(col)` and `col[i]` for any `i = 1:length(col)`. Note that
+`length(col)` and `col[i]` for any `i in eachindex(col)`. Note that
 even if the input table source is row-oriented by nature, an efficient generic
 definition of `Tables.columns` is defined in Tables.jl to build a `AbstractColumns`-
 compatible object object from the input rows.

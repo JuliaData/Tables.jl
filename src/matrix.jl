@@ -70,12 +70,12 @@ function matrix(table; transpose::Bool=false)
     if !transpose
         mat = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(Columns(cols))
-            mat[:, i] = col
+            mat[:, i] = getarray(col)
         end
     else
         mat = Matrix{T}(undef, p, n)
         for (i, col) in enumerate(Columns(cols))
-            mat[i, :] = col
+            mat[i, :] = getarray(col)
         end
     end
     return mat

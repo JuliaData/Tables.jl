@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, OffsetArrays
 
 @testset "utils.jl" begin
 
@@ -167,6 +167,10 @@ end
     @test eltype(rt).parameters[1] == nms
     @test Tables.columntable(rt) == nt
     @test Tables.buildcolumns(nothing, rt) == nt
+
+    # test OffsetArrays, i.e. non-traditional columns
+    nt = (a=OffsetArray([t for t in 0:2], 0:2), b=[3.14, 3.15, 3.16])
+
 end
 
 @testset "Materializer" begin 
