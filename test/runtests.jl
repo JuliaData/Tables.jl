@@ -433,7 +433,6 @@ end
 
     # a Dict w/ scalar values isn't a table
     @test_throws Exception Tables.columns(d)
-    @test_throws Exception Tables.rows(d)
 end
 
 struct Row <: Tables.AbstractRow
