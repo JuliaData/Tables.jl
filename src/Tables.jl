@@ -126,13 +126,13 @@ isrowtable(::T) where {T} = isrowtable(T)
 isrowtable(::Type{T}) where {T} = false
 
 # default definitions for AbstractDict to act as an AbstractColumns or AbstractRow
-getcolumn(x::AbstractDict, i::Int) = x[i]
-getcolumn(x::AbstractDict, nm::Symbol) = x[nm]
-getcolumn(x::AbstractDict, ::Type{T}, i::Int, nm::Symbol) where {T} = x[nm]
-columnnames(x::AbstractDict) = collect(keys(x))
+getcolumn(x::AbstractDict{Symbol}, i::Int) = x[columnnames(x)[i]]
+getcolumn(x::AbstractDict{Symbol}, nm::Symbol) = x[nm]
+getcolumn(x::AbstractDict{Symbol}, ::Type{T}, i::Int, nm::Symbol) where {T} = x[nm]
+columnnames(x::AbstractDict{Symbol}) = collect(keys(x))
 
 # AbstractVector of Dicts for Tables.rows
-const DictRows = AbstractVector{T} where {T <: AbstractDict}
+const DictRows = AbstractVector{T} where {T <: AbstractDict{Symbol}}
 isrowtable(::Type{<:DictRows}) = true
 # DictRows doesn't naturally lend itself to the `Tables.schema` requirement
 # we can't just look at the first row, because the types might change,
@@ -141,14 +141,14 @@ isrowtable(::Type{<:DictRows}) = true
 schema(x::DictRows) = nothing
 
 # Dict of AbstractVectors for Tables.columns
-const DictColumns = AbstractDict{K, V} where {K <: Union{Integer, Symbol, String}, V <: AbstractVector}
+const DictColumns = AbstractDict{K, V} where {K <: Symbol, V <: AbstractVector}
 istable(::Type{<:DictColumns}) = true
-columnaccess(::Type{<:AbstractDict}) = true
+columnaccess(::Type{<:DictColumns}) = true
 columns(x::DictColumns) = x
 schema(x::DictColumns) = Schema(collect(keys(x)), eltype.(values(x)))
 
 # for other AbstractDict, let's throw an informative error
-columns(x::T) where {T <: AbstractDict} = error("to treat $T as a table, it must have a key type of `Integer`, `Symbol`, or `String`, and a value type `<: AbstractVector`")
+columns(x::T) where {T <: AbstractDict} = error("to treat $T as a table, it must have a key type of `Symbol`, and a value type `<: AbstractVector`")
 
 # default definitions for AbstractRow, AbstractColumns
 const RorC = Union{AbstractRow, AbstractColumns}
