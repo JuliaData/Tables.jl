@@ -9,7 +9,8 @@ don't need to use Tables.jl directly.
 
 With that said, don't hesitate to [open a new issue](https://github.com/JuliaData/Tables.jl/issues/new), even
 just for a question, or come chat with us on the [#data](https://julialang.slack.com/messages/data/) slack
-channel with questions, concerns, or clarifications.
+channel with questions, concerns, or clarifications. Also one can find list of packages that supports
+Tables.jl interface in [INTEGRATIONS.md](https://github.com/Arkoniak/Tables.jl/blob/master/INTEGRATIONS.md).
 
 ```@contents
 Depth = 3
@@ -248,7 +249,7 @@ Tables.AbstractColumns
 ### Implementation Example
 As an extended example, let's take a look at some code defined in Tables.jl for treating `AbstractMatrix`s as tables.
 
-First, we define a special `MatrixTable` type that will wrap an `AbstractMatrix`, and allow easy overloading for the 
+First, we define a special `MatrixTable` type that will wrap an `AbstractMatrix`, and allow easy overloading for the
 Tables.jl interface.
 
 ```julia
@@ -390,7 +391,7 @@ we're really just testing that our interface methods are doing what we expect th
 Now, while we didn't go over a "sink" function for matrices in our walkthrough, there does indeed exist a `Tables.matrix` function that allows converting any table input source into a plain Julia `Matrix` object.
 
 Having both Tables.jl "source" and "sink" implementations (i.e. a type that is a Tables.jl-compatible source,
-as well as a way to _consume_ other tables), allows us to do some additional "round trip" testing: 
+as well as a way to _consume_ other tables), allows us to do some additional "round trip" testing:
 
 ```julia
 rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
