@@ -144,7 +144,7 @@ end
 ```
 
 The strategy taken here is to start iterating the input source, and using the first row
-as a guide, we make a `Tables.Schema` object with just the column names, which we can
+as a guide, we make a [`Tables.Schema`](@ref) object with just the column names, which we can
 then still pass to [`Tables.eachcolumn`](@ref) to apply our `bind!` function to each row value.
 
 ### `Tables.columns` usage
@@ -196,6 +196,8 @@ the table-specific use-case, knowing that it will Just Work™️.
 Before moving on to _implementing_ the Tables.jl interfaces, we take a quick
 break to highlight some useful utility functions provided by Tables.jl:
 ```@docs
+Tables.Schema
+Tables.schema
 Tables.rowtable
 Tables.columntable
 Tables.namedtupleiterator
@@ -228,7 +230,7 @@ The interface to becoming a proper table is straightforward:
 | `Tables.columnaccess(table)` |                              | Declare that your table type defines a `Tables.columns(table)` method                                                           |
 | `Tables.columns(table)`      |                              | Return an `Tables.AbstractColumns`-compatible object from your table                                                            |
 | **Optional methods**         |                              |                                                                                                                                 |
-| `Tables.schema(x)`           | `Tables.schema(x) = nothing` | Return a `Tables.Schema` object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
+| `Tables.schema(x)`           | `Tables.schema(x) = nothing` | Return a [`Tables.Schema`](@ref) object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
 | `Tables.materializer(table)` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Tables.AbstractRow` iterator
@@ -269,8 +271,8 @@ Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype
 ```
 
 Here we defined `Tables.istable` for all `MatrixTable` types, signaling that they implement the Tables.jl interfaces.
-We also defined `Tables.schema` by pulling the column names out that we stored, and since `AbstractMatrix` have a single
-`eltype`, we repeat it for each column (the call to `fill`). Note that defining `Tables.schema` is optional on tables; by default, `nothing`
+We also defined [`Tables.schema`](@ref) by pulling the column names out that we stored, and since `AbstractMatrix` have a single
+`eltype`, we repeat it for each column (the call to `fill`). Note that defining [`Tables.schema`](@ref) is optional on tables; by default, `nothing`
 is returned and Tables.jl consumers should account for both known and unknown schema cases. Returning a schema when possible allows consumers
 to have certain optimizations when they can know the types of all columns upfront (and if the # of columns isn't too large)
 to generate more efficient code.
