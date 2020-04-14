@@ -1,3 +1,4 @@
+istable(::AbstractMatrix) = false
 istable(::Type{<:AbstractMatrix}) = false
 
 rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
