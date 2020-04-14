@@ -244,6 +244,8 @@ end
     T = Tables.table(hcat([1,2,3],[1,2,3]))
     M = Tables.matrix(T)
     @test M[:, 1] == [1, 2, 3]
+    # 167
+    @test !Tables.istable(Matrix{Union{}}(undef, 2, 3))
 end
 
 import Base: ==
