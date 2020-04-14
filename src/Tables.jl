@@ -174,14 +174,19 @@ Base.isempty(r::RorC) = length(r) == 0
 
 function Base.NamedTuple(r::RorC)
     names = columnnames(r)
-    return NamedTuple{names}(Tuple(getcolumn(r, nm) for nm in names))
+    return NamedTuple{Tuple(names)}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
 function Base.show(io::IO, x::T) where {T <: RorC}
-    println(io, "$T:")
-    names = collect(columnnames(x))
-    values = [getcolumn(x, nm) for nm in names]
-    Base.print_matrix(io, hcat(names, values))
+    if get(io, :compact, false) || get(io, :limit, false)
+        print(io, "$T: ")
+        show(io, NamedTuple(x))
+    else
+        println(io, "$T:")
+        names = collect(columnnames(x))
+        values = [getcolumn(x, nm) for nm in names]
+        Base.print_matrix(io, hcat(names, values))
+    end
 end
 
 # AbstractRow AbstractVector as Rows
