@@ -70,15 +70,15 @@ function matrix(table; transpose::Bool=false)
     T = reduce(promote_type, types)
     n, p = rowcount(cols), length(types)
     if !transpose
-        mat = Matrix{T}(undef, n, p)
+        matrix = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(Columns(cols))
-            mat[:, i] = col
+            matrix[:, i] = col
         end
     else
-        mat = Matrix{T}(undef, p, n)
+        matrix = Matrix{T}(undef, p, n)
         for (i, col) in enumerate(Columns(cols))
-            mat[i, :] = col
+            matrix[i, :] = col
         end
     end
-    return mat
+    return matrix
 end

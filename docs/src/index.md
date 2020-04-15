@@ -264,7 +264,7 @@ end
 Tables.istable(::Type{<:MatrixTable}) = true
 # getter methods to avoid getproperty clash
 names(m::MatrixTable) = getfield(m, :names)
-mat(m::MatrixTable) = getfield(m, :matrix)
+matrix(m::MatrixTable) = getfield(m, :matrix)
 lookup(m::MatrixTable) = getfield(m, :lookup)
 # schema is column names and types
 Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype(T), size(mat(m), 2)))
@@ -286,9 +286,9 @@ valid `Tables.AbstractColumns` object:
 Tables.columnaccess(::Type{<:MatrixTable}) = true
 Tables.columns(m::MatrixTable) = m
 # required Tables.AbstractColumns object methods
-Tables.getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = mat(m)[:, col]
-Tables.getcolumn(m::MatrixTable, nm::Symbol) = mat(m)[:, lookup(m)[nm]]
-Tables.getcolumn(m::MatrixTable, i::Int) = mat(m)[:, i]
+Tables.getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = matrix(m)[:, col]
+Tables.getcolumn(m::MatrixTable, nm::Symbol) = matrix(m)[:, lookup(m)[nm]]
+Tables.getcolumn(m::MatrixTable, i::Int) = matrix(m)[:, i]
 Tables.columnnames(m::MatrixTable) = names(m)
 ```
 
@@ -307,7 +307,7 @@ rows(m::MatrixTable) = m
 # the iteration interface, at a minimum, requires `eltype`, `length`, and `iterate`
 # for `MatrixTable` `eltype`, we're going to provide a custom row type
 Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
-Base.length(m::MatrixTable) = size(mat(m), 1)
+Base.length(m::MatrixTable) = size(matrix(m), 1)
 
 Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
