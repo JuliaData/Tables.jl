@@ -51,7 +51,7 @@ the Tables.jl interface. This allows accesing the matrix via `Tables.rows` and
 to be used as the column names. Note that no copy of the `AbstractMatrix` is made.
 """
 function table(m::AbstractMatrix; header::Vector{Symbol}=[Symbol("Column$i") for i = 1:size(m, 2)])
-    length(header) == size(m, 2) || throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2))"))
+    length(header) == size(m, 2) || throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
     lookup = Dict(nm=>i for (i, nm) in enumerate(header))
     return MatrixTable(header, lookup, m)
 end
