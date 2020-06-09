@@ -10,7 +10,9 @@ don't need to use Tables.jl directly.
 With that said, don't hesitate to [open a new issue](https://github.com/JuliaData/Tables.jl/issues/new), even
 just for a question, or come chat with us on the [#data](https://julialang.slack.com/messages/data/) slack
 channel with questions, concerns, or clarifications. Also one can find list of packages that supports
-Tables.jl interface in [INTEGRATIONS.md](https://github.com/Arkoniak/Tables.jl/blob/master/INTEGRATIONS.md).
+Tables.jl interface in [INTEGRATIONS.md](https://github.com/JuliaData/Tables.jl/blob/master/INTEGRATIONS.md).
+
+Common table operations (```select, transform, filter, map```) can be found in [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl). 
 
 ```@contents
 Depth = 3
