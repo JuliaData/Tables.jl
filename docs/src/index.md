@@ -234,7 +234,9 @@ The interface to becoming a proper table is straightforward:
 | `Tables.materializer(table)` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Tables.AbstractRow` iterator
-or `Tables.AbstractColumns` object satisfies the respective interface:
+or `Tables.AbstractColumns` object satisfies the respective interface.
+
+As an additional source of documentation, see [this discourse post](https://discourse.julialang.org/t/struggling-to-implement-tables-jl-interface-for-vector-mystruct/42318/7?u=quinnj) outlining in detail a walk-through of making a row-oriented table.
 
 ### `Tables.AbstractRow`
 
