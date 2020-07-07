@@ -18,7 +18,7 @@ that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
 `Tables.columns` must return an object that satisfies the `Tables.AbstractColumns` interface.
 While `Tables.AbstractColumns` is an abstract type that custom "columns" types may subtype for
 useful default behavior (indexing, iteration, property-access, etc.), users should not use it
-for dispatch, as Tables.jl interface objects ***are not required*** to subtype, but only
+for dispatch, as Tables.jl interface objects **are not required** to subtype, but only
 implement the required interface methods.
 
 Interface definition:
@@ -48,7 +48,7 @@ Abstract interface type representing the expected `eltype` of the iterator retur
 `Tables.rows` must return an iterator of elements that satisfy the `Tables.AbstractRow` interface.
 While `Tables.AbstractRow` is an abstract type that custom "row" types may subtype for
 useful default behavior (indexing, iteration, property-access, etc.), users should not use it
-for dispatch, as Tables.jl interface objects ***are not required*** to subtype, but only
+for dispatch, as Tables.jl interface objects **are not required** to subtype, but only
 implement the required interface methods.
 
 Interface definition:
