@@ -198,7 +198,7 @@ end
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0])
 
-    mat = Tables.(rt)
+    mat = Tables.matrix(rt)
     @test nt.a == mat[:, 1]
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
