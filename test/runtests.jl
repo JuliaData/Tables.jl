@@ -198,7 +198,7 @@ end
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0])
 
-    mat = Tables.matrix(rt)
+    mat = Tables.(rt)
     @test nt.a == mat[:, 1]
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
@@ -241,9 +241,12 @@ end
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 
     # #155
-    T = Tables.table(hcat([1,2,3],[1,2,3]))
+    m = hcat([1,2,3],[1,2,3])
+    T = Tables.table(m)
     M = Tables.matrix(T)
     @test M[:, 1] == [1, 2, 3]
+    # 182
+    @test M === m #checks that both are the same object in memory
     # 167
     @test !Tables.istable(Matrix{Union{}}(undef, 2, 3))
 end
