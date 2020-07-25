@@ -241,9 +241,14 @@ end
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 
     # #155
-    T = Tables.table(hcat([1,2,3],[1,2,3]))
+    m = hcat([1,2,3],[1,2,3])
+    T = Tables.table(m)
     M = Tables.matrix(T)
+    Mt = Tables.matrix(T, transpose=true)
     @test M[:, 1] == [1, 2, 3]
+    # 182
+    @test M === m #checks that both are the same object in memory
+    @test Mt == permutedims(m) 
     # 167
     @test !Tables.istable(Matrix{Union{}}(undef, 2, 3))
 end

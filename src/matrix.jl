@@ -59,10 +59,12 @@ end
 """
     Tables.matrix(table; transpose::Bool=false)
 
-Materialize any table source input as a `Matrix`. If the table column types are not homogenous,
+Materialize any table source input as a new `Matrix` or in the case of a `MatrixTable`
+return the originally wrapped matrix. If the table column types are not homogenous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are
 ignored in the conversion. By default, input table columns will be materialized as corresponding
-matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows.
+matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows
+or in the case of a `MatrixTable` apply `permutedims` to the originally wrapped matrix.
 """
 function matrix(table; transpose::Bool=false)
     cols = columns(table)
@@ -81,4 +83,10 @@ function matrix(table; transpose::Bool=false)
         end
     end
     return matrix
+end
+	
+function matrix(table::MatrixTable; transpose::Bool=false) 
+    matrix = getfield(table, :matrix)
+    transpose || return matrix
+    return permutedims(matrix)
 end
