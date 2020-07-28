@@ -12,6 +12,8 @@ just for a question, or come chat with us on the [#data](https://julialang.slack
 channel with questions, concerns, or clarifications. Also one can find list of packages that supports
 Tables.jl interface in [INTEGRATIONS.md](https://github.com/JuliaData/Tables.jl/blob/master/INTEGRATIONS.md).
 
+Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl) for common table operations such as  `select`, `transform`, `filter` and  `map`.
+
 ```@contents
 Depth = 3
 ```

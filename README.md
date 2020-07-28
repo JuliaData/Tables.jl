@@ -11,3 +11,7 @@ The Tables.jl package provides simple, yet powerful interface functions for work
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://juliadata.github.io/Tables.jl/dev)
 
 List of packages which support Tables.jl interface can be found in [INTEGRATIONS.md](INTEGRATIONS.md).
+
+### Additional Resources
+
+Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl) for common table operations (`select`, `filter`, `transform`, `map`, etc.)
