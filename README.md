@@ -14,4 +14,4 @@ List of packages which support Tables.jl interface can be found in [INTEGRATIONS
 
 ### Additional Resources
 
-Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl) for common table operations (```select```, ```filter``` etc.)
+Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl) for common table operations (`select`, `filter`, `transform`, `map`, etc.)
