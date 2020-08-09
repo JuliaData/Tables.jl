@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, SplittablesBase, SplittablesTesting
 
 @testset "utils.jl" begin
 
@@ -550,4 +550,29 @@ Tables.isrowtable(::Type{IsRowTable}) = true
     @test Tables.rows(rt) === rt
     @test Tables.columntable(rt) == Tables.columntable([nt, nt, nt])
 
+end
+
+@testset "SplittablesBase" begin
+    nt4 = (a = [0, 1, 2, 3], b = [5, 6, 7, 8])
+    nt5 = (a = [0, 1, 2, 3, 4], b = [5, 6, 7, 8, 9])
+    SplittablesTesting.test_ordered([
+        (label = "RowIterator (length = 4)", data = Tables.rows(nt4)),
+        (label = "RowIterator (length = 5)", data = Tables.rows(nt5)),
+        (
+            label = "NamedTupleIterator (length = 4)",
+            data = Tables.namedtupleiterator(Tables.rows(nt4)),
+        ),
+        (
+            label = "NamedTupleIterator (length = 5)",
+            data = Tables.namedtupleiterator(Tables.rows(nt5)),
+        ),
+    ])
+
+    @testset "Inconsistent `halve` of columns should throw" begin
+        rt = Tables.rows((a = [0, 1, 2, 3, 4], b = [5, 6, 7, 8]))
+        @test_throws(
+            ArgumentError("`halve` on columns return inconsistent number or rows"),
+            SplittablesBase.halve(rt)
+        )
+    end
 end

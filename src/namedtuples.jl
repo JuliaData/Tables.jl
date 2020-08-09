@@ -65,6 +65,14 @@ function Base.iterate(rows::NamedTupleIterator{Nothing}, state::Tuple{Val{names}
     return NamedTuple{names}(Tuple(getcolumn(row, nm) for nm in names)), (Val(names), (st,))
 end
 
+function SplittablesBase.halve(rows::NamedTupleIterator{schema}) where schema
+    left, right = SplittablesBase.halve(rows.x)
+    return (
+        NamedTupleIterator{schema,typeof(left)}(left),
+        NamedTupleIterator{schema,typeof(right)}(right),
+    )
+end
+
 # sink function
 """
     Tables.rowtable(x) => Vector{NamedTuple}

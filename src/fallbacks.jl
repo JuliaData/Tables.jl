@@ -79,6 +79,28 @@ schema(x::RowIterator) = schema(columns(x))
     return ColumnsRow(columns(rows), st), st + 1
 end
 
+function consistent_rowcount(cols)
+    len = length(cols[1])
+    if !all(c -> length(c) == len, cols)
+        throw(ArgumentError("`halve` on columns return inconsistent number or rows"))
+    end
+    return len
+end
+
+function SplittablesBase.halve(x::RowIterator)
+    if isempty(columns(x))
+        len = cld(length(x), 2)
+        return (RowIterator(columns(x), len), RowIterator(columns(x), length(x) - len))
+    end
+    cs = map(SplittablesBase.halve, columns(x))
+    lefts = map(first, cs)
+    rights = map(last, cs)
+    return (
+        RowIterator(lefts, consistent_rowcount(lefts)),
+        RowIterator(rights, consistent_rowcount(rights)),
+    )
+end
+
 # this is our generic Tables.rows fallback definition
 function rows(x::T) where {T}
     isrowtable(x) && return x
