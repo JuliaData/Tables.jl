@@ -408,6 +408,63 @@ end
 
 Base.propertynames(sch::Schema) = (:names, :types)
 
+# partitions
+
+"""
+    Tables.partitions(x)
+
+Request a "table" iterator from `x`. Each iterated element must be a "table" in the sense
+that one may call `Tables.rows` or `Tables.columns` to get a row-iterator or collection
+of columns. All iterated elements _must_ have identical schema, so that users may call
+`Tables.schema(first_element)` on the first iterated element and know that each
+subsequent iteration will match the same schema. The default definition is:
+```julia
+Tables.partitions(x) = (x,)
+```
+So that any input is assumed to be a single "table". This means users should feel free
+to call `Tables.partitions` anywhere they're currently calling `Tables.columns` or
+`Tables.rows`, and get back an iterator of those instead. In other words, "sink" functions
+can use `Tables.partitions` whether or not the user passes a partionable table, since the
+default is to treat a single input as a single, non-partitioned table.
+
+`Tables.partitioner(itr)`(@ref) is a convenience wrapper to provide table partitions
+from any table iterator; this allows for easy wrapping of a `Vector` or iterator of tables
+as valid partitions, since by default, they'd be treated as a single table.
+
+A 2nd convenience method is provided with the defintion:
+```julia
+Tables.partitions(x...) = x
+```
+That allows passing vararg tables and they'll be treated as separate partitions. Sink
+functions may allow vararg table inputs and can "splat them through" to `partitions`.
+"""
+partitions(x) = (x,)
+partitions(x...) = x
+
+struct Partitioner{T}
+    x::T
+end
+
+"""
+    Tables.partitioner(x)
+
+Convenience wrapper that treats the input as a table iterator. Provided because the
+default behavior of `Tables.partition(x)` is to treat `x` as a single, non-partitioned
+table. This allows users to easily wrap a `Vector` or generator of tables as table
+partitions to pass to sink functions able to utilize `Tables.partitions`.
+"""
+partitioner(x) = Partitioner(x)
+
+partitions(x::Partitioner) = x
+
+Base.IteratorEltype(::Type{Partitioner{S}}) where {S} = Base.IteratorEltype(S)
+Base.eltype(x::Partitioner{S}) where {S} = eltype(x.x)
+Base.eltype(::Type{Partitioner{S}}) where {S} = eltype(S)
+Base.IteratorSize(::Type{Partitioner{S}}) where {S} = Base.IteratorSize(S)
+Base.length(x::Partitioner) = length(x.x)
+Base.size(x::Partitioner) = size(x.x)
+Base.iterate(x::Partitioner, st...) = iterate(x.x, st...)
+
 # helper functions
 include("utils.jl")
 
