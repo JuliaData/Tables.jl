@@ -441,19 +441,67 @@ functions may allow vararg table inputs and can "splat them through" to `partiti
 partitions(x) = (x,)
 partitions(x...) = x
 
+"""
+    Tables.LazyTable(f, arg)
+
+A "table" type that delays materialization until `Tables.columns` or `Tables.rows` is called.
+This allows, for example, sending a `LazyTable` to a remote process or thread which can
+then call `Tables.columns` or `Tables.rows` to "materialize" the table. Is used by default
+in `Tables.partitioner(f, itr)` where a materializer function `f` is passed to each element
+of an iterable `itr`, allowing distributed/concurrent patterns like:
+
+```julia
+for tbl in Tables.partitions(Tables.partitioner(CSV.File, list_of_csv_files))
+    Threads.@spawn begin
+        cols = Tables.columns(tbl)
+        # do stuff with cols
+    end
+end
+```
+In this example, `CSV.File` will be called like `CSV.File(x)` for each element of the
+`list_of_csv_files` iterable, but _not until_ `Tables.columns(tbl)` is called, which
+in this case happens in a thread-spawned task, allowing files to be parsed and processed
+in parallel.
+"""
+struct LazyTable{F, T}
+    f::F
+    x::T
+end
+
+columns(x::LazyTable) = columns(x.f(x.x))
+rows(x::LazyTable) = rows(x.f(x.x))
+
 struct Partitioner{T}
     x::T
 end
 
 """
+    Tables.partitioner(f, itr)
     Tables.partitioner(x)
 
-Convenience wrapper that treats the input as a table iterator. Provided because the
-default behavior of `Tables.partition(x)` is to treat `x` as a single, non-partitioned
-table. This allows users to easily wrap a `Vector` or generator of tables as table
-partitions to pass to sink functions able to utilize `Tables.partitions`.
+Convenience methods to generate table iterators. The first method takes a "materializer"
+function `f` and an iterator `itr`, and will call `Tables.LazyTable(f, x) for x in itr`
+for each iteration. This allows delaying table materialization until `Tables.columns`
+or `Tables.rows` are called on the `LazyTable` object (which will call `f(x)`). This
+allows a common desired pattern of materializing and processing a table on a remote
+process or thread, like:
+
+```julia
+for tbl in Tables.partitions(Tables.partitioner(CSV.File, list_of_csv_files))
+    Threads.@spawn begin
+        cols = Tables.columns(tbl)
+        # do stuff with cols
+    end
+end
+```
+
+The second method is provided because the default behavior of `Tables.partition(x)`
+is to treat `x` as a single, non-partitioned table. This method allows users to easily
+wrap a `Vector` or generator of tables as table partitions to pass to sink functions
+able to utilize `Tables.partitions`.
 """
 partitioner(x) = Partitioner(x)
+partitioner(f, itr) = partitioner((LazyTable(f, x) for x in itr))
 
 partitions(x::Partitioner) = x
 

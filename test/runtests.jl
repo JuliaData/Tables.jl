@@ -551,3 +551,18 @@ Tables.isrowtable(::Type{IsRowTable}) = true
     @test Tables.columntable(rt) == Tables.columntable([nt, nt, nt])
 
 end
+
+@testset "Tables.partitions" begin
+
+    ct = (a=[1, 2], b=[missing, 3.14], c=["hey", "ho"])
+
+    for tbl in Tables.partitions(ct)
+        @test tbl === ct
+    end
+
+    parts = [ct, ct]
+    for tbl in Tables.partitions(Tables.partitioner(parts))
+        @test tbl === ct
+    end
+
+end
