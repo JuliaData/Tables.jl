@@ -565,4 +565,8 @@ end
         @test tbl === ct
     end
 
+    for tbl in Tables.partitions(Tables.partitioner(x -> x, parts))
+        @test Tables.columns(tbl) === ct
+    end
+
 end
