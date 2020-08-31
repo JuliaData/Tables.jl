@@ -72,3 +72,4 @@ Packages currently integrating with Tables.jl:
 * [PostgresCatalog](https://github.com/rbt-lang/PostgresCatalog.jl.git)
 * [PredictMD](https://github.com/bcbi/PredictMD.jl.git)
 * [PrettyTables](https://github.com/ronisbr/PrettyTables.jl.git)
+* [PGFPlotsX](https://github.com/KristofferC/PGFPlotsX.jl.git)
