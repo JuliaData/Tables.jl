@@ -200,6 +200,8 @@ break to highlight some useful utility functions provided by Tables.jl:
 ```@docs
 Tables.Schema
 Tables.schema
+Tables.partitions
+Tables.partitioner
 Tables.rowtable
 Tables.columntable
 Tables.namedtupleiterator
