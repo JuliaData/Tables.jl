@@ -17,6 +17,7 @@ Packages currently integrating with Tables.jl:
 * [DataKnots](https://github.com/rbt-lang/DataKnots.jl.git)
 * [DataTools](https://github.com/JuliaFolds/DataTools.jl.git)
 * [DeIdentification](https://github.com/bcbi/DeIdentification.jl.git)
+* [DimensionalData](https://github.com/rafaqz/DimensionalData.jl)
 * [DungAnalyse](https://github.com/yakir12/DungAnalyse.jl.git)
 * [Econometrics](https://github.com/Nosferican/Econometrics.jl.git)
 * [EvoTrees](https://github.com/Evovest/EvoTrees.jl.git)
