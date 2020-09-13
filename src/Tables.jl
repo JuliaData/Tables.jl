@@ -59,7 +59,7 @@ Interface definition:
 | `Tables.getcolumn(row, nm::Symbol)`                    | getproperty(row, nm)      | Retrieve a column value by name                                                                                                                                  |
 | `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
 | **Optional methods**                                   |                           |                                                                                                                                                                  |
-| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+| `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column element type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
 While custom row types aren't required to subtype `Tables.AbstractRow`, benefits of doing so include:
   * Indexing interface defined (using `getcolumn`); i.e. `row[i]` will return the column value at index `i`
@@ -81,7 +81,7 @@ abstract type AbstractRow end
     Tables.getcolumn(::AbstractRow, T, i::Int, nm::Symbol) => Column value
 
 Retrieve an entire column (from `AbstractColumns`) or single row column value (from an `AbstractRow`) by column name (`nm`), index (`i`),
-or if desired, by column type (`T`), index (`i`), and name (`nm`). When called on a `AbstractColumns` interface object,
+or if desired, by column element type (`T`), index (`i`), and name (`nm`). When called on a `AbstractColumns` interface object,
 the returned object should be an indexable collection with known length. When called on a `AbstractRow` interface
 object, it returns the single column value. The methods taking a single `Symbol` or `Int` are both required
 for the `AbstractColumns` and `AbstractRow` interfaces; the third method is optional if type stability is possible.
@@ -364,13 +364,13 @@ returned from `Tables.rows` or an `AbstractColumns` object returned from `Tables
 as well as provide a convenient "structural" type for code generation.
 
 To get a table's schema, one can call `Tables.schema` on the result of `Tables.rows` or `Tables.columns`,
-but also note that a table may return `nothing`, indicating that its column names and/or column types
+but also note that a table may return `nothing`, indicating that its column names and/or column element types
 are unknown (usually not inferrable). This is similar to the `Base.EltypeUnknown()` trait for iterators
 when `Base.IteratorEltype` is called. Users should account for the `Tables.schema(tbl) => nothing` case
 by using the properties of the results of `Tables.rows(x)` and `Tables.columns(x)` directly.
 
 To access the names, one can simply call `sch.names` to return the tuple of Symbols.
-To access column types, one can similarly call `sch.types`, which will return a tuple of types (like `(Int64, Float64, String)`).
+To access column element types, one can similarly call `sch.types`, which will return a tuple of types (like `(Int64, Float64, String)`).
 
 The actual type definition is
 ```julia
@@ -538,7 +538,7 @@ columnindex(table, colname::Symbol) = columnindex(schema(table), colname)
 """
     Tables.columntype(table, name::Symbol)
 
-Return the column type of a column by `name` in a table with a known schema; returns Union{} if `name` doesn't exist in table
+Return the column element type of a column by `name` in a table with a known schema; returns Union{} if `name` doesn't exist in table
 """
 columntype(table, colname::Symbol) = columntype(schema(table), colname)
 
