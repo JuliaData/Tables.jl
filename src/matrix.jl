@@ -45,15 +45,19 @@ columnnames(m::MatrixTable) = names(m)
 """
     Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
 
-Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies
-the Tables.jl interface. This allows accesing the matrix via `Tables.rows` and
-`Tables.columns`. An optional keyword argument `header` can be passed as a `Vector{Symbol}`
-to be used as the column names. Note that no copy of the `AbstractMatrix` is made.
+Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
+Tables.jl interface. This allows accesing the matrix via `Tables.rows` and `Tables.columns`.
+An optional keyword argument iterator `header` can be passed which will be converted to a
+`Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractMatrix`
+is made, but `header` is always stored as freshly allocated object.
 """
-function table(m::AbstractMatrix; header::Vector{Symbol}=[Symbol("Column$i") for i = 1:size(m, 2)])
-    length(header) == size(m, 2) || throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
-    lookup = Dict(nm=>i for (i, nm) in enumerate(header))
-    return MatrixTable(header, lookup, m)
+function table(m::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)])
+    symbol_header = [Symbol(h) for h in header]
+    if length(symbol_header) != size(m, 2)
+        throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
+    end
+    lookup = Dict(nm=>i for (i, nm) in enumerate(symbol_header))
+    return MatrixTable(symbol_header, lookup, m)
 end
 
 """
