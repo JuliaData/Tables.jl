@@ -244,7 +244,7 @@ end
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
     mattbl = Tables.table(mat, header=view(["DUMMY", "A", "B", "C"], 2:4))
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
-    mattbl = Tables.table(mat, header=(["DUMMY", "A", "B", "C"] for i in 2:4))
+    mattbl = Tables.table(mat, header=(["DUMMY", "A", "B", "C"][i] for i in 2:4))
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
     mattbl = Tables.table(mat, header=1:3)
     @test Tables.columnnames(mattbl) == Symbol.(1:3)
