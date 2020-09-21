@@ -43,7 +43,7 @@ getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
 columnnames(m::MatrixTable) = names(m)
 
 """
-    Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
+    Tables.table(m::AbstractMatrix; [header])
 
 Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
 Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
