@@ -46,7 +46,7 @@ columnnames(m::MatrixTable) = names(m)
     Tables.table(m::AbstractMatrix; [header::Vector{Symbol}])
 
 Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
-Tables.jl interface. This allows accesing the matrix via `Tables.rows` and `Tables.columns`.
+Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
 An optional keyword argument iterator `header` can be passed which will be converted to a
 `Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractMatrix`
 is made, but `header` is always stored as freshly allocated object.
