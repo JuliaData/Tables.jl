@@ -240,6 +240,16 @@ end
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 
+    mattbl = Tables.table(mat, header=[:A, :B, :C])
+    @test Tables.columnnames(mattbl) == [:A, :B, :C]
+    mattbl = Tables.table(mat, header=view(["DUMMY", "A", "B", "C"], 2:4))
+    @test Tables.columnnames(mattbl) == [:A, :B, :C]
+    mattbl = Tables.table(mat, header=(["DUMMY", "A", "B", "C"][i] for i in 2:4))
+    @test Tables.columnnames(mattbl) == [:A, :B, :C]
+    mattbl = Tables.table(mat, header=1:3)
+    @test Tables.columnnames(mattbl) == Symbol.(1:3)
+    @test_throws ArgumentError Tables.table(mat, header=[:A, :B, :C, :D])
+
     # #155
     m = hcat([1,2,3],[1,2,3])
     T = Tables.table(m)
