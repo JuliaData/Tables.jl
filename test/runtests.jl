@@ -240,8 +240,10 @@ end
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
 
-    mattbl = Tables.table(mat, header=[:A, :B, :C])
+    mattbl = Tables.table(mat, header=[:A, :B, :C], reuse_header=false)
+    mattb2 = Tables.table(mat, header=[:A, :B, :C], reuse_header=true)
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
+    @test Tables.columnnames(mattb2) === [:A, :B, :C]
     mattbl = Tables.table(mat, header=view(["DUMMY", "A", "B", "C"], 2:4))
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
     mattbl = Tables.table(mat, header=(["DUMMY", "A", "B", "C"][i] for i in 2:4))
