@@ -60,14 +60,14 @@ Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tab
 
 Note that no copy of the `AbstractMatrix`is made.
 """
-function table(matrix::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)], reuse_header=false)
+function table(matrix::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(matrix, 2)], reuse_header=false)
     if header isa Vector{Symbol} && reuse_header
 	symbol_header = header
     else
 	symbol_header = [Symbol(h) for h in header]
     end	
     if length(symbol_header) != size(matrix, 2)
-        throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
+        throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(matrix, 2)))"))
     end
     lookup = Dict(nm=>i for (i, nm) in enumerate(symbol_header))
     return MatrixTable(symbol_header, lookup, matrix)
