@@ -52,7 +52,7 @@ Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tab
 - `matrix::AbstractMatrix`: The matrix to be wrapped in a `MatrixTable`.
 
 # Keywords
-- `header::Any=[Symbol("Column$i") for i = 1:size(matrix, 2)]`: An iterator(e.g `Tuple` or `AbstractVector`) 
+- `header=[Symbol("Column$i") for i = 1:size(matrix, 2)]`: An iterator (`Tuple`, `AbstractVector` etc.) 
     to be used as the column names in  the `MatrixTable`.
 - `reuse_header::Bool=true`: if set to `false` and `header::Vector{Symbol}` then the `header` passed is re-used 
     as the column names of the `MatrixTable` else a freshly allocated `Vector{Symbol}` object derived from `header` 
