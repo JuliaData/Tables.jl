@@ -52,7 +52,7 @@ An optional keyword argument iterator `header` can be passed which will be conve
 is made, but `header` is always stored as freshly allocated object.
 """
 function table(m::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)])
-    symbol_header = [Symbol(h) for h in header]
+    symbol_header = header isa Vector{Symbol} ? header : [Symbol(h) for h in header]
     if length(symbol_header) != size(m, 2)
         throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
     end
