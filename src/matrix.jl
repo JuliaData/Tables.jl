@@ -54,7 +54,7 @@ Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tab
 # Keywords
 - `header=[Symbol("Column\$i") for i = 1:size(matrix, 2)]`: An iterator (`Tuple`, `AbstractVector` etc.) 
     to be used as the column names in  the `MatrixTable`.
-- `reuse_header::Bool=true`: if set to `false` and `header::Vector{Symbol}` then the `header` passed is re-used 
+- `reuse_header::Bool=false`: if set to `true` and `header::Vector{Symbol}` then the `header` passed is re-used 
     as the column names of the `MatrixTable` else a freshly allocated `Vector{Symbol}` object derived from `header` 
     is used as the column names of the `MatrixTable`.
 
