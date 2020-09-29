@@ -43,21 +43,34 @@ getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
 columnnames(m::MatrixTable) = names(m)
 
 """
-    Tables.table(m::AbstractMatrix; [header])
+    Tables.table(matrix::AbstractMatrix; [header])
 
 Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
-Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
-An optional keyword argument iterator `header` can be passed which will be converted to a
-`Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractMatrix`
-is made, but `header` is always stored as freshly allocated object.
+Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`
+
+# Arguments.
+- `matrix::AbstractMatrix`: The matrix to be wrapped in a `MatrixTable`.
+
+# Keywords
+- `header::Any=[Symbol("Column$i") for i = 1:size(matrix, 2)]`: An iterator(e.g `Tuple` or `AbstractVector`) 
+    to be used as the column names in  the `MatrixTable`.
+- `reuse_header::Bool=true`: if set to `false` and `header::Vector{Symbol}` then the `header` passed is re-used 
+    as the column names of the `MatrixTable` else a freshly allocated `Vector{Symbol}` object derived from `header` 
+    is used as the column names of the `MatrixTable`.
+
+Note that no copy of the `AbstractMatrix`is made.
 """
-function table(m::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)])
-    symbol_header = header isa Vector{Symbol} ? header : [Symbol(h) for h in header]
-    if length(symbol_header) != size(m, 2)
+function table(matrix::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)], reuse_header=false)
+    if header isa Vector{Symbol} && reuse_header
+	symbol_header = header
+    else
+	symbol_header = [Symbol(h) for h in header]
+    end	
+    if length(symbol_header) != size(matrix, 2)
         throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
     end
     lookup = Dict(nm=>i for (i, nm) in enumerate(symbol_header))
-    return MatrixTable(symbol_header, lookup, m)
+    return MatrixTable(symbol_header, lookup, matrix)
 end
 
 """
