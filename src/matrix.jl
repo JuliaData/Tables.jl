@@ -49,7 +49,8 @@ Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which s
 Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
 An optional keyword argument iterator `header` can be passed which will be converted to a
 `Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractMatrix`
-is made, but `header` is always stored as freshly allocated object.
+is made, and `header` will be re-used if passed as a `Vector{Symbol}`, and converted
+to one for everything else passed.
 """
 function table(m::AbstractMatrix; header=nothing)
     symbol_header = header isa Vector{Symbol} ? header : [Symbol(h) for h in header]
