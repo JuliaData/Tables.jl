@@ -347,6 +347,17 @@ end
 
     @test_throws ArgumentError Tables.columns(Int64)
     @test_throws ArgumentError Tables.rows(Int64)
+
+    # 204
+    rows = NamedTuple{(:a, :b), Tuple{Int64, Float64}}[]
+    t = Tables.columns(rows)
+    @test Tables.schema(t) == Tables.Schema((:a, :b), (Int64, Float64))
+    rows = GenericRow[]
+    t = Tables.columns(rows)
+    @test Tables.schema(t) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
+    rows = Tuple{Int64, Float64, String}[]
+    t = Tables.columns(rows)
+    @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int, Float64, String))
 end
 
 @testset "isless" begin

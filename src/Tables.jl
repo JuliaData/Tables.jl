@@ -174,7 +174,7 @@ Base.isempty(r::RorC) = length(r) == 0
 
 function Base.NamedTuple(r::RorC)
     names = columnnames(r)
-    return NamedTuple{Tuple(names)}(Tuple(getcolumn(r, nm) for nm in names))
+    return NamedTuple{Tuple(Base.map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
 function Base.show(io::IO, x::T) where {T <: RorC}
