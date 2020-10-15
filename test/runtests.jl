@@ -357,7 +357,7 @@ end
     @test Tables.schema(t) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
     rows = Tuple{Int64, Float64, String}[]
     t = Tables.columns(rows)
-    @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int, Float64, String))
+    @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int64, Float64, String))
 end
 
 @testset "isless" begin

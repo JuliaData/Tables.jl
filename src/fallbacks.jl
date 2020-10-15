@@ -180,6 +180,12 @@ function _buildcolumns(rowitr, row, st, sch, columns, updated)
     return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
 end
 
+if defined(Base, :fieldtypes)
+    _fieldtypes = fieldtypes
+else
+    _fieldtypes(T) = (fieldtype(T, i) for i = 1:fieldcount(T))
+end
+
 # when Tables.schema(x) === nothing
 @inline function buildcolumns(::Nothing, rowitr::T) where {T}
     state = iterate(rowitr)
@@ -188,9 +194,9 @@ end
         if Base.IteratorEltype(rowitr) == Base.HasEltype()
             WT = wrappedtype(eltype(rowitr))
             if WT <: Tuple
-                return allocatecolumns(Schema((Symbol("Column$i") for i = 1:fieldcount(WT)), fieldtypes(WT)), 0)
+                return allocatecolumns(Schema((Symbol("Column$i") for i = 1:fieldcount(WT)), _fieldtypes(WT)), 0)
             elseif fieldcount(WT) > 0
-                return allocatecolumns(Schema(fieldnames(WT), fieldtypes(WT)), 0)
+                return allocatecolumns(Schema(fieldnames(WT), _fieldtypes(WT)), 0)
             end
         end
         return NamedTuple()
