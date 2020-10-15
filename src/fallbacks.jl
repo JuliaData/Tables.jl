@@ -180,7 +180,7 @@ function _buildcolumns(rowitr, row, st, sch, columns, updated)
     return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
 end
 
-if defined(Base, :fieldtypes)
+if isdefined(Base, :fieldtypes)
     _fieldtypes = fieldtypes
 else
     _fieldtypes(T) = (fieldtype(T, i) for i = 1:fieldcount(T))
