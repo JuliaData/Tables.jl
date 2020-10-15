@@ -61,6 +61,7 @@ struct IteratorRow{T} <: AbstractRow
 end
 
 getrow(r::IteratorRow) = getfield(r, :row)
+wrappedtype(::Type{IteratorRow{T}}) where {T} = T
 
 unwrap(::Type{T}, x) where {T} = convert(T, x)
 unwrap(::Type{Any}, x) = x.hasvalue ? x.value : missing
