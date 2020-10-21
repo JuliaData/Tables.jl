@@ -69,9 +69,9 @@ unwrap(::Type{Any}, x) = x.hasvalue ? x.value : missing
 nondv(T) = DataValueInterfaces.nondatavaluetype(T)
 undatavalue(x::T) where {T} = T == nondv(T) ? x : unwrap(nondv(T), x)
 
-getcolumn(r::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T} = undatavalue(getcolumn(getrow(r), T, col, nm))
-getcolumn(r::IteratorRow, nm::Symbol) = undatavalue(getcolumn(getrow(r), nm))
-getcolumn(r::IteratorRow, i::Int) = undatavalue(getcolumn(getrow(r), i))
+@inline getcolumn(r::IteratorRow, ::Type{T}, col::Int, nm::Symbol) where {T} = undatavalue(getcolumn(getrow(r), T, col, nm))
+@inline getcolumn(r::IteratorRow, nm::Symbol) = undatavalue(getcolumn(getrow(r), nm))
+@inline getcolumn(r::IteratorRow, i::Int) = undatavalue(getcolumn(getrow(r), i))
 columnnames(r::IteratorRow) = columnnames(getrow(r))
 
 # DataValueRowIterator wraps a Row iterator and will wrap `Union{T, Missing}` typed fields in DataValues
