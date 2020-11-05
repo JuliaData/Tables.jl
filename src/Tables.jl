@@ -437,9 +437,13 @@ Tables.partitions(x...) = x
 ```
 That allows passing vararg tables and they'll be treated as separate partitions. Sink
 functions may allow vararg table inputs and can "splat them through" to `partitions`.
+
+For convenience, `Tables.partitions(Iterators.partition(...))` is defined for cases
+where user-controlled partitioning is desired over an applicable input (an input iterator).
 """
 partitions(x) = (x,)
 partitions(x...) = x
+partitions(x::Iterators.PartitionIterator) = x
 
 """
     Tables.LazyTable(f, arg)
