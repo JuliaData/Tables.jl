@@ -517,6 +517,8 @@ Base.length(x::Partitioner) = length(x.x)
 Base.size(x::Partitioner) = size(x.x)
 Base.iterate(x::Partitioner, st...) = iterate(x.x, st...)
 
+const SPECIALIZATION_THRESHOLD = 100
+
 # helper functions
 include("utils.jl")
 

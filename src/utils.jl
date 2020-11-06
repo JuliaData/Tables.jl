@@ -62,146 +62,68 @@ function eachcolumn end
 quot(s::Symbol) = Meta.QuoteNode(s)
 quot(x::Int) = x
 
-@inline function eachcolumn(f::Base.Callable, sch::Schema{names, types}, row) where {names, types}
-    if @generated
-        if length(names) < 101
-            block = Expr(:block, Expr(:meta, :inline))
-            for i = 1:length(names)
-                push!(block.args, quote
-                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])))
-                end)
-            end
-            return block
-        end
-        rle = runlength(types)
-        if length(rle) < 100
-            block = Expr(:block, Expr(:meta, :inline))
-            i = 1
-            for (T, len) in rle
-                push!(block.args, quote
-                    for j = 0:$(len-1)
-                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j])
-                    end
-                end)
-                i += len
-            end
-            b = block
-        else
-            b = quote
-                $(Expr(:meta, :inline))
-                for (i, nm) in enumerate(names)
-                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm)
-                end
-                return
+@inline function eachcolumn(f::F, sch::Schema{names, types}, row::T) where {F, names, types, T}
+    N = fieldcount(types)
+    if N <= SPECIALIZATION_THRESHOLD
+        Base.@nexprs 100 i -> begin
+            if i <= N
+                f(getcolumn(row, fieldtype(types, i), i, names[i]), i, names[i])
             end
         end
-        # println(b)
-        return b
     else
         for (i, nm) in enumerate(names)
             f(getcolumn(row, fieldtype(types, i), i, nm), i, nm)
         end
-        return
     end
+    return
 end
 
-@inline function eachcolumn(f::Base.Callable, sch::Schema{names, nothing}, row) where {names}
-    if @generated
-        if length(names) < 100
-            block = Expr(:block, Expr(:meta, :inline))
-            for i = 1:length(names)
-                push!(block.args, quote
-                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])))
-                end)
+@inline function eachcolumn(f::F, sch::Schema{names, nothing}, row::T) where {F, names, T}
+    N = length(names)
+    if N <= SPECIALIZATION_THRESHOLD
+        Base.@nexprs 100 i -> begin
+            if i <= N
+                f(getcolumn(row, names[i]), i, names[i])
             end
-            return block
-        else
-            b = quote
-                $(Expr(:meta, :inline))
-                for (i, nm) in enumerate(names)
-                    f(getcolumn(row, nm), i, nm)
-                end
-                return
-            end
-            return b
         end
     else
         for (i, nm) in enumerate(names)
             f(getcolumn(row, nm), i, nm)
         end
-        return
     end
+    return
 end
 
 # these are specialized `eachcolumn`s where we also want
 # the indexing of `columns` to be constant propagated, so it needs to be returned from the generated function
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, types}, row, columns, args...) where {names, types}
-    if @generated
-        if length(names) < 101
-            block = Expr(:block, Expr(:meta, :inline))
-            for i = 1:length(names)
-                push!(block.args, quote
-                    f(getcolumn(row, $(fieldtype(types, i)), $i, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
-                end)
-            end
-            return block
-        end
-        rle = runlength(types)
-        if length(rle) < 100
-            block = Expr(:block, Expr(:meta, :inline))
-            i = 1
-            for (T, len) in rle
-                push!(block.args, quote
-                    for j = 0:$(len-1)
-                        @inbounds f(getcolumn(row, $T, $i + j, names[$i + j]), $i + j, names[$i + j], columns[$i + j], args...)
-                    end
-                end)
-                i += len
-            end
-            b = block
-        else
-            b = quote
-                $(Expr(:meta, :inline))
-                for (i, nm) in enumerate(names)
-                    f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
-                end
-                return
+@inline function eachcolumns(f::F, sch::Schema{names, types}, row::T, columns::S, args...) where {F, names, types, T, S}
+    N = fieldcount(types)
+    if N <= SPECIALIZATION_THRESHOLD
+        Base.@nexprs 100 i -> begin
+            if i <= N
+                f(getcolumn(row, fieldtype(types, i), i, names[i]), i, names[i], columns[i], args...)
             end
         end
-        # println(b)
-        return b
     else
         for (i, nm) in enumerate(names)
             f(getcolumn(row, fieldtype(types, i), i, nm), i, nm, columns[i], args...)
         end
-        return
     end
+    return
 end
 
-@inline function eachcolumns(f::Base.Callable, sch::Schema{names, nothing}, row, columns, args...) where {names}
-    if @generated
-        if length(names) < 100
-            block = Expr(:block, Expr(:meta, :inline))
-            for i = 1:length(names)
-                push!(block.args, quote
-                    f(getcolumn(row, $(quot(names[i]))), $i, $(quot(names[i])), columns[$i], args...)
-                end)
+@inline function eachcolumns(f::F, sch::Schema{names, nothing}, row::T, columns::S, args...) where {F, names, T, S}
+    N = length(names)
+    if N <= SPECIALIZATION_THRESHOLD
+        Base.@nexprs 100 i -> begin
+            if i <= N
+                f(getcolumn(row, names[i]), i, names[i], columns[i], args...)
             end
-            return block
-        else
-            b = quote
-                $(Expr(:meta, :inline))
-                for (i, nm) in enumerate(names)
-                    f(getcolumn(row, nm), i, nm, columns[i], args...)
-                end
-                return
-            end
-            return b
         end
     else
         for (i, nm) in enumerate(names)
             f(getcolumn(row, nm), i, nm, columns[i], args...)
         end
-        return
     end
+    return
 end

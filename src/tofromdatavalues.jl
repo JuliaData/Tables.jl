@@ -104,6 +104,7 @@ Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
 function Base.iterate(rows::DataValueRowIterator{NamedTuple{names, dtypes}, Schema{names, rtypes}, S}, st=()) where {names, dtypes, rtypes, S}
+    # use of @generated justified here because Queryverse has stated only support for "reasonable amount of columns"
     if @generated
         vals = Any[ :(convert($(fieldtype(dtypes, i)), getcolumn(row, $(fieldtype(rtypes, i)), $i, $(Meta.QuoteNode(names[i]))))) for i = 1:length(names) ]
         ret = Expr(:new, :(NamedTuple{names, dtypes}), vals...)
