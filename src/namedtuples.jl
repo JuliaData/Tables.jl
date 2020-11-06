@@ -32,7 +32,8 @@ Base.IteratorSize(::Type{NamedTupleIterator{sch, T}}) where {sch, T} = Base.Iter
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
-@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
+@inline function _iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
+    # use of @generated justified because it's user-controlled; they explicitly asked for vector of namedtuples
     if @generated
         vals = Any[ :(getcolumn(row, $(fieldtype(T, i)), $i, $(quot(names[i])))) for i = 1:fieldcount(T) ]
         ret = Expr(:new, :(NamedTuple{names, T}), vals...)
@@ -42,6 +43,17 @@ Base.size(nt::NamedTupleIterator) = (length(nt.x),)
             row, st = x
             return $ret, (st,)
         end
+    else
+        x = iterate(rows.x, st...)
+        x === nothing && return nothing
+        row, st = x
+        return NamedTuple{Base.map(Symbol, names), T}(Tuple(getcolumn(row, fieldtype(T, i), i, names[i]) for i = 1:fieldcount(T))), (st,)
+    end
+end
+
+@inline function Base.iterate(rows::NamedTupleIterator{Schema{names, T}}, st=()) where {names, T}
+    if fieldcount(T) <= SPECIALIZATION_THRESHOLD
+        return _iterate(rows, st)
     else
         x = iterate(rows.x, st...)
         x === nothing && return nothing
@@ -117,10 +129,19 @@ naturally.
 """
 function columntable end
 
-function columntable(sch::Schema{names, types}, cols) where {names, types}
+function _columntable(sch::Schema{names, types}, cols) where {names, types}
+    # use of @generated justified because it's user-controlled; they explicitly asked for namedtuple of vectors
     if @generated
         vals = Tuple(:(getarray(getcolumn(cols, $(fieldtype(types, i)), $i, $(quot(names[i]))))) for i = 1:fieldcount(types))
         return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
+    else
+        return NamedTuple{Base.map(Symbol, names)}(Tuple(getarray(getcolumn(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
+    end
+end
+
+function columntable(sch::Schema{names, types}, cols) where {names, types}
+    if fieldcount(types) <= SPECIALIZATION_THRESHOLD
+        return _columntable(sch, cols)
     else
         return NamedTuple{Base.map(Symbol, names)}(Tuple(getarray(getcolumn(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
     end

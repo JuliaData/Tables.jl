@@ -106,10 +106,18 @@ Alternatively, and more generally, custom scalars can overload `DataAPI.defaulta
 """
 allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 
-@inline function allocatecolumns(::Schema{names, types}, len) where {names, types}
+@inline function _allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
         vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
         return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
+    else
+        return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
+    end
+end
+
+@inline function allocatecolumns(sch::Schema{names, types}, len) where {names, types}
+    if fieldcount(types) <= SPECIALIZATION_THRESHOLD
+        return _allocatecolumns(sch, len)
     else
         return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
