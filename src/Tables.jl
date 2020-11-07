@@ -534,6 +534,9 @@ include("tofromdatavalues.jl")
 # matrix integration
 include("matrix.jl")
 
+# dict tables
+include("dicts.jl")
+
 """
     Tables.columnindex(table, name::Symbol)
 
