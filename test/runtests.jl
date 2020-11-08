@@ -635,16 +635,16 @@ end
 
     drt = Tables.dictrowtable(rt)
     @test length(drt) == 5
-    @test Tables.schema(drt).names == (:a, :b, :c, :d)
-    @test Tables.schema(drt).types == (Union{Int, Missing}, Union{Int, Float64, Missing}, Union{Int, Missing}, Union{Int, Missing})
     ct = Tables.columntable(drt)
     @test isequal(ct.a, [1, missing, 6, 8, 8])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.1, missing, 9, 9])
+    @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(ct.d, [missing, 5, 7, missing, 11])
 
     dct = Tables.dictcolumntable(rt)
-    @test Tables.schema(drt).names == (:a, :b, :c, :d)
-    @test Tables.schema(drt).types == (Union{Int, Missing}, Union{Int, Float64, Missing}, Union{Int, Missing}, Union{Int, Missing})
     @test isequal(dct.a, [1, missing, 6, 8, 8])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.1, missing, 9, 9])
+    @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(dct.d, [missing, 5, 7, missing, 11])
 
 end
