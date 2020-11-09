@@ -627,7 +627,7 @@ end
 
     rt = [
         (a=1, b=2, c=3),
-        (b=4.1, c=missing, d=5),
+        (b=4.0, c=missing, d=5),
         (a=6, d=7),
         (a=8, b=9, c=10, d=missing),
         (d=11, c=10, b=9, a=8)
@@ -637,13 +637,13 @@ end
     @test length(drt) == 5
     ct = Tables.columntable(drt)
     @test isequal(ct.a, [1, missing, 6, 8, 8])
-    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.1, missing, 9, 9])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.0, missing, 9, 9])
     @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(ct.d, [missing, 5, 7, missing, 11])
 
     dct = Tables.dictcolumntable(rt)
     @test isequal(dct.a, [1, missing, 6, 8, 8])
-    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.1, missing, 9, 9])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.0, missing, 9, 9])
     @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(dct.d, [missing, 5, 7, missing, 11])
 
