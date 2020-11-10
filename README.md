@@ -1,6 +1,6 @@
 ### Tables.jl
 
-[![Build Status](https://travis-ci.org/JuliaData/Tables.jl.svg?branch=master)](https://travis-ci.org/JuliaData/Tables.jl)
+[![Build Status](https://travis-ci.com/JuliaData/Tables.jl.svg?branch=master)](https://travis-ci.com/JuliaData/Tables.jl)
 [![Codecov](https://codecov.io/gh/JuliaData/Tables.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaData/Tables.jl)
 
 The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data.
