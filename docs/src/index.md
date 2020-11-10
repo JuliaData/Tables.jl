@@ -204,6 +204,8 @@ Tables.partitions
 Tables.partitioner
 Tables.rowtable
 Tables.columntable
+Tables.dictrowtable
+Tables.dictcolumntable
 Tables.namedtupleiterator
 Tables.datavaluerows
 Tables.nondatavaluerows

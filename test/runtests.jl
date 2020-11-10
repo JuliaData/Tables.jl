@@ -591,3 +591,60 @@ end
     end
 
 end
+
+@testset "Dict tables" begin
+
+    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
+    ct = (a=[1, 2, 3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
+
+    dct = Tables.dictcolumntable(rt)
+    @test Tables.istable(dct)
+    @test Tables.columnaccess(dct)
+    @test Tables.columns(dct) === dct
+    @test Tables.schema(dct) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
+    @test dct.a == [1, 2, 3]
+    @test dct.b == [4.0, 5.0, 6.0]
+    @test dct.c == ["7", "8", "9"]
+    
+    dct = Tables.dictcolumntable(ct)
+    @test dct.a == [1, 2, 3]
+    @test dct.b == [4.0, 5.0, 6.0]
+    @test dct.c == ["7", "8", "9"]
+    cct = Tables.columntable(dct)
+    @test cct.a == [1, 2, 3]
+    @test cct.b == [4.0, 5.0, 6.0]
+    @test cct.c == ["7", "8", "9"]
+
+    drt = Tables.dictrowtable(rt)
+    @test Tables.isrowtable(drt)
+    @test Tables.schema(drt) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
+    row = first(drt)
+    @test (row.a, row.b, row.c) == (1, 4.0, "7")
+    cct = Tables.columntable(drt)
+    @test cct.a == [1, 2, 3]
+    @test cct.b == [4.0, 5.0, 6.0]
+    @test cct.c == ["7", "8", "9"]
+
+    rt = [
+        (a=1, b=2, c=3),
+        (b=4.0, c=missing, d=5),
+        (a=6, d=7),
+        (a=8, b=9, c=10, d=missing),
+        (d=11, c=10, b=9, a=8)
+    ]
+
+    drt = Tables.dictrowtable(rt)
+    @test length(drt) == 5
+    ct = Tables.columntable(drt)
+    @test isequal(ct.a, [1, missing, 6, 8, 8])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.0, missing, 9, 9])
+    @test isequal(ct.c, [3, missing, missing, 10, 10])
+    @test isequal(ct.d, [missing, 5, 7, missing, 11])
+
+    dct = Tables.dictcolumntable(rt)
+    @test isequal(dct.a, [1, missing, 6, 8, 8])
+    @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.0, missing, 9, 9])
+    @test isequal(ct.c, [3, missing, missing, 10, 10])
+    @test isequal(dct.d, [missing, 5, 7, missing, 11])
+
+end
