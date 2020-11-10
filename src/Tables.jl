@@ -124,6 +124,8 @@ function isrowtable end
 
 isrowtable(::T) where {T} = isrowtable(T)
 isrowtable(::Type{T}) where {T} = false
+# to avoid ambiguities
+isrowtable(::Type{T}) where {T <: AbstractVector{Union{}}} = false
 
 # default definitions for AbstractDict to act as an AbstractColumns or AbstractRow
 getcolumn(x::AbstractDict{Symbol}, i::Int) = x[columnnames(x)[i]]
@@ -254,6 +256,9 @@ function istable end
 
 istable(x::T) where {T} = istable(T) || TableTraits.isiterabletable(x) === true
 istable(::Type{T}) where {T} = isrowtable(T)
+# to avoid ambiguities
+istable(::Type{T}) where {T <: AbstractVector{Union{}}} = false
+istable(::AbstractVector{Union{}}) = false
 
 """
     Tables.rowaccess(x) => Bool
