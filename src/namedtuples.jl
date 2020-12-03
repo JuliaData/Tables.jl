@@ -15,6 +15,8 @@ end
     Tables.namedtupleiterator(x)
 
 Pass any table input source and return a `NamedTuple` iterator
+
+See also [`rowtable`](@ref).
 """
 function namedtupleiterator(x)
     r = rows(x)
@@ -87,6 +89,8 @@ table type of sorts, since it satisfies the Tables.jl row interface
 naturally, i.e. a `Vector` naturally iterates its elements, and
 `NamedTuple` satisifes the `AbstractRow` interface by default (allows
 indexing value by index, name, and getting all names).
+
+For a lazy iterator over rows see [`namedtupleiterator`](@ref).
 """
 function rowtable end
 
