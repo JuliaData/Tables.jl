@@ -16,7 +16,7 @@ end
 
 Pass any table input source and return a `NamedTuple` iterator
 
-See also [`rowtable`](@ref).
+See also [`rows`](@ref) and [`rowtable`](@ref).
 """
 function namedtupleiterator(x)
     r = rows(x)
@@ -90,7 +90,7 @@ naturally, i.e. a `Vector` naturally iterates its elements, and
 `NamedTuple` satisifes the `AbstractRow` interface by default (allows
 indexing value by index, name, and getting all names).
 
-For a lazy iterator over rows see [`namedtupleiterator`](@ref).
+For a lazy iterator over rows see [`rows`](@ref) and [`namedtupleiterator`](@ref).
 """
 function rowtable end
 
