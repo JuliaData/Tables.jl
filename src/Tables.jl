@@ -356,6 +356,8 @@ which may return `nothing` if the schema is unknown.
 Column names can always be queried by calling `Tables.columnnames(row)` on an individual row,
 and row values can be accessed by calling `Tables.getcolumn(rows, i::Int )` or
 `Tables.getcolumn(rows, nm::Symbol)` with a column index or name, respectively.
+
+See also [`rowtable`](@ref) and [`namedtupleiterator`](@ref).
 """
 function rows end
 
