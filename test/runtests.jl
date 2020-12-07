@@ -250,6 +250,13 @@ end
     @test Tables.columnnames(mattbl) == Symbol.(1:3)
     @test_throws ArgumentError Tables.table(mat, header=[:A, :B, :C, :D])
 
+    X = [1 2; 3 4; 5 6]
+    tbl = Tables.table(X)
+    tbl[1][1] = 100
+    @test X[1, 1] == 100
+    tbl[2][3] = 200
+    @test X[3, 2] == 200
+
     # #155
     m = hcat([1,2,3],[1,2,3])
     T = Tables.table(m)
