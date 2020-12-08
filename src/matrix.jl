@@ -37,9 +37,9 @@ Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m
 Columns(m::T) where {T <: MatrixTable} = Columns{T}(m)
 columnaccess(::Type{<:MatrixTable}) = true
 columns(m::MatrixTable) = m
-getcolumn(m::MatrixTable, ::Type{T}, col::Int, nm::Symbol) where {T} = getfield(m, :matrix)[:, col]
-getcolumn(m::MatrixTable, nm::Symbol) = getfield(m, :matrix)[:, getfield(m, :lookup)[nm]]
-getcolumn(m::MatrixTable, i::Int) = getfield(m, :matrix)[:, i]
+getcolumn(m::MatrixTable, i::Int) = view(getfield(m, :matrix), :, i)
+getcolumn(m::MatrixTable, ::Type, col::Int, nm::Symbol) = getcolumn(m, col)
+getcolumn(m::MatrixTable, nm::Symbol) = getcolumn(m, getfield(m, :lookup)[nm])
 columnnames(m::MatrixTable) = names(m)
 
 """
