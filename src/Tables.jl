@@ -31,6 +31,9 @@ Interface definition:
 | **Optional methods**                                     |                             |                                                                                                                                                              |
 | `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
+Note that subtypes of `Tables.AbstractColumns` **must** overload all required methods listed
+above instead of relying on these methods' default definitions.
+
 While types aren't required to subtype `Tables.AbstractColumns`, benefits of doing so include:
   * Indexing interface defined (using `getcolumn`); i.e. `tbl[i]` will retrieve the column at index `i`
   * Property access interface defined (using `columnnames` and `getcolumn`); i.e. `tbl.col1` will retrieve column named `col1`
@@ -60,6 +63,9 @@ Interface definition:
 | `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
 | **Optional methods**                                   |                           |                                                                                                                                                                  |
 | `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column element type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+
+Note that subtypes of `Tables.AbstractRow` **must** overload all required methods listed above
+instead of relying on these methods' default definitions.
 
 While custom row types aren't required to subtype `Tables.AbstractRow`, benefits of doing so include:
   * Indexing interface defined (using `getcolumn`); i.e. `row[i]` will return the column value at index `i`
@@ -155,6 +161,11 @@ columns(x::T) where {T <: AbstractDict} = error("to treat $T as a table, it must
 # default definitions for AbstractRow, AbstractColumns
 const RorC = Union{AbstractRow, AbstractColumns}
 
+# avoids mutual recursion with default definitions (issue #221)
+getcolumn(::T, ::Int) where {T <: RorC} = error("`Tables.getcolumn` must be specifically overloaded for $T <: Union{AbstractRow, AbstractColumns}`")
+getcolumn(::T, ::Symbol) where {T <: RorC} = error("`Tables.getcolumn` must be specifically overloaded for $T <: Union{AbstractRow, AbstractColumns}`")
+columnnames(::T) where {T <: RorC} = error("`Tables.columnnames` must be specifically overloaded for $T <: Union{AbstractRow, AbstractColumns}`")
+
 Base.IteratorSize(::Type{R}) where {R <: RorC} = Base.HasLength()
 Base.length(r::RorC) = length(columnnames(r))
 Base.IndexStyle(::Type{<:RorC}) = Base.IndexLinear()
@@ -246,7 +257,7 @@ columnnames(x::RorC2) = columnnames(getx(x))
 """
     Tables.istable(x) => Bool
 
-Check if an object has specifically defined that it is a table. Note that 
+Check if an object has specifically defined that it is a table. Note that
 not all valid tables will return true, since it's possible to satisfy the
 Tables.jl interface at "run-time", e.g. a `Generator` of `NamedTuple`s iterates
 `NamedTuple`s, which satisfies the `AbstractRow` interface, but there's no static way
@@ -329,7 +340,7 @@ materializer(::Type{T}) where {T} = columntable
 
 Accesses data of input table source `x` by returning an [`AbstractColumns`](@ref)-compatible
 object, which allows retrieving entire columns by name or index. A retrieved column
-is an object that is indexable and has a known length, i.e. supports 
+is an object that is indexable and has a known length, i.e. supports
 `length(col)` and `col[i]` for any `i = 1:length(col)`. Note that
 even if the input table source is row-oriented by nature, an efficient generic
 definition of `Tables.columns` is defined in Tables.jl to build a `AbstractColumns`-
