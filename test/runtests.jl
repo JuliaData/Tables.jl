@@ -171,7 +171,7 @@ end
     @test Tables.buildcolumns(nothing, rt) == nt
 end
 
-@testset "Materializer" begin 
+@testset "Materializer" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
 
@@ -265,7 +265,7 @@ end
     @test M[:, 1] == [1, 2, 3]
     # 182
     @test M === m #checks that both are the same object in memory
-    @test Mt == permutedims(m) 
+    @test Mt == permutedims(m)
     # 167
     @test !Tables.istable(Matrix{Union{}}(undef, 2, 3))
 end
@@ -483,6 +483,8 @@ Tables.getcolumn(r::Row, nm::Symbol) = getfield(r, nm)
 Tables.getcolumn(r::Row, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
 Tables.columnnames(r::Row) = fieldnames(Row)
 
+struct DummyRow <: Tables.AbstractRow end
+
 @testset "AbstractRow" begin
 
     row = Row(1, missing, "hey")
@@ -516,6 +518,10 @@ Tables.columnnames(r::Row) = fieldnames(Row)
     @test Tables.schema(art) === nothing
     @test isequal(Tables.columntable(art), ct)
 
+    r = DummyRow()
+    @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyRow <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(r, 1)
+    @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyRow <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(r, :a)
+    @test_throws ErrorException("`Tables.columnnames` must be specifically overloaded for DummyRow <: Union{AbstractRow, AbstractColumns}`") Tables.columnnames(r)
 end
 
 struct Columns <: Tables.AbstractColumns
@@ -528,6 +534,8 @@ Tables.getcolumn(r::Columns, i::Int) = getfield(r, i)
 Tables.getcolumn(r::Columns, nm::Symbol) = getfield(r, nm)
 Tables.getcolumn(r::Columns, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
 Tables.columnnames(r::Columns) = fieldnames(Columns)
+
+struct DummyCols <: Tables.AbstractColumns end
 
 @testset "AbstractColumns" begin
 
@@ -557,6 +565,11 @@ Tables.columnnames(r::Columns) = fieldnames(Columns)
     @test Tables.columns(col) === col
     @test Tables.schema(col) === nothing
     @test isequal(Tables.columntable(col), ct)
+
+    c = DummyCols()
+    @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, 1)
+    @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, :a)
+    @test_throws ErrorException("`Tables.columnnames` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.columnnames(c)
 end
 
 struct IsRowTable
@@ -612,7 +625,7 @@ end
     @test dct.a == [1, 2, 3]
     @test dct.b == [4.0, 5.0, 6.0]
     @test dct.c == ["7", "8", "9"]
-    
+
     dct = Tables.dictcolumntable(ct)
     @test dct.a == [1, 2, 3]
     @test dct.b == [4.0, 5.0, 6.0]
