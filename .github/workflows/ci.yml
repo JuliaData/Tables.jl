@@ -1,9 +1,12 @@
 name: CI
 on:
-  push:
-    branches: [master]
-    tags: ["*"]
   pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags: '*'
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
@@ -14,23 +17,15 @@ jobs:
         version:
           - '1.0'
           - '1' # automatically expands to the latest stable 1.x release of Julia
-          - nightly
+          - 'nightly'
         os:
           - ubuntu-latest
         arch:
           - x64
-          - x86
         include:
-          # test macOS and Windows with latest Julia only
-          - os: macOS-latest
-            arch: x64
-            version: 1
           - os: windows-latest
-            arch: x64
-            version: 1
-          - os: windows-latest
+            version: '1'
             arch: x86
-            version: 1
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -66,6 +61,11 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
+      - run: |
+          julia --project=docs -e '
+            using Documenter: doctest
+            using StructTypes
+            doctest(StructTypes)'
       - run: julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
