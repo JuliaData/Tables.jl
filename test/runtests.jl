@@ -268,6 +268,13 @@ end
     @test Mt == permutedims(m)
     # 167
     @test !Tables.istable(Matrix{Union{}}(undef, 2, 3))
+
+    # Tables.Columns roundtrip
+    X = [1 0 0; 0 1 0; 0 0 1]
+    X′ = Tables.matrix(Tables.Columns(Tables.table(X)))
+    @test X′ == X
+    # test for presence of superfluous wrapping
+    @test typeof(X′) == typeof(X)
 end
 
 import Base: ==
@@ -524,22 +531,22 @@ struct DummyRow <: Tables.AbstractRow end
     @test_throws ErrorException("`Tables.columnnames` must be specifically overloaded for DummyRow <: Union{AbstractRow, AbstractColumns}`") Tables.columnnames(r)
 end
 
-struct Columns <: Tables.AbstractColumns
+struct TestColumns <: Tables.AbstractColumns
     a::Vector{Int}
     b::Vector{Union{Float64, Missing}}
     c::Vector{String}
 end
 
-Tables.getcolumn(r::Columns, i::Int) = getfield(r, i)
-Tables.getcolumn(r::Columns, nm::Symbol) = getfield(r, nm)
-Tables.getcolumn(r::Columns, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
-Tables.columnnames(r::Columns) = fieldnames(Columns)
+Tables.getcolumn(r::TestColumns, i::Int) = getfield(r, i)
+Tables.getcolumn(r::TestColumns, nm::Symbol) = getfield(r, nm)
+Tables.getcolumn(r::TestColumns, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
+Tables.columnnames(r::TestColumns) = fieldnames(TestColumns)
 
 struct DummyCols <: Tables.AbstractColumns end
 
 @testset "AbstractColumns" begin
 
-    col = Columns([1, 2], [missing, 3.14], ["hey", "ho"])
+    col = TestColumns([1, 2], [missing, 3.14], ["hey", "ho"])
 
     @test Base.IteratorSize(typeof(col)) == Base.HasLength()
     @test length(col) == 3
@@ -570,6 +577,21 @@ struct DummyCols <: Tables.AbstractColumns end
     @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, 1)
     @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, :a)
     @test_throws ErrorException("`Tables.columnnames` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.columnnames(c)
+end
+
+@testset "Tables.Columns" begin
+    X = (A=[1,2], B=[im, -im], C=["kirk", "spock"])
+
+    @test_throws ArgumentError("Columns can only wrap an object for which `Tables.istable` is true") Tables.Columns(nothing)
+    Xc = Tables.Columns(X)
+    @test Tables.schema(X) == Tables.schema(Xc)
+    for i ∈ 1:3
+        @test Tables.getcolumn(X, i) == Tables.getcolumn(Xc, i)
+    end
+    for i ∈ (:A, :B, :C)
+        @test Tables.getcolumn(X, i) == Tables.getcolumn(Xc, i)
+    end
+    @test Tables.columnnames(X) == Tables.columnnames(Xc)
 end
 
 struct IsRowTable

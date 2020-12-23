@@ -241,9 +241,17 @@ to provide useful default behaviors (allows any `AbstractColumns` to be used lik
 """
 struct Columns{T} <: AbstractColumns
     x::T
+
+    function Columns{T}(x::T) where {T}
+        istable(x) ? new{T}(x) : throw(ArgumentError("Columns can only wrap an object for which `Tables.istable` is true"))
+    end
 end
 
+Columns(x) = Columns{typeof(x)}(x)
 Columns(x::AbstractColumns) = x
+
+# Columns can only wrap something that is a table, so we pass the schema through
+schema(x::Columns) = schema(getx(x))
 
 const RorC2 = Union{Row, Columns}
 
