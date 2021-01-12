@@ -243,7 +243,6 @@ struct Columns{T} <: AbstractColumns
     x::T
 end
 
-Columns(x) = Columns{typeof(x)}(x)
 Columns(x::AbstractColumns) = x
 
 # Columns can only wrap something that is a table, so we pass the schema through

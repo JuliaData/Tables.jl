@@ -582,7 +582,6 @@ end
 @testset "Tables.Columns" begin
     X = (A=[1,2], B=[im, -im], C=["kirk", "spock"])
 
-    @test_throws ArgumentError("Columns can only wrap an object for which `Tables.istable` is true") Tables.Columns(nothing)
     Xc = Tables.Columns(X)
     @test Tables.schema(X) == Tables.schema(Xc)
     for i ∈ 1:3
