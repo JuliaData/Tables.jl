@@ -241,10 +241,6 @@ to provide useful default behaviors (allows any `AbstractColumns` to be used lik
 """
 struct Columns{T} <: AbstractColumns
     x::T
-
-    function Columns{T}(x::T) where {T}
-        istable(x) ? new{T}(x) : throw(ArgumentError("Columns can only wrap an object for which `Tables.istable` is true"))
-    end
 end
 
 Columns(x) = Columns{typeof(x)}(x)
