@@ -14,4 +14,5 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/JuliaData/Tables.jl",
+    devbranch = "main"
 )
