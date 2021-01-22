@@ -245,6 +245,9 @@ end
 
 Columns(x::AbstractColumns) = x
 
+# Columns can only wrap something that is a table, so we pass the schema through
+schema(x::Columns) = schema(getx(x))
+
 const RorC2 = Union{Row, Columns}
 
 getx(x::RorC2) = getfield(x, :x)
