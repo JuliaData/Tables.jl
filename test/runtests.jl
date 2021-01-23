@@ -169,6 +169,9 @@ end
     @test eltype(rt).parameters[1] == nms
     @test Tables.columntable(rt) == nt
     @test Tables.buildcolumns(nothing, rt) == nt
+
+    # 228
+    @test Tables.columntable(NamedTuple[]) === NamedTuple()
 end
 
 @testset "Materializer" begin
