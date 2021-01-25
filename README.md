@@ -26,4 +26,4 @@ Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperation
 
 ### Zenodo Link
 
-https://zenodo.org/record/4458977#.YA8Dc5DYrik
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4458977.svg)](https://doi.org/10.5281/zenodo.4458977)
