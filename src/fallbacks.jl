@@ -143,7 +143,7 @@ end
 replacex(t, col::Int, x) = ntuple(i->i == col ? x : t[i], length(t))
 
 @inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, L) where {T}
-    if val isa T
+    if val isa T || promote_type(typeof(val), T) <: T
         add!(dest, val, L, row)
         return
     else
