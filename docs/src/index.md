@@ -215,6 +215,7 @@ Tables.eachcolumn
 Tables.materializer
 Tables.columnindex
 Tables.columntype
+Tables.rowmerge
 Tables.Row
 Tables.Columns
 ```

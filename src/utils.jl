@@ -127,3 +127,22 @@ end
     end
     return
 end
+
+"""
+    rowmerge(row, other_rows...)
+    rowmerge(row; fields_to_merge...)
+
+Return a `NamedTuple` by merging `row` (an `AbstractRow`-compliant value) with `other_rows`
+(one or more `AbstractRow`-compliant values) via `Base.merge`. This function is similar to
+`Base.merge(::NamedTuple, ::NamedTuple...)`, but accepts `AbstractRow`-compliant values
+instead of `NamedTuple`s.
+
+A convenience method `rowmerge(row; fields_to_merge...) = rowmerge(row, fields_to_merge)`
+is defined that enables the `fields_to_merge` to be specified as keyword arguments.
+"""
+rowmerge(row, other) = merge(_row_to_named_tuple(row), _row_to_named_tuple(other))
+rowmerge(row, other, more...) = merge(_row_to_named_tuple(row), rowmerge(other, more...))
+rowmerge(row; fields_to_merge...) = rowmerge(row, fields_to_merge.data)
+
+_row_to_named_tuple(row::NamedTuple) = row
+_row_to_named_tuple(row) = NamedTuple(Row(row))
