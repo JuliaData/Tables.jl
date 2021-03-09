@@ -140,7 +140,7 @@ Return a `NamedTuple` by merging `row` (a `AbstractRow`-compliant value) with `p
 A convenience method `with(row; patch...) = with(row, patch)` is defined that enables `patch`
 fields to be specified as keyword arguments.
 """
-with(row; patch...) = with(row, patch)
+with(row; patch...) = with(row, patch.data)
 with(row, patch) = merge(_row_to_named_tuple(row), _row_to_named_tuple(patch))
 with(row, patch, more...) = merge(_row_to_named_tuple(row), with(patch, more...))
 
