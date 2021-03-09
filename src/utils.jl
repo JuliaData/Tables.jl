@@ -129,20 +129,20 @@ end
 end
 
 """
-    with(row; patch...)
-    with(row, patches...)
+    rowmerge(row, other_rows...)
+    rowmerge(row; fields_to_merge...)
 
-Return a `NamedTuple` by merging `row` (a `AbstractRow`-compliant value) with `patches` (one or more
-`AbstractRow`-compliant values) via `Base.merge`. In other words, this function is similar to
-`Base.merge(::NamedTuple, ::NamedTuple...)`, but accepts `AbstractRow`-compliant values intead of
-`NamedTuple`s.
+Return a `NamedTuple` by merging `row` (an `AbstractRow`-compliant value) with `other_rows`
+(one or more `AbstractRow`-compliant values) via `Base.merge`. This function is similar to
+`Base.merge(::NamedTuple, ::NamedTuple...)`, but accepts `AbstractRow`-compliant values
+instead of `NamedTuple`s.
 
-A convenience method `with(row; patch...) = with(row, patch)` is defined that enables `patch`
-fields to be specified as keyword arguments.
+A convenience method `rowmerge(row; fields_to_merge...) = rowmerge(row, fields_to_merge)`
+is defined that enables the `fields_to_merge` to be specified as keyword arguments.
 """
-with(row; patch...) = with(row, patch)
-with(row, patch) = merge(_row_to_named_tuple(row), _row_to_named_tuple(patch))
-with(row, patch, more...) = merge(_row_to_named_tuple(row), with(patch, more...))
+rowmerge(row; fields_to_merge...) = rowmerge(row, fields_to_merge.data)
+rowmerge(row, other) = merge(_row_to_named_tuple(row), _row_to_named_tuple(other))
+rowmerge(row, other, more...) = merge(_row_to_named_tuple(row), rowmerge(other, more...))
 
 _row_to_named_tuple(row::NamedTuple) = row
 _row_to_named_tuple(row) = NamedTuple(Row(row))
