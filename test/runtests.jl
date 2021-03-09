@@ -84,6 +84,10 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
     @test Tables.columns(rows) === nt
     @test Tables.materializer(rows) === Tables.materializer(nt)
 
+    @test Tables.with(row; b=200, hey="hello") == (a=1, b=200, hey="hello")
+    @test Tables.with(row, (hey="hello", a=200)) == (a=200, b=4, hey="hello")
+    @test Tables.with(row, (hey="hello", a=200), row, (x=:x, y=:y, hey="bye")) == (a=1, b=4, hey="bye", x=:x, y=:y)
+
     @test Tables.sym(1) === 1
     @test Tables.sym("hey") == :hey
 

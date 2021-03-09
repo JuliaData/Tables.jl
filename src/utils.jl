@@ -127,3 +127,22 @@ end
     end
     return
 end
+
+"""
+    with(row; patch...)
+    with(row, patches...)
+
+Return a `NamedTuple` by merging `row` (a `AbstractRow`-compliant value) with `patches` (one or more
+`AbstractRow`-compliant values) via `Base.merge`. In other words, this function is similar to
+`Base.merge(::NamedTuple, ::NamedTuple...)`, but accepts `AbstractRow`-compliant values intead of
+`NamedTuple`s.
+
+A convenience method `with(row; patch...) = with(row, patch)` is defined that enables `patch`
+fields to be specified as keyword arguments.
+"""
+with(row; patch...) = with(row, patch)
+with(row, patch) = merge(_row_to_named_tuple(row), _row_to_named_tuple(patch))
+with(row, patch, more...) = merge(_row_to_named_tuple(row), with(patch, more...))
+
+_row_to_named_tuple(row::NamedTuple) = row
+_row_to_named_tuple(row) = NamedTuple(Row(row))
