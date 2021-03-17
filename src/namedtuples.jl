@@ -79,6 +79,40 @@ function Base.iterate(rows::NamedTupleIterator{Nothing}, state::Tuple{Val{names}
     return NamedTuple{names}(Tuple(getcolumn(row, nm) for nm in names)), (Val(names), (st,))
 end
 
+# Faster columns implementation
+@generated function columns(rows::RowTable)
+    T = eltype(rows)
+    # Handle the empty non-concrete named tuple case with a fallback to the
+    # generic buildcolumns
+    !isconcretetype(T) && return quote
+        CopiedColumns(buildcolumns(schema(rows), rows))
+    end
+
+    # Generate expression for named tuple of columns, entirely unfilled
+    exs = map(enumerate(fieldnames(T))) do (i, field)
+        return :($field = begin
+            TT = fieldtype($T, $i)
+            Vector{TT}(undef, length(rows))
+        end)
+    end
+    col_expr = Expr(:tuple, exs...)
+
+    # Generate expression for unrolled loop over the fieldnames
+    inner = Expr(:block)
+    for field in fieldnames(T)
+        ex = :(cols.$field[i] = rows[i].$field)
+        push!(inner.args, ex)
+    end
+
+    return quote
+        cols = $col_expr
+        for i in eachindex(rows)
+            $inner
+        end
+        return CopiedColumns(cols)
+    end
+end
+
 # sink function
 """
     Tables.rowtable(x) => Vector{NamedTuple}
