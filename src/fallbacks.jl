@@ -109,7 +109,7 @@ allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 @inline function _allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
         vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
-        return :(NamedTuple{Base.map(Symbol, names)}(($(vals...),)))
+        return :(NamedTuple{$(Base.map(Symbol, names))}(($(vals...),)))
     else
         return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
@@ -131,17 +131,10 @@ end
     L = Base.IteratorSize(T)
     len = Base.haslength(T) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
-    buildcolumns!(nt, schema, rowitr)
-    
-    return nt
-end
-
-function buildcolumns!(nt, schema, rowitr::T) where {T}
-    L = Base.IteratorSize(T)
-    len = Base.haslength(T) ? length(rowitr) : 0
     for (i, row) in enumerate(rowitr)
         eachcolumns(add!, schema, row, nt, L, i)
     end
+    return nt
 end
 
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
