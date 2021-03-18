@@ -176,14 +176,6 @@ end
 
     # 228
     @test Tables.columntable(NamedTuple[]) === NamedTuple()
-
-    # Test that concrete columntable method returns the same as buildcolumns
-    rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
-    t1 = Tables.columns(rt)
-    t2 = Tables.buildcolumns(nothing, rt)
-    @test t1.a == t2.a
-    @test t1.b == t2.b
-    @test t1.c == t2.c
 end
 
 @testset "Materializer" begin

@@ -131,10 +131,17 @@ end
     L = Base.IteratorSize(T)
     len = Base.haslength(T) ? length(rowitr) : 0
     nt = allocatecolumns(schema, len)
+    buildcolumns!(nt, schema, rowitr)
+    
+    return nt
+end
+
+function buildcolumns!(nt, schema, rowitr::T) where {T}
+    L = Base.IteratorSize(T)
+    len = Base.haslength(T) ? length(rowitr) : 0
     for (i, row) in enumerate(rowitr)
         eachcolumns(add!, schema, row, nt, L, i)
     end
-    return nt
 end
 
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
