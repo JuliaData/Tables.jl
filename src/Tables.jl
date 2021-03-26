@@ -179,7 +179,7 @@ Base.propertynames(r::RorC) = columnnames(r)
 Base.keys(r::RorC) = columnnames(r)
 Base.values(r::RorC) = collect(r)
 Base.haskey(r::RorC, key::Symbol) = key in columnnames(r)
-Base.haskey(r::RorC, i::Int) = 0 < i < length(columnnames(r))
+Base.haskey(r::RorC, i::Int) = 0 < i <= length(columnnames(r))
 Base.get(r::RorC, key::Union{Integer, Symbol}, default) = haskey(r, key) ? getcolumn(r, key) : default
 Base.get(f::Base.Callable, r::RorC, key::Union{Integer, Symbol}) = haskey(r, key) ? getcolumn(r, key) : f()
 Base.iterate(r::RorC, i=1) = i > length(r) ? nothing : (getcolumn(r, i), i + 1)
