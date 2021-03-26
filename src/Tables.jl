@@ -13,7 +13,7 @@ end
 
 An interface type defined as an ordered set of columns that support
 retrieval of individual columns by name or index. A retrieved column
-must be an indexable collection with known length, i.e. an object
+must be a 1-based indexable collection with known length, i.e. an object
 that supports `length(col)` and `col[i]` for any `i = 1:length(col)`.
 `Tables.columns` must return an object that satisfies the `Tables.AbstractColumns` interface.
 While `Tables.AbstractColumns` is an abstract type that custom "columns" types may subtype for
