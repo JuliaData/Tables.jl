@@ -190,7 +190,7 @@ function Base.NamedTuple(r::RorC)
     return NamedTuple{Tuple(Base.map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
-function Base.show(io::IO, x::T) where {T <: RorC}
+function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
         print(io, "$T: ")
         show(io, NamedTuple(x))
@@ -199,6 +199,25 @@ function Base.show(io::IO, x::T) where {T <: RorC}
         names = collect(columnnames(x))
         values = [getcolumn(x, nm) for nm in names]
         Base.print_matrix(io, hcat(names, values))
+    end
+end
+
+function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
+    nrows = try
+        string(length(Tables.getcolumn(table, 1)))
+    catch e
+        e isa MethodError || rethrow()
+        "an unknown number of"
+    end
+    cols = Tables.columnnames(table)
+    ncols = length(cols)
+    print(io, "$(typeof(table)) with $(nrows) rows and $(ncols) columns, and ")
+    sch = schema(table)
+    if sch !== nothing
+        print(io, "schema:\n")
+        show(io, sch)
+    else
+        print(io, "an unknown schema.")
     end
 end
 
