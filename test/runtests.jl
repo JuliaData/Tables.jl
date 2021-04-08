@@ -601,6 +601,9 @@ end
         @test Tables.getcolumn(X, i) == Tables.getcolumn(Xc, i)
     end
     @test Tables.columnnames(X) == Tables.columnnames(Xc)
+
+    tbl = Tables.Columns((; a=rand(Int, 100), b=rand(100), c=[ "a" for _ = 1:100]))
+    @test length(sprint(show, tbl)) < 500
 end
 
 struct IsRowTable

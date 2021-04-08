@@ -204,11 +204,11 @@ end
 
 function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
     ncols = length(columnnames(table))
-    print(io, "$(typeof(table)) with $(rowcount(table)) rows and $(ncols) columns, and ")
+    print(io, "$(typeof(table)) with $(rowcount(table)) rows, $(ncols) columns, and ")
     sch = schema(table)
     if sch !== nothing
         print(io, "schema:\n")
-        show(io, sch)
+        show(IOContext(io, :print_schema_header => false), sch)
     else
         print(io, "an unknown schema.")
     end
@@ -425,7 +425,7 @@ Schema(names, ::Nothing) = Schema{Tuple(Base.map(sym, names)), nothing}()
 Schema(names, types) = Schema{Tuple(Base.map(sym, names)), Tuple{types...}}()
 
 function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
-    println(io, "Tables.Schema:")
+    get(io, :print_schema_header, true) && println(io, "Tables.Schema:")
     Base.print_matrix(io, hcat(collect(names), types === nothing ? fill(nothing, length(names)) : collect(fieldtype(types, i) for i = 1:fieldcount(types))))
 end
 
