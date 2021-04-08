@@ -203,15 +203,8 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
 end
 
 function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
-    nrows = try
-        string(length(Tables.getcolumn(table, 1)))
-    catch e
-        e isa MethodError || rethrow()
-        "an unknown number of"
-    end
-    cols = Tables.columnnames(table)
-    ncols = length(cols)
-    print(io, "$(typeof(table)) with $(nrows) rows and $(ncols) columns, and ")
+    ncols = length(columnnames(table))
+    print(io, "$(typeof(table)) with $(rowcount(table)) rows and $(ncols) columns, and ")
     sch = schema(table)
     if sch !== nothing
         print(io, "schema:\n")
