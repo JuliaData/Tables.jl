@@ -573,6 +573,9 @@ struct DummyCols <: Tables.AbstractColumns end
     @test isequal(collect(col), [[1,2], [missing,3.14], ["hey","ho"]])
     show(col)
 
+    tbl = TestColumns(rand(Int, 100), rand(100), [ "a" for _ = 1:100])
+    @test length(sprint(show, tbl)) < 500
+
     ct = (a=[1, 2], b=[missing, 3.14], c=["hey", "ho"])
     @test Tables.istable(col)
     @test Tables.columnaccess(col)
@@ -598,6 +601,9 @@ end
         @test Tables.getcolumn(X, i) == Tables.getcolumn(Xc, i)
     end
     @test Tables.columnnames(X) == Tables.columnnames(Xc)
+
+    tbl = Tables.Columns((; a=rand(Int, 100), b=rand(100), c=[ "a" for _ = 1:100]))
+    @test length(sprint(show, tbl)) < 500
 end
 
 struct IsRowTable

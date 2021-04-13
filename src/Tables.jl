@@ -190,7 +190,7 @@ function Base.NamedTuple(r::RorC)
     return NamedTuple{Tuple(Base.map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
-function Base.show(io::IO, x::T) where {T <: RorC}
+function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
         print(io, "$T: ")
         show(io, NamedTuple(x))
@@ -199,6 +199,18 @@ function Base.show(io::IO, x::T) where {T <: RorC}
         names = collect(columnnames(x))
         values = [getcolumn(x, nm) for nm in names]
         Base.print_matrix(io, hcat(names, values))
+    end
+end
+
+function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
+    ncols = length(columnnames(table))
+    print(io, "$(typeof(table)) with $(rowcount(table)) rows, $(ncols) columns, and ")
+    sch = schema(table)
+    if sch !== nothing
+        print(io, "schema:\n")
+        show(IOContext(io, :print_schema_header => false), sch)
+    else
+        print(io, "an unknown schema.")
     end
 end
 
@@ -413,7 +425,7 @@ Schema(names, ::Nothing) = Schema{Tuple(Base.map(sym, names)), nothing}()
 Schema(names, types) = Schema{Tuple(Base.map(sym, names)), Tuple{types...}}()
 
 function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
-    println(io, "Tables.Schema:")
+    get(io, :print_schema_header, true) && println(io, "Tables.Schema:")
     Base.print_matrix(io, hcat(collect(names), types === nothing ? fill(nothing, length(names)) : collect(fieldtype(types, i) for i = 1:fieldcount(types))))
 end
 
