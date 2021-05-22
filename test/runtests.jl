@@ -688,6 +688,7 @@ end
     ]
 
     drt = Tables.dictrowtable(rt)
+    @test Tables.schema(drt) == Tables.Schema((:a, :b, :c, :d), (Union{Missing, Int64}, Union{Missing, Float64, Int64}, Union{Missing, Int64}, Union{Missing, Int64}))
     @test length(drt) == 5
     ct = Tables.columntable(drt)
     @test isequal(ct.a, [1, missing, 6, 8, 8])
