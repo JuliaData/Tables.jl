@@ -145,7 +145,7 @@ function dictrowtable(x)
     r = rows(x)
     L = Base.IteratorSize(typeof(r))
     out = Vector{Dict{Symbol, Any}}(undef, Base.haslength(r) ? length(r) : 0)
-    for (i, drow) in enumerate(x)
+    for (i, drow) in enumerate(r)
         row = Dict{Symbol, Any}(nm => getcolumn(drow, nm) for nm in columnnames(drow))
         add!(row, 0, :_, out, L, i)
         if isempty(names)
@@ -170,7 +170,11 @@ function dictrowtable(x)
                 if !(k in seen)
                     push!(seen, k)
                     push!(names, k)
-                    types[k] = typeof(v)
+                    # we mark the type as Union{T, Missing} here because
+                    # we're at least on the 2nd row, and we didn't see
+                    # this column in the 1st row, so its value will be
+                    # `missing` for that row
+                    types[k] = Union{typeof(v), Missing}
                 end
             end
         end
