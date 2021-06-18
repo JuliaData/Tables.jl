@@ -187,7 +187,7 @@ Base.isempty(r::RorC) = length(r) == 0
 
 function Base.NamedTuple(r::RorC)
     names = columnnames(r)
-    return NamedTuple{Tuple(Base.map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
+    return NamedTuple{Tuple(map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
@@ -413,33 +413,49 @@ Where `names` is a tuple of Symbols, and `types` is a tuple _type_ of types (lik
 Encoding the names & types as type parameters allows convenient use of the type in generated functions
 and other optimization use-cases.
 """
-struct Schema{names, types} end
-Schema(names::Tuple{Vararg{Symbol}}, types::Type{T}) where {T <: Tuple} = Schema{names, T}()
+struct Schema{names, types}
+    storednames::Union{Nothing, Vector{Symbol}}
+    storedtypes::Union{Nothing, Vector{Type}}
+end
+
+Schema{names, types}() where {names, types} = Schema{names, types}(nothing, nothing)
+Schema(names::Tuple{Vararg{Symbol}}, ::Type{T}) where {T <: Tuple} = Schema{names, T}()
 Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, types}()
 
 # pass through Ints to allow Tuples to act as rows
 sym(x) = Symbol(x)
 sym(x::Int) = x
 
-Schema(names, ::Nothing) = Schema{Tuple(Base.map(sym, names)), nothing}()
-Schema(names, types) = Schema{Tuple(Base.map(sym, names)), Tuple{types...}}()
+Schema(names, ::Nothing) = Schema{Tuple(map(sym, names)), nothing}()
 
-function Base.show(io::IO, sch::Schema{names, types}) where {names, types}
+const SCHEMA_SPECIALIZATION_THRESHOLD = 65000
+
+function Schema(names, types)
+    if length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
+        return Schema{nothing, nothing}([sym(x) for x in names], Type[T for T in types])
+    else
+        return Schema{Tuple(map(sym, names)), Tuple{types...}}()
+    end
+end
+
+function Base.show(io::IO, sch::Schema)
     get(io, :print_schema_header, true) && println(io, "Tables.Schema:")
-    Base.print_matrix(io, hcat(collect(names), types === nothing ? fill(nothing, length(names)) : collect(fieldtype(types, i) for i = 1:fieldcount(types))))
+    nms = sch.names
+    Base.print_matrix(io, hcat(collect(nms), sch.types === nothing ? fill(nothing, length(nms)) : collect(sch.types)))
 end
 
 function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names, types}
     if field === :names
-        return names
+        return names === nothing ? getfield(sch, :storednames) : names
     elseif field === :types
-        return types === nothing ? nothing : Tuple(fieldtype(types, i) for i = 1:fieldcount(types))
+        T = getfield(sch, :storedtypes)
+        return types === nothing ? (T !== nothing ? T : nothing) : Tuple(fieldtype(types, i) for i = 1:fieldcount(types))
     else
         throw(ArgumentError("unsupported property for Tables.Schema"))
     end
 end
 
-Base.propertynames(sch::Schema) = (:names, :types)
+Base.propertynames(::Schema) = (:names, :types)
 
 # partitions
 

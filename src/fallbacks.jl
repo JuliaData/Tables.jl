@@ -109,9 +109,9 @@ allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(undef, len)
 @inline function _allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
         vals = Tuple(:(allocatecolumn($(fieldtype(types, i)), len)) for i = 1:fieldcount(types))
-        return :(NamedTuple{$(Base.map(Symbol, names))}(($(vals...),)))
+        return :(NamedTuple{$(map(Symbol, names))}(($(vals...),)))
     else
-        return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
+        return NamedTuple{map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
 end
 
@@ -119,7 +119,7 @@ end
     if fieldcount(types) <= SPECIALIZATION_THRESHOLD
         return _allocatecolumns(sch, len)
     else
-        return NamedTuple{Base.map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
+        return NamedTuple{map(Symbol, names)}(Tuple(allocatecolumn(fieldtype(types, i), len) for i = 1:fieldcount(types)))
     end
 end
 
@@ -214,7 +214,7 @@ end
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = Tuple(EmptyVector(len) for _ = 1:length(names))
-    return NamedTuple{Base.map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
+    return NamedTuple{map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
 end
 
 """
