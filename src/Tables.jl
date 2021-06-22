@@ -8,6 +8,8 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
     Base.getproperty(t::Tuple, i::Int) = t[i]
 end
 
+import Base: ==
+
 """
     Tables.AbstractColumns
 
