@@ -1,6 +1,5 @@
 module Tables
 
-using Core: Argument
 using LinearAlgebra, DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions
 
 export rowtable, columntable
