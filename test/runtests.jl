@@ -755,7 +755,6 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
     @test_throws ArgumentError Tables.rowtable(x)
     y = Tables.dictrowtable(x);
     @test length(y) == 100
-    @test Tables.schema(y) == Tables.schema(x)
     y = Tables.dictcolumntable(x);
     @test Tables.schema(y) == Tables.schema(x)
     # y = Tables.matrix(x); # works, just takes a really long time and a lot of memory
