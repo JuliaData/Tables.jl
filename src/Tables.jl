@@ -432,6 +432,7 @@ Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, ty
 
 # whether names/types are stored or not
 stored(::Schema{names, types}) where {names, types} = names === nothing && types === nothing
+stored(::Nothing) = false
 
 # pass through Ints to allow Tuples to act as rows
 sym(x) = Symbol(x)
