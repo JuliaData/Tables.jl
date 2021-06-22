@@ -718,6 +718,7 @@ Tables.columnaccess(::Type{WideTable}) = true
 Tables.columns(x::WideTable) = x
 Tables.schema(::WideTable) = Tables.Schema([Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)], [Float64 for _ = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)])
 Tables.getcolumn(g::WideTable, nm::Symbol) = rand(100)
+Tables.getcolumn(g::WideTable, i::Int) = rand(100)
 Base.getindex(::WideTable, i::Int) = rand(100)
 Tables.columnnames(::WideTable) = [Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
 
@@ -750,6 +751,14 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
         @test nm isa Symbol
         @test col isa Vector{Float64}
     end
+    @test_throws ArgumentError Tables.columntable(x)
+    @test_throws ArgumentError Tables.rowtable(x)
+    y = Tables.dictrowtable(x);
+    @test length(y) == 100
+    @test Tables.schema(y) == Tables.schema(x)
+    y = Tables.dictcolumntable(x);
+    @test Tables.schema(y) == Tables.schema(x)
+    # y = Tables.matrix(x); # works, just takes a really long time and a lot of memory
 
     x = WideTable2();
     sch = Tables.schema(x)

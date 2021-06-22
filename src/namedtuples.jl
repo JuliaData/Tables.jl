@@ -17,10 +17,14 @@ end
 Pass any table input source and return a `NamedTuple` iterator
 
 See also [`rows`](@ref) and [`rowtable`](@ref).
+
+Not for use with extremely wide tables with # of columns > 67K; current fundamental compiler limits
+prevent constructing `NamedTuple`s that large.
 """
 function namedtupleiterator(x)
     r = rows(x)
     sch = schema(r)
+    stored(sch) && throw(ArgumentError("input table too wide ($(length(sch.names)) columns) to construct `NamedTuple` rows"))
     return NamedTupleIterator{typeof(sch), typeof(r)}(r)
 end
 
@@ -91,6 +95,9 @@ naturally, i.e. a `Vector` naturally iterates its elements, and
 indexing value by index, name, and getting all names).
 
 For a lazy iterator over rows see [`rows`](@ref) and [`namedtupleiterator`](@ref).
+
+Not for use with extremely wide tables with # of columns > 67K; current fundamental compiler limits
+prevent constructing `NamedTuple`s that large.
 """
 function rowtable end
 
@@ -130,6 +137,9 @@ Takes any input table source `x` and returns a `NamedTuple` of `Vector`s,
 also known as a "column table". A "column table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl column interface
 naturally.
+
+Not for use with extremely wide tables with # of columns > 67K; current fundamental compiler limits
+prevent constructing `NamedTuple`s that large.
 """
 function columntable end
 
@@ -150,6 +160,9 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
         return NamedTuple{map(Symbol, names)}(Tuple(getarray(getcolumn(cols, fieldtype(types, i), i, names[i])) for i = 1:fieldcount(types)))
     end
 end
+
+# extremely large tables
+columntable(sch::Schema{nothing, nothing}, cols) = throw(ArgumentError("input table too wide ($(length(sch.names)) columns) to convert to `NamedTuple` of `Vector`s"))
 
 # unknown schema case
 columntable(::Nothing, cols) = NamedTuple{Tuple(map(Symbol, columnnames(cols)))}(Tuple(getarray(getcolumn(cols, col)) for col in columnnames(cols)))
