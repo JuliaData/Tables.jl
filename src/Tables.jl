@@ -428,10 +428,10 @@ sym(x::Int) = x
 
 Schema(names, ::Nothing) = Schema{Tuple(map(sym, names)), nothing}()
 
-const SCHEMA_SPECIALIZATION_THRESHOLD = 65000
+const SCHEMA_SPECIALIZATION_THRESHOLD = 67000
 
-function Schema(names, types)
-    if length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
+function Schema(names, types; stored::Bool=false)
+    if stored || length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
         return Schema{nothing, nothing}([sym(x) for x in names], Type[T for T in types])
     else
         return Schema{Tuple(map(sym, names)), Tuple{types...}}()
@@ -441,7 +441,7 @@ end
 function Base.show(io::IO, sch::Schema)
     get(io, :print_schema_header, true) && println(io, "Tables.Schema:")
     nms = sch.names
-    Base.print_matrix(io, hcat(collect(nms), sch.types === nothing ? fill(nothing, length(nms)) : collect(sch.types)))
+    Base.print_matrix(io, hcat(nms isa Vector ? nms : collect(nms), sch.types === nothing ? fill(nothing, length(nms)) : collect(sch.types)))
 end
 
 function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names, types}

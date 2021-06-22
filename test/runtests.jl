@@ -115,6 +115,11 @@ using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceEx
 
     @test Tables.getarray([1,2,3]) == [1,2,3]
     @test Tables.getarray((1,2,3)) == [1,2,3]
+
+    # empty schema
+    sch = Tables.Schema((), ())
+    @test sch.names == ()
+    @test sch.types == ()
 end
 
 @testset "namedtuples.jl" begin
@@ -702,4 +707,65 @@ end
     @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(dct.d, [missing, 5, 7, missing, 11])
 
+end
+
+# extremely wide tables
+struct WideTable <: Tables.AbstractColumns
+end
+
+Tables.istable(::Type{WideTable}) = true
+Tables.columnaccess(::Type{WideTable}) = true
+Tables.columns(x::WideTable) = x
+Tables.schema(::WideTable) = Tables.Schema([Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)], [Float64 for _ = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)])
+Tables.getcolumn(g::WideTable, nm::Symbol) = rand(100)
+Base.getindex(::WideTable, i::Int) = rand(100)
+Tables.columnnames(::WideTable) = [Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
+
+struct WideTable2 <: Tables.AbstractColumns
+end
+
+Tables.istable(::Type{WideTable2}) = true
+Tables.columnaccess(::Type{WideTable2}) = true
+Tables.columns(x::WideTable2) = x
+Tables.schema(::WideTable2) = Tables.Schema([Symbol("x", i) for i = 1:1000], [Float64 for _ = 1:1000]; stored=true)
+Tables.getcolumn(g::WideTable2, nm::Symbol) = rand(100)
+Base.getindex(::WideTable2, i::Int) = rand(100)
+Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
+
+@testset "wide tables" begin
+    x = WideTable();
+    sch = Tables.schema(x)
+    @test sch.names == [Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
+    @test sch.types == [Float64 for _ = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
+    @test typeof(sch) == Tables.Schema{nothing, nothing}
+    r = Tables.rows(x)
+    Tables.eachcolumn(sch, first(r)) do y, i, nm
+        @test y isa Float64
+        @test i isa Integer
+        @test nm isa Symbol
+    end
+    Tables.eachcolumns(sch, first(r), x) do y, i, nm, col
+        @test y isa Float64
+        @test i isa Integer
+        @test nm isa Symbol
+        @test col isa Vector{Float64}
+    end
+
+    x = WideTable2();
+    sch = Tables.schema(x)
+    @test sch.names == [Symbol("x", i) for i = 1:1000]
+    @test sch.types == [Float64 for _ = 1:1000]
+    @test typeof(sch) == Tables.Schema{nothing, nothing}
+    r = Tables.rows(x)
+    Tables.eachcolumn(sch, first(r)) do y, i, nm
+        @test y isa Float64
+        @test i isa Integer
+        @test nm isa Symbol
+    end
+    Tables.eachcolumns(sch, first(r), x) do y, i, nm, col
+        @test y isa Float64
+        @test i isa Integer
+        @test nm isa Symbol
+        @test col isa Vector{Float64}
+    end
 end
