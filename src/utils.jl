@@ -94,6 +94,13 @@ end
     return
 end
 
+@inline function eachcolumn(f::F, sch::Schema{nothing, nothing}, row::T) where {F, T}
+    for (i, nm) in enumerate(sch.names)
+        f(getcolumn(row, nm), i, nm)
+    end
+    return
+end
+
 # these are specialized `eachcolumn`s where we also want
 # the indexing of `columns` to be constant propagated, so it needs to be returned from the generated function
 @inline function eachcolumns(f::F, sch::Schema{names, types}, row::T, columns::S, args...) where {F, names, types, T, S}
@@ -124,6 +131,13 @@ end
         for (i, nm) in enumerate(names)
             f(getcolumn(row, nm), i, nm, columns[i], args...)
         end
+    end
+    return
+end
+
+@inline function eachcolumns(f::F, sch::Schema{nothing, nothing}, row::T, columns::S, args...) where {F, T, S}
+    for (i, nm) in enumerate(sch.names)
+        f(getcolumn(row, nm), i, nm, columns[i], args...)
     end
     return
 end
