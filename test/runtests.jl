@@ -290,8 +290,8 @@ end
 
     # Treating vectors as 1-column tables:
     x = [1,2,3,4,5]
-    X′ = Tables.matrix(Tables.Columns(Tables.table(x)))
-    @test X′ == reshape(x, :, 1)
+    x′ = Tables.matrix(Tables.Columns(Tables.table(x)))
+    @test x′ == x
 end
 
 import Base: ==
