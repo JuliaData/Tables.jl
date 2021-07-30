@@ -91,6 +91,12 @@ end
 
 function matrix(table::MatrixTable; transpose::Bool=false)
     matrix = getfield(table, :matrix)
-    transpose || return matrix
-    return permutedims(matrix)
+    if transpose
+        return permutedims(matrix)
+    elseif matrix isa AbstractVector
+        # always return a matrix, for type stability
+        return reshape(matrix, :, 1)
+    else
+        return matrix
+    end
 end
