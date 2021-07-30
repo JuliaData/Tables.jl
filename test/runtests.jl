@@ -294,6 +294,7 @@ end
     @test keys(tbl) == [:Column1]
     x′ = Tables.matrix(tbl)
     @test x′ == reshape(x, :, 1)
+    @test Tables.matrix(Tables.table(x)) == x
 end
 
 import Base: ==
