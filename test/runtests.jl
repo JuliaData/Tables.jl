@@ -287,6 +287,11 @@ end
     @test X′ == X
     # test for presence of superfluous wrapping
     @test typeof(X′) == typeof(X)
+
+    # Treating vectors as 1-column tables:
+    x = [1,2,3,4,5]
+    X′ = Tables.matrix(Tables.Columns(Tables.table(x)))
+    @test X′ == reshape(x, :, 1)
 end
 
 import Base: ==

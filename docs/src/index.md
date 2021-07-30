@@ -258,13 +258,13 @@ Tables.AbstractColumns
 ```
 
 ### Implementation Example
-As an extended example, let's take a look at some code defined in Tables.jl for treating `AbstractMatrix`s as tables.
+As an extended example, let's take a look at some code defined in Tables.jl for treating `AbstractVecOrMat`s as tables.
 
-First, we define a special `MatrixTable` type that will wrap an `AbstractMatrix`, and allow easy overloading for the
+First, we define a special `MatrixTable` type that will wrap an `AbstractVecOrMat`, and allow easy overloading for the
 Tables.jl interface.
 
 ```julia
-struct MatrixTable{T <: AbstractMatrix} <: Tables.AbstractColumns
+struct MatrixTable{T <: AbstractVecOrMat} <: Tables.AbstractColumns
     names::Vector{Symbol}
     lookup::Dict{Symbol, Int}
     matrix::T
@@ -280,7 +280,7 @@ Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype
 ```
 
 Here we defined `Tables.istable` for all `MatrixTable` types, signaling that they implement the Tables.jl interfaces.
-We also defined [`Tables.schema`](@ref) by pulling the column names out that we stored, and since `AbstractMatrix` have a single
+We also defined [`Tables.schema`](@ref) by pulling the column names out that we stored, and since `AbstractVecOrMat` have a single
 `eltype`, we repeat it for each column (the call to `fill`). Note that defining [`Tables.schema`](@ref) is optional on tables; by default, `nothing`
 is returned and Tables.jl consumers should account for both known and unknown schema cases. Returning a schema when possible allows consumers
 to have certain optimizations when they can know the types of all columns upfront (and if the # of columns isn't too large)
@@ -320,7 +320,7 @@ Base.length(m::MatrixTable) = size(matrix(m), 1)
 
 Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
-# a custom row type; acts as a "view" into a row of an AbstractMatrix
+# a custom row type; acts as a "view" into a row of an AbstractVecOrMat
 struct MatrixRow{T} <: Tables.AbstractRow
     row::Int
     source::MatrixTable{T}
