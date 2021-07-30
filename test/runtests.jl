@@ -290,8 +290,10 @@ end
 
     # Treating vectors as 1-column tables:
     x = [1,2,3,4,5]
-    x′ = Tables.matrix(Tables.Columns(Tables.table(x)))
-    @test x′ == x
+    tbl = Tables.Columns(Tables.table(x))
+    @test keys(tbl) == [:Column1]
+    x′ = Tables.matrix(tbl)
+    @test x′ == reshape(x, :, 1)
 end
 
 import Base: ==
