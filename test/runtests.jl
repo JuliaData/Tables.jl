@@ -292,6 +292,7 @@ end
     x = [1,2,3,4,5]
     tbl = Tables.Columns(Tables.table(x))
     @test keys(tbl) == [:Column1]
+    @test keys(Tables.Columns(Tables.table(x, header=["col1"]))) == [:col1]
     x′ = Tables.matrix(tbl)
     @test x′ == reshape(x, :, 1) == Tables.matrix(Tables.table(x))
 end
