@@ -1,10 +1,10 @@
 istable(::AbstractMatrix) = false
 istable(::Type{<:AbstractMatrix}) = false
 
-rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
-columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractMatrix as a table"))
+rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
 
-struct MatrixTable{T <: AbstractMatrix} <: AbstractColumns
+struct MatrixTable{T <: AbstractVecOrMat} <: AbstractColumns
     names::Vector{Symbol}
     lookup::Dict{Symbol, Int}
     matrix::T
@@ -43,15 +43,15 @@ getcolumn(m::MatrixTable, nm::Symbol) = getcolumn(m, getfield(m, :lookup)[nm])
 columnnames(m::MatrixTable) = names(m)
 
 """
-    Tables.table(m::AbstractMatrix; [header])
+    Tables.table(m::AbstractVecOrMat; [header])
 
-Wrap an `AbstractMatrix` (`Matrix`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
-Tables.jl interface. This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
+Wrap an `AbstractVecOrMat` (`Matrix`, `Vector`, `Adjoint`, etc.) in a `MatrixTable`, which satisfies the
+Tables.jl interface.  (An `AbstractVector` is treated as a 1-column matrix.) This allows accessing the matrix via `Tables.rows` and `Tables.columns`.
 An optional keyword argument iterator `header` can be passed which will be converted to a
-`Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractMatrix`
+`Vector{Symbol}` to be used as the column names. Note that no copy of the `AbstractVecOrMat`
 is made.
 """
-function table(m::AbstractMatrix; header=[Symbol("Column$i") for i = 1:size(m, 2)])
+function table(m::AbstractVecOrMat; header=[Symbol("Column$i") for i = 1:size(m, 2)])
     symbol_header = header isa Vector{Symbol} ? header : [Symbol(h) for h in header]
     if length(symbol_header) != size(m, 2)
         throw(ArgumentError("provided column names `header` length must match number of columns in matrix ($(size(m, 2)))"))
@@ -88,9 +88,15 @@ function matrix(table; transpose::Bool=false)
     end
     return matrix
 end
-	
-function matrix(table::MatrixTable; transpose::Bool=false) 
+
+function matrix(table::MatrixTable; transpose::Bool=false)
     matrix = getfield(table, :matrix)
-    transpose || return matrix
-    return permutedims(matrix)
+    if transpose
+        return permutedims(matrix)
+    elseif matrix isa AbstractVector
+        # always return a matrix, for type stability
+        return reshape(matrix, :, 1)
+    else
+        return matrix
+    end
 end
