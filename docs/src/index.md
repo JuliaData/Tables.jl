@@ -36,7 +36,7 @@ for row in rows
 end
 
 # access data of input table `x` column-by-column
-# Tables.columns returns an object where individul, entire columns can be accessed
+# Tables.columns returns an object where individual, entire columns can be accessed
 columns = Tables.columns(x)
 
 # iterate through each column name in table
