@@ -106,7 +106,10 @@ getcolumn(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {nam
 """
     Tables.columnnames(::Union{AbstractColumns, AbstractRow}) => Indexable collection
 
-Retrieves the list of column names as an indexable collection (like a `Tuple` or `Vector`) for a `AbstractColumns` or `AbstractRow` interface object. The default definition calls `propertynames(x)`.
+Retrieves the list of column names as an indexable collection (like a `Tuple` or `Vector`)
+for a `AbstractColumns` or `AbstractRow` interface object.
+The default definition calls `propertynames(x)`.
+The returned column names must be unique.
 """
 function columnnames end
 
