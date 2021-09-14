@@ -156,7 +156,7 @@ is defined that enables the `fields_to_merge` to be specified as keyword argumen
 """
 rowmerge(row, other) = merge(_row_to_named_tuple(row), _row_to_named_tuple(other))
 rowmerge(row, other, more...) = merge(_row_to_named_tuple(row), rowmerge(other, more...))
-rowmerge(row; fields_to_merge...) = rowmerge(row, fields_to_merge.data)
+rowmerge(row; fields_to_merge...) = rowmerge(row, values(fields_to_merge))
 
 _row_to_named_tuple(row::NamedTuple) = row
 _row_to_named_tuple(row) = NamedTuple(Row(row))

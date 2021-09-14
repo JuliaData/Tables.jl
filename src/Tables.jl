@@ -443,7 +443,7 @@ sym(x::Int) = x
 
 Schema(names, ::Nothing) = Schema{Tuple(map(sym, names)), nothing}()
 
-const SCHEMA_SPECIALIZATION_THRESHOLD = 67000
+const SCHEMA_SPECIALIZATION_THRESHOLD = (2^16) - 1
 
 function Schema(names, types; stored::Bool=false)
     if stored || length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
