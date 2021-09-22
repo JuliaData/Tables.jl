@@ -244,7 +244,7 @@ struct Row{T} <: AbstractRow
     x::T
 end
 
-Row(x::AbstractRow) = x
+Row(x::Row) = x
 
 """
     Tables.Columns(columns)
@@ -260,7 +260,7 @@ struct Columns{T} <: AbstractColumns
     x::T
 end
 
-Columns(x::AbstractColumns) = x
+Columns(x::Columns) = x
 
 # Columns can only wrap something that is a table, so we pass the schema through
 schema(x::Columns) = schema(getx(x))
