@@ -259,7 +259,10 @@ to provide useful default behaviors (allows any `AbstractColumns` to be used lik
 struct Columns{T} <: AbstractColumns
     x::T
 
-    Columns(x::T) where {T} = new{T}(columns(x))
+    function Columns(x)
+        cols = columns(x)
+        return new{typeof(cols)}(cols)
+    end
 end
 
 Columns(x::Columns) = x
