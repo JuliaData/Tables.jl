@@ -70,18 +70,18 @@ matrix columns; passing `transpose=true` will transpose the input with input col
 or in the case of a `MatrixTable` apply `permutedims` to the originally wrapped matrix.
 """
 function matrix(table; transpose::Bool=false)
-    cols = columns(table)
+    cols = Columns(table)
     types = schema(cols).types
     T = reduce(promote_type, types)
     n, p = rowcount(cols), length(types)
     if !transpose
         matrix = Matrix{T}(undef, n, p)
-        for (i, col) in enumerate(Columns(cols))
+        for (i, col) in enumerate(cols)
             matrix[:, i] = col
         end
     else
         matrix = Matrix{T}(undef, p, n)
-        for (i, col) in enumerate(Columns(cols))
+        for (i, col) in enumerate(cols)
             matrix[i, :] = col
         end
     end
