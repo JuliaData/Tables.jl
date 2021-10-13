@@ -84,7 +84,7 @@ function rows(x::T) where {T}
     isrowtable(x) && return x
     # because this method is being called, we know `x` didn't define it's own Tables.rows
     # first check if it supports column access, and if so, wrap it in a RowIterator
-    if columnaccess(T)
+    if columnaccess(x)
         cols = columns(x)
         return RowIterator(cols, Int(rowcount(cols)))
     # otherwise, if the input is at least iterable, we'll wrap it in an IteratorWrapper
