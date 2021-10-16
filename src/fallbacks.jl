@@ -248,7 +248,7 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
 @inline function columns(x::T) where {T}
     # because this method is being called, we know `x` didn't define it's own Tables.columns method
     # first check if it explicitly supports row access, and if so, build up the desired columns
-    if rowaccess(T)
+    if rowaccess(x)
         r = rows(x)
         return CopiedColumns(buildcolumns(schema(r), r))
     # though not widely supported, if a source supports the TableTraits column interface, use it
