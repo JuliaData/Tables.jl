@@ -287,6 +287,10 @@ not all valid tables will return true, since it's possible to satisfy the
 Tables.jl interface at "run-time", e.g. a `Generator` of `NamedTuple`s iterates
 `NamedTuple`s, which satisfies the `AbstractRow` interface, but there's no static way
 of knowing that the generator is a table.
+
+It is recommended that for users implementing `MyType`, they define only
+`istable(::Type{MyType})`. `istable(::MyType)` will then automatically delegate to this
+method.
 """
 function istable end
 
@@ -309,6 +313,10 @@ an object defines `rowaccess` doesn't mean a user should call `Tables.rows` on i
 `Tables.columns` will also work, providing a valid `AbstractColumns` object from the rows.
 Hence, users should call `Tables.rows` or `Tables.columns` depending on what is most
 natural for them to *consume* instead of worrying about what and how the input is oriented.
+
+It is recommended that for users implementing `MyType`, they define only
+`rowaccess(::Type{MyType})`. `rowaccess(::MyType)` will then automatically delegate to this
+method.
 """
 function rowaccess end
 
@@ -328,6 +336,10 @@ mean a user should call `Tables.columns` on it; `Tables.rows` will also work, pr
 valid `AbstractRow` iterator. Hence, users should call `Tables.rows` or `Tables.columns` depending
 on what is most natural for them to *consume* instead of worrying about what and how the
 input is oriented.
+
+It is recommended that for users implementing `MyType`, they define only
+`columnaccess(::Type{MyType})`. `columnaccess(::MyType)` will then automatically delegate to
+this method.
 """
 function columnaccess end
 
@@ -354,6 +366,10 @@ workflows that take table inputs, apply transformations, potentially converting 
 a different form, and end with producing a table of the same type as the original input. The
 default materializer is `Tables.columntable`, which converts any table input into a `NamedTuple`
 of `Vector`s.
+
+It is recommended that for users implementing `MyType`, they define only
+`materializer(::Type{MyType})`. `materializer(::MyType)` will then automatically delegate to
+this method.
 """
 function materializer end
 
