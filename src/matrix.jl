@@ -77,12 +77,12 @@ function matrix(table; transpose::Bool=false)
     if !transpose
         matrix = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(cols)
-            matrix[:, i] = col
+            matrix[:, i] .= col
         end
     else
         matrix = Matrix{T}(undef, p, n)
         for (i, col) in enumerate(cols)
-            matrix[i, :] = col
+            matrix[i, :] .= col
         end
     end
     return matrix
