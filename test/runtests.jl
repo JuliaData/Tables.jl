@@ -295,6 +295,18 @@ end
     @test keys(Tables.Columns(Tables.table(x, header=["col1"]))) == [:col1]
     x′ = Tables.matrix(tbl)
     @test x′ == reshape(x, :, 1) == Tables.matrix(Tables.table(x))
+        
+    # For the case that `Tables.getcolumn` doesn't return an `AbstractVector`
+    # e.g Tuple, see #263.
+    struct MockTable end #Table with tuple columns.
+    Tables.istable(::Type{MockTable}) = true
+    Tables.columnaccess(::Type{MockTable}) = true
+    Tables.columnnames(x::MockTable) = (:a, :b, :c)
+    Tables.columns(x::MockTable) = x
+    Tables.getcolumn(x::MockTable, ::Symbol) = (1, 2, 3)
+    Tables.getcolumn(x::MockTable, ::Int) = (1, 2, 3)
+    Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
+    @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
 end
 
 import Base: ==
