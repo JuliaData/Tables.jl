@@ -206,6 +206,16 @@ end
     @test Tables.materializer(1) === Tables.columntable
 end
 
+# Table with tuple columns.
+struct MockTable end 
+Tables.istable(::Type{MockTable}) = true
+Tables.columnaccess(::Type{MockTable}) = true
+Tables.columnnames(x::MockTable) = (:a, :b, :c)
+Tables.columns(x::MockTable) = x
+Tables.getcolumn(x::MockTable, ::Symbol) = (1, 2, 3)
+Tables.getcolumn(x::MockTable, ::Int) = (1, 2, 3)
+Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
+
 @testset "Matrix integration" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0])
@@ -295,6 +305,10 @@ end
     @test keys(Tables.Columns(Tables.table(x, header=["col1"]))) == [:col1]
     x′ = Tables.matrix(tbl)
     @test x′ == reshape(x, :, 1) == Tables.matrix(Tables.table(x))
+        
+    # For the case that `Tables.getcolumn` doesn't return an `AbstractVector`
+    # e.g Tuple, see #263
+    @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
 end
 
 import Base: ==
