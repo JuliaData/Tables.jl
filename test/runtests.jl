@@ -249,14 +249,14 @@ Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     mattbl = Tables.table(mat)
     @test Tables.istable(typeof(mattbl))
     @test Tables.rowaccess(typeof(mattbl))
-    @test Tables.rows(mattbl) === mattbl
     @test Tables.columnaccess(typeof(mattbl))
     @test Tables.columns(mattbl) === mattbl
     @test mattbl.Column1 == [1,2,3]
     @test Tables.getcolumn(mattbl, :Column1) == [1,2,3]
     @test Tables.getcolumn(mattbl, 1) == [1,2,3]
-    matrow = first(mattbl)
-    @test eltype(mattbl) == typeof(matrow)
+    matrowtbl = Tables.rows(mattbl)
+    matrow = first(matrowtbl)
+    @test eltype(matrowtbl) == typeof(matrow)
     @test matrow.Column1 == 1
     @test Tables.getcolumn(matrow, :Column1) == 1
     @test Tables.getcolumn(matrow, 1) == 1

@@ -10,13 +10,24 @@ struct MatrixTable{T <: AbstractVecOrMat} <: AbstractColumns
     matrix::T
 end
 
-isrowtable(::Type{<:MatrixTable}) = true
-names(m::MatrixTable) = getfield(m, :names)
+struct MatrixRowTable{T <: AbstractVecOrMat}
+    names::Vector{Symbol}
+    lookup::Dict{Symbol, Int}
+    matrix::T
+end
+
+const MatrixTables{T} = Union{MatrixTable{T}, MatrixRowTable{T}}
+
+names(m::MatrixTables) = getfield(m, :names)
 
 # row interface
+istable(::Type{<:MatrixTable}) = true
+rowaccess(::Type{<:MatrixTable}) = true
+rows(x::MatrixTable) = MatrixRowTable(getfield(x, :names), getfield(x, :lookup), getfield(x, :matrix))
+
 struct MatrixRow{T} <: AbstractRow
     row::Int
-    source::MatrixTable{T}
+    source::MatrixRowTable{T}
 end
 
 getcolumn(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
@@ -27,11 +38,11 @@ getcolumn(m::MatrixRow, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
 columnnames(m::MatrixRow) = names(getfield(m, :source))
 
-schema(m::MatrixTable{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
-Base.eltype(m::MatrixTable{T}) where {T} = MatrixRow{T}
-Base.length(m::MatrixTable) = size(getfield(m, :matrix), 1)
+schema(m::MatrixTables{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
+Base.eltype(m::MatrixRowTable{T}) where {T} = MatrixRow{T}
+Base.length(m::MatrixRowTable) = size(getfield(m, :matrix), 1)
 
-Base.iterate(m::MatrixTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
+Base.iterate(m::MatrixRowTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 
 # column interface
 columnaccess(::Type{<:MatrixTable}) = true
