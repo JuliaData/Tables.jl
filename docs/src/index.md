@@ -160,11 +160,11 @@ getvector(x) = collect(x)
 
 # note that copycols is ignored in this definition (Tables.CopiedColumns implies copies have already been made)
 fromcolumns(x::Tables.CopiedColumns, names; copycols::Bool=true) =
-    DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm) for nm in names],
+    DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm)) for nm in names],
               Index(names),
               copycols=false)
-fromcolumns(x; copycols::Bool=true) =
-    DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm) for nm in names],
+fromcolumns(x, names; copycols::Bool=true) =
+    DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm)) for nm in names],
               Index(names),
               copycols=copycols)
 
