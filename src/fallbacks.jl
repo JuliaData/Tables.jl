@@ -140,8 +140,6 @@ end
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
 
-replacex(t, col::Int, x) = ntuple(i->i == col ? x : t[i], length(t))
-
 @inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, L) where {T}
     if val isa T || promote_type(typeof(val), T) <: T
         add!(dest, val, L, row)
@@ -150,7 +148,7 @@ replacex(t, col::Int, x) = ntuple(i->i == col ? x : t[i], length(t))
         new = allocatecolumn(promote_type(T, typeof(val)), length(dest))
         row > 1 && copyto!(new, 1, dest, 1, row - 1)
         add!(new, val, L, row)
-        updated[] = replacex(updated[], col, new)
+        updated[] = ntuple(i->i == col ? new : updated[][i], length(updated[]))
         return
     end
 end

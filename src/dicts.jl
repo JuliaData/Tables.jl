@@ -1,6 +1,6 @@
 struct DictColumnTable <: AbstractColumns
     schema::Schema
-    values::Dict{Symbol, AbstractVector}
+    values::OrderedDict{Symbol, AbstractVector}
 end
 
 """
@@ -24,7 +24,7 @@ function dictcolumntable(x)
         cols = columns(x)
         names = columnnames(cols)
         sch = schema(cols)
-        out = Dict(nm => getcolumn(cols, nm) for nm in names)
+        out = OrderedDict(nm => getcolumn(cols, nm) for nm in names)
     else
         r = rows(x)
         L = Base.IteratorSize(typeof(r))
@@ -32,15 +32,15 @@ function dictcolumntable(x)
         sch = schema(r)
         if sch !== nothing
             names, types = sch.names, sch.types
-            out = Dict{Int, AbstractVector}(i => allocatecolumn(types[i], len) for i = 1:length(types))
+            out = OrderedDict{Int, AbstractVector}(i => allocatecolumn(types[i], len) for i = 1:length(types))
             for (i, row) in enumerate(r)
                 eachcolumns(add!, sch, row, out, L, i)
             end
-            out = Dict(names[k] => v for (k, v) in out)
+            out = OrderedDict(names[k] => v for (k, v) in out)
         else
             names = Symbol[]
             seen = Set{Symbol}()
-            out = Dict{Symbol, AbstractVector}()
+            out = OrderedDict{Symbol, AbstractVector}()
             for (i, row) in enumerate(r)
                 for nm in columnnames(row)
                     push!(seen, nm)
