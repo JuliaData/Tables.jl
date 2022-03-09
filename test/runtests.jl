@@ -345,7 +345,6 @@ end
 Base.eltype(g::GenericColumn{T}) where {T} = T
 Base.length(g::GenericColumn) = length(g.data)
 ==(a::GenericColumn, b::GenericColumn) = a.data == b.data
-Base.size(g::GenericColumn) = (1,)
 Base.getindex(g::GenericColumn, i::Int) = g.data[i]
 
 struct GenericColumnTable
