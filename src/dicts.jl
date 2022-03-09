@@ -7,7 +7,7 @@ end
     Tables.dictcolumntable(x) => Tables.DictColumnTable
 
 Take any Tables.jl-compatible source `x` and return a `DictColumnTable`, which
-can be thought of as a `Dict` mapping column names as `Symbol`s to `AbstractVector`s.
+can be thought of as a `OrderedDict` mapping column names as `Symbol`s to `AbstractVector`s.
 The order of the input table columns is preserved via the `Tables.schema(::DictColumnTable)`.
 
 For "schema-less" input tables, `dictcolumntable` employs a "column unioning" behavior,
@@ -126,7 +126,7 @@ end
     Tables.dictrowtable(x) => Tables.DictRowTable
 
 Take any Tables.jl-compatible source `x` and return a `DictRowTable`, which
-can be thought of as a `Vector` of `Dict` rows mapping column names as `Symbol`s to values.
+can be thought of as a `Vector` of `OrderedDict` rows mapping column names as `Symbol`s to values.
 The order of the input table columns is preserved via the `Tables.schema(::DictRowTable)`.
 
 For "schema-less" input tables, `dictrowtable` employs a "column unioning" behavior,
