@@ -141,12 +141,12 @@ the union behavior is needed.
 function dictrowtable(x)
     names = Symbol[]
     seen = Set{Symbol}()
-    types = Dict{Symbol, Type}()
+    types = OrderedDict{Symbol, Type}()
     r = rows(x)
     L = Base.IteratorSize(typeof(r))
-    out = Vector{Dict{Symbol, Any}}(undef, Base.haslength(r) ? length(r) : 0)
+    out = Vector{OrderedDict{Symbol, Any}}(undef, Base.haslength(r) ? length(r) : 0)
     for (i, drow) in enumerate(r)
-        row = Dict{Symbol, Any}(nm => getcolumn(drow, nm) for nm in columnnames(drow))
+        row = OrderedDict{Symbol, Any}(nm => getcolumn(drow, nm) for nm in columnnames(drow))
         add!(row, 0, :_, out, L, i)
         if isempty(names)
             for (k, v) in row
