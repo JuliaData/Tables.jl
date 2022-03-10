@@ -343,7 +343,7 @@ struct GenericColumn{T} <: AbstractVector{T}
     data::Vector{T}
 end
 Base.eltype(g::GenericColumn{T}) where {T} = T
-Base.length(g::GenericColumn) = length(g.data)
+Base.size(g::GenericColumn) = (length(g.data),)
 ==(a::GenericColumn, b::GenericColumn) = a.data == b.data
 Base.getindex(g::GenericColumn, i::Int) = g.data[i]
 
@@ -388,7 +388,7 @@ end
     @test_throws ArgumentError sch.foobar
 
     gr = GenericRowTable([GenericRow(1, 4.0, "7"), GenericRow(2, 5.0, "8"), GenericRow(3, 6.0, "9")])
-    gc = GenericColumnTable(Dict(:a=>1, :b=>2, :c=>3), [GenericColumn([1,2,3]), GenericColumn([4.0, 5.0, 6.0]), GenericColumn(["7", "8", "9"])])
+    gc = GenericColumnTable(Dict(:a=>1, :b=>2, :c=>3), GenericColumn[GenericColumn([1,2,3]), GenericColumn([4.0, 5.0, 6.0]), GenericColumn(["7", "8", "9"])])
     @test gc == (gr |> genericcolumntable)
     @test gr == (gc |> genericrowtable)
     @test gr == (gr |> genericrowtable)
