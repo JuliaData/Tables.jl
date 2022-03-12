@@ -413,6 +413,15 @@ See also [`rowtable`](@ref) and [`namedtupleiterator`](@ref).
 """
 function rows end
 
+"""
+    Tables.indexablerows(x) => Row indexable
+
+Similar to `Tables.rows`, but instead of only returning an iterator, returns an indexable object.
+This allows random-access to the input table rows, which can be useful in contexts when
+a known subset of the input is needed.
+"""
+function indexablerows end
+
 # Schema implementation
 """
     Tables.Schema(names, types)
