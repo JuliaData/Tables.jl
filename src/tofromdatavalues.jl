@@ -93,7 +93,15 @@ IteratorInterfaceExtensions.getiterator(x::MyTable) = Tables.datavaluerows(x)
 ```
 """
 function datavaluerows(x)
-    r = Tables.rows(x)
+    x2 = if Tables.columnaccess(x)
+        Tables.columntable(x)
+    elseif Tables.rowaccess(x)
+        x
+    else
+        error("Invalid input table, must either declare to have a Tables.rows or Tables.columns method.")
+    end
+
+    r = Tables.rows(x2)
     s = Tables.schema(r)
     s === nothing && error("Schemaless sources cannot be passed to datavaluerows.")
     return DataValueRowIterator{datavaluenamedtuple(s), typeof(s), typeof(r)}(r)
