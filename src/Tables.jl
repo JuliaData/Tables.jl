@@ -368,7 +368,7 @@ default materializer is `Tables.columntable`, which converts any table input int
 of `Vector`s.
 
 It is recommended that for users implementing `MyType`, they define only
-`materializer(::Type{MyType})`. `materializer(::MyType)` will then automatically delegate to
+`materializer(::Type{<:MyType})`. `materializer(::MyType)` will then automatically delegate to
 this method.
 """
 function materializer end
