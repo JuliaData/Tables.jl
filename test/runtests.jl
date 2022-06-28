@@ -798,4 +798,8 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
         @test nm isa Symbol
         @test col isa Vector{Float64}
     end
+
+    @testset "getrows" begin
+        Tables.getrows isa Function
+    end
 end

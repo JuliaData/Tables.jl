@@ -566,6 +566,28 @@ struct Partitioner{T}
 end
 
 """
+    getrows(x, inds; view=nothing)
+
+Return one or more rows from table `x` according to the position(s) specified by `inds`.
+
+- If `inds` is a single integer return a row object.
+- If `inds` is a collection of integers, return a table object. 
+  In this case,t he returned type is not necessarily the same as the original table type.
+
+The `view` argument influences whether the returned object is a view of the original table
+or an independent copy:
+- If `view=nothing` (the default) then the implementation for a specific table type 
+  is free to decide  whether to return a copy or a view.
+- If `view=true` then a view is returned and if `view=false` a copy is returned.
+  This applies both to returning a row or a table.
+ 
+Any specialized implementation of `getrows` must support the `view=nothing` argument. 
+Support for `view=true` or `view=false` instead can be an opt-in 
+(i.e. implementations might error on them if they are not supported).
+"""
+function getrows end
+
+"""
     Tables.partitioner(f, itr)
     Tables.partitioner(x)
 
