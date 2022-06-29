@@ -84,7 +84,7 @@ function matrix(table; transpose::Bool=false)
     cols = Columns(table)
     types = schema(cols).types
     T = reduce(promote_type, types)
-    n, p = rowcount(cols), length(types)
+    n, p = nrow(cols), length(types)
     if !transpose
         matrix = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(cols)

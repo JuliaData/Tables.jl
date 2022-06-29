@@ -132,8 +132,9 @@ end
 
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
-    @test Tables.rowcount(nt) == 3
-    @test Tables.columncount(nt) == 3
+    @test_deprecated Tables.rowcount(nt)
+    @test Tables.nrow(nt) == 3
+    @test Tables.ncol(nt) == 3
     @test Tables.schema(nt) == Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
     @test Tables.istable(typeof(nt))
     @test Tables.columnaccess(typeof(nt))

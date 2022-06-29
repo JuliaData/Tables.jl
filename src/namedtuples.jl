@@ -108,7 +108,7 @@ end
 
 # NamedTuple of arrays of matching dimensionality
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractArray{S, D} where S}} where {N, D}
-rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
+nrow(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 # interface implementation
 istable(::Type{<:ColumnTable}) = true

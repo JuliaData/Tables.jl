@@ -5,16 +5,15 @@
 # Turn any AbstractColumns into an AbstractRow iterator
 
 "Return the number of rows in the incoming table."
-function rowcount(cols)
+function nrow(cols)
     names = columnnames(cols)
     isempty(names) && return 0
     return length(getcolumn(cols, names[1]))
 end
+@deprecate rowcount(x) nrow(x)
 
 "Return the number of columns in the incoming table."
-function columncount(cols)
-    return length(columnnames(cols))
-end
+ncol(cols) = length(columnnames(cols))
 
 # a lazy row view into a AbstractColumns object
 struct ColumnsRow{T} <: AbstractRow
@@ -91,7 +90,7 @@ function rows(x::T) where {T}
     # first check if it supports column access, and if so, wrap it in a RowIterator
     if columnaccess(x)
         cols = columns(x)
-        return RowIterator(cols, Int(rowcount(cols)))
+        return RowIterator(cols, Int(nrow(cols)))
     # otherwise, if the input is at least iterable, we'll wrap it in an IteratorWrapper
     # which will iterate the input, validating that elements support the AbstractRow interface
     # and unwrapping any DataValues that are encountered
