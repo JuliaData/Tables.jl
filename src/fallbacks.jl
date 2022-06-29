@@ -4,11 +4,16 @@
 
 # Turn any AbstractColumns into an AbstractRow iterator
 
-# get the number of rows in the incoming table
+"Return the number of rows in the incoming table."
 function rowcount(cols)
     names = columnnames(cols)
     isempty(names) && return 0
     return length(getcolumn(cols, names[1]))
+end
+
+"Return the number of columns in the incoming table."
+function columncount(cols)
+    return length(columnnames(cols))
 end
 
 # a lazy row view into a AbstractColumns object
