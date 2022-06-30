@@ -277,6 +277,8 @@ matrix(m::MatrixTable) = getfield(m, :matrix)
 lookup(m::MatrixTable) = getfield(m, :lookup)
 # schema is column names and types
 Tables.schema(m::MatrixTable{T}) where {T} = Tables.Schema(names(m), fill(eltype(T), size(mat(m), 2)))
+Tables.ncol(m::MatrixTable) = size(m.matrix, 2)
+Tables.nrow(m::MatrixTable) = size(m.matrix, 1)
 ```
 
 Here we defined `Tables.istable` for all `MatrixTable` types, signaling that they implement the Tables.jl interfaces.

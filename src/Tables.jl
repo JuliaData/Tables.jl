@@ -32,6 +32,7 @@ Interface definition:
 | `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as an indexable collection                                                                                                   |
 | **Optional methods**                                     |                             |                                                                                                                                                              |
 | `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+| `Tables.ncols(table)`                                    | Tables.ncol(table)          | Return the number of columns                                                                                                                                 |
 
 Note that subtypes of `Tables.AbstractColumns` **must** overload all required methods listed
 above instead of relying on these methods' default definitions.
@@ -65,6 +66,7 @@ Interface definition:
 | `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
 | **Optional methods**                                   |                           |                                                                                                                                                                  |
 | `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column element type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+| `Tables.ncols(row)`                                    | length(propertynames(row) | Return number of columns                                                                                                                                         |
 
 Note that subtypes of `Tables.AbstractRow` **must** overload all required methods listed above
 instead of relying on these methods' default definitions.
@@ -208,7 +210,8 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
 end
 
 function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
-    print(io, "$(typeof(table)) with $(nrow(table)) rows, $(ncol(table)) columns, and ")
+    ncols = length(columnnames(table))
+    print(io, "$(typeof(table)) with $(rowcount(table)) rows, $(ncols) columns, and ")
     sch = schema(table)
     if sch !== nothing
         print(io, "schema:\n")
@@ -411,6 +414,23 @@ and row values can be accessed by calling `Tables.getcolumn(rows, i::Int )` or
 See also [`rowtable`](@ref) and [`namedtupleiterator`](@ref).
 """
 function rows end
+
+"""
+    nrow(cols::AbstractColumns)
+
+Returns the number of rows in an object that satisfies the `AbstractColumns` interface
+as returned from `Tables.columns(tbl)`. Note that this isn't valid to call on _any_ valid
+Tables.jl source as row-oriented tables may not have a defined length.
+"""
+function nrow end
+
+"""
+    ncol(rows::AbstractRows)
+
+Returns the number of columns in an object that satisfies the `AbstractRows` interface
+as returned from `Tables.rows(tbl)`.
+"""
+function ncol end
 
 # Schema implementation
 """

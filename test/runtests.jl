@@ -132,9 +132,7 @@ end
 
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
-    @test_deprecated Tables.rowcount(nt)
-    @test Tables.nrow(nt) == 3
-    @test Tables.ncol(nt) == 3
+    @test Tables.rowcount(nt) == 3
     @test Tables.schema(nt) == Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
     @test Tables.istable(typeof(nt))
     @test Tables.columnaccess(typeof(nt))
@@ -263,6 +261,8 @@ Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test Tables.getcolumn(matrow, :Column1) == 1
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+    @test Tables.nrow(mattbl) == 3
+    @test Tables.ncol(mattbl) == 3
 
     mattbl = Tables.table(mat, header=[:A, :B, :C])
     @test Tables.columnnames(mattbl) == [:A, :B, :C]
