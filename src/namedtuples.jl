@@ -108,7 +108,7 @@ end
 
 function getrows(x::RowTable, inds; view::Union{Bool,Nothing} = nothing)
     if view === true
-        return view(x, inds)
+        return Base.view(x, inds)
     else
         return x[inds]
     end
@@ -184,7 +184,7 @@ columntable(x::ColumnTable) = x
 
 function getrows(x::ColumnTable, inds; view::Union{Bool,Nothing} = nothing)
     if view === true
-        return map(c -> view(c, inds), x)
+        return map(c -> Base.view(c, inds), x)
     else
         return map(c -> c[inds], x)
     end

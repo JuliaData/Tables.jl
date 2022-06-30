@@ -566,12 +566,12 @@ struct Partitioner{T}
 end
 
 """
-    getrows(x, inds; view=nothing)
+    Tables.getrows(x, inds; view=nothing)
 
 Return one or more rows from table `x` according to the position(s) specified by `inds`:
 
 - If `inds` is a single integer return a row object.
-- If `inds` is a collection of integers, return a table object. 
+- If `inds` is a collection of integers, return an indexable object of rows. 
   In this case, the returned type is not necessarily the same as the original table type.
 
 The `view` argument influences whether the returned object is a view of the original table

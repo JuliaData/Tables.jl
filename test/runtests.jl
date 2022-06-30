@@ -145,6 +145,34 @@ end
     @test Tables.buildcolumns(nothing, rt) == nt
     @test Tables.columntable(nothing, nt) == nt
 
+    @testset "columntable getrows" begin
+        @test Tables.getrows(nt, 1) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(nt, 1, view=false) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(nt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(nt, 1:2) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.getrows(nt, 1:2, view=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.getrows(nt, 1:2, view=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        
+        @test Tables.getrows(nt, 1, view=true) == (a = fill(1), b = fill(4.0), c = fill("7"))
+        rs = Tables.getrows(nt, 1:2, view=true)
+        @test rs == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test rs.a.parent === nt.a
+    end
+
+    @testset "rowtable getrows" begin
+        @test Tables.getrows(rt, 1) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(rt, 1, view=false) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(rt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.getrows(rt, 1:2) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.getrows(rt, 1:2, view=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.getrows(rt, 1:2, view=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        
+        @test Tables.getrows(rt, 1, view=true) == fill((a = 1, b = 4.0, c = "7"))
+        rs = Tables.getrows(rt, 1:2, view=true)
+        @test rs == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test rs.parent === rt
+    end
+
     # test push!
     rtf = Iterators.Filter(x->x.a >= 1, rt)
     @test Tables.columntable(rtf) == nt
@@ -799,7 +827,4 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
         @test col isa Vector{Float64}
     end
 
-    @testset "getrows" begin
-        Tables.getrows isa Function
-    end
 end
