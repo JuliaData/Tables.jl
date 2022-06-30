@@ -247,14 +247,17 @@ end
 Row(x::Row) = x
 
 """
-    Tables.Columns(columns)
+    Tables.Columns(tbl)
 
-Convenience type to wrap any `AbstractColumns` interface object in a dedicated struct
+Convenience type that calls `Tables.columns` on an input `tbl` and wraps the resulting `AbstractColumns` interface object in a dedicated struct
 to provide useful default behaviors (allows any `AbstractColumns` to be used like a `NamedTuple` of `Vectors`):
   * Indexing interface defined; i.e. `row[i]` will return the column at index `i`, `row[nm]` will return column for column name `nm`
   * Property access interface defined; i.e. `row.col1` will retrieve the value for the column named `col1`
   * Iteration interface defined; i.e. `for x in row` will iterate each column in the row
   * `AbstractDict` methods defined (`get`, `haskey`, etc.) for checking and retrieving columns
+
+Note that `Tables.Columns` calls `Tables.columns` internally on the provided table argument.
+`Tables.Columns` can be used for dispatch if needed.
 """
 struct Columns{T} <: AbstractColumns
     x::T
