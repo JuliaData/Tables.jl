@@ -4,7 +4,13 @@
 
 # Turn any AbstractColumns into an AbstractRow iterator
 
-"Return the number of rows in the incoming table."
+"""
+    nrow(::AbstractColumns)
+    
+Returns the number of rows in an object that satisfies the `AbstractColumns` interface
+as returned from `Tables.columns(tbl)`. Note that this isn't valid to call on _any_ valid
+Tables.jl source as row-oriented tables may not have a defined length.
+"""
 function nrow(cols)
     names = columnnames(cols)
     isempty(names) && return 0
