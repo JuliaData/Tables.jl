@@ -93,7 +93,7 @@ schema(x::DictColumnTable) = getfield(x, :schema)
 columnnames(x::DictColumnTable) = getfield(x, :schema).names
 getcolumn(x::DictColumnTable, i::Int) = getfield(x, :values)[columnnames(x)[i]]
 getcolumn(x::DictColumnTable, nm::Symbol) = getfield(x, :values)[nm]
-ncols(x::DictColumnTable) = length(columnnames(x))
+ncol(x::DictColumnTable) = length(columnnames(x))
 
 struct DictRowTable
     names::Vector{Symbol}
