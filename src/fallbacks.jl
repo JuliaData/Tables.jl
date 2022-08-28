@@ -104,7 +104,7 @@ end
 Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 Alternatively, and more generally, custom scalars can overload `DataAPI.defaultarray` to signal the default array type.
 """
-allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(nonmissingtype(T) === T ? undef : missing, len)
+allocatecolumn(T, len) = DataAPI.defaultarray(T, 1)(Base.nonmissingtype(T) === T ? undef : missing, len)
 
 @inline function _allocatecolumns(::Schema{names, types}, len) where {names, types}
     if @generated
