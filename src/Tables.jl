@@ -583,7 +583,7 @@ or an independent copy:
   This applies both to returning a row or a table.
  
 Any specialized implementation of `getrows` must support the `view=nothing` argument. 
-Support for `view=true` or `view=false` instead can be an opt-in 
+Support for `view=true` or `view=false` is optional
 (i.e. implementations might error on them if they are not supported).
 """
 function getrows end
