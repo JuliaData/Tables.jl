@@ -730,7 +730,8 @@ end
     @test isequal(dct.d, [missing, 5, 7, missing, 11])
 
     # https://github.com/JuliaData/Tables.jl/issues/286
-    dt = Tables.dictcolumntable([(; a="hey"), (; b=2)]).a
+    dta = Tables.dictcolumntable([(; a="hey"), (; b=2)]).a
+    @test isequal(dta, ["hey", missing])
 end
 
 # extremely wide tables
