@@ -289,6 +289,8 @@ Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test Tables.getcolumn(matrow, :Column1) == 1
     @test Tables.getcolumn(matrow, 1) == 1
     @test propertynames(mattbl) == propertynames(matrow) == [:Column1, :Column2, :Column3]
+    @test Tables.nrow(mattbl) == 3
+    @test Tables.ncol(mattbl) == 3
 
     mattbl = Tables.table(mat, header=[:A, :B, :C])
     @test Tables.columnnames(mattbl) == [:A, :B, :C]

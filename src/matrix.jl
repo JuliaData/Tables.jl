@@ -40,6 +40,8 @@ columnnames(m::MatrixRow) = names(getfield(m, :source))
 schema(m::MatrixTables{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
 Base.eltype(m::MatrixRowTable{T}) where {T} = MatrixRow{T}
 Base.length(m::MatrixRowTable) = size(getfield(m, :matrix), 1)
+ncol(m::MatrixTable) = size(getfield(m, :matrix), 2)
+nrow(m::MatrixTable) = size(getfield(m, :matrix), 1)
 
 Base.iterate(m::MatrixRowTable, st=1) = st > length(m) ? nothing : (MatrixRow(st, m), st + 1)
 

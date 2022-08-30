@@ -5,6 +5,7 @@
 # Turn any AbstractColumns into an AbstractRow iterator
 
 # get the number of rows in the incoming table
+# this function is internal
 function rowcount(cols)
     names = columnnames(cols)
     isempty(names) && return 0
@@ -241,6 +242,7 @@ getcolumn(x::CopiedColumns, ::Type{T}, col::Int, nm::Symbol) where {T} = getcolu
 getcolumn(x::CopiedColumns, i::Int) = getcolumn(source(x), i)
 getcolumn(x::CopiedColumns, nm::Symbol) = getcolumn(source(x), nm)
 columnnames(x::CopiedColumns) = columnnames(source(x))
+ncol(x::CopiedColumns) = length(columnnames(x))
 
 # here's our generic fallback Tables.columns definition
 @inline function columns(x::T) where {T}
