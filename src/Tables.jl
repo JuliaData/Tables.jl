@@ -570,9 +570,11 @@ end
 
 Return one or more rows from table `x` according to the position(s) specified by `inds`:
 
-- If `inds` is a single integer return a row object.
-- If `inds` is a collection of integers, return an indexable object of rows. 
+- If `inds` is a single non-boolean integer return a row object.
+- If `inds` is a vector of non-boolean integers, a vector of booleans, or a `:`, return an indexable object of rows. 
   In this case, the returned type is not necessarily the same as the original table type.
+  
+If other type of `inds` is passed than specified above the behavior is undefined.
 
 The `view` argument influences whether the returned object is a view of the original table
 or an independent copy:
