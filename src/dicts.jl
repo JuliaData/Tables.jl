@@ -1,3 +1,4 @@
+# Dict of Vectors as table
 struct DictColumnTable <: AbstractColumns
     schema::Schema
     values::OrderedDict{Symbol, AbstractVector}
@@ -94,6 +95,7 @@ columnnames(x::DictColumnTable) = getfield(x, :schema).names
 getcolumn(x::DictColumnTable, i::Int) = getfield(x, :values)[columnnames(x)[i]]
 getcolumn(x::DictColumnTable, nm::Symbol) = getfield(x, :values)[nm]
 
+# Vector of Dicts as table
 struct DictRowTable
     names::Vector{Symbol}
     types::Dict{Symbol, Type}
@@ -120,6 +122,16 @@ Base.eltype(x::DictRowTable) = DictRow
 function Base.iterate(x::DictRowTable, st=1)
     st > length(x) && return nothing
     return DictRow(x.names, x.values[st]), st + 1
+end
+
+function subset(x::DictRowTable, inds; view::Union{Bool,Nothing} = nothing)
+    values = view === true ? Base.view(getfield(x, :values), inds) : getfield(x, :values)[inds]
+    if inds isa Integer
+        return DictRow(getfield(x, :names), values)
+    else
+        values isa AbstractVector || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `RowTable` output, got $(typeof(ret))"))
+        return DictRowTable(getfield(x, :names), getfield(x, :types), values)
+    end
 end
 
 """

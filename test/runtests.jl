@@ -145,30 +145,32 @@ end
     @test Tables.buildcolumns(nothing, rt) == nt
     @test Tables.columntable(nothing, nt) == nt
 
-    @testset "columntable getrows" begin
-        @test Tables.getrows(nt, 1) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(nt, 1, view=false) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(nt, 1, view=nothing) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(nt, 1:2) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
-        @test Tables.getrows(nt, 1:2, view=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
-        @test Tables.getrows(nt, 1:2, view=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+    @testset "columntable subset" begin
+        @test Tables.subset(nt, 1) == (a=1, b=4.0, c="7")
+        @test Tables.subset(nt, 1, view=false) == (a=1, b=4.0, c="7")
+        @test Tables.subset(nt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.subset(nt, 1:2) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.subset(nt, 1:2, view=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.subset(nt, 1:2, view=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test_throws ArgumentError Tables.subset(nt, [1:2 1:2])
         
-        @test Tables.getrows(nt, 1, view=true) == (a = fill(1), b = fill(4.0), c = fill("7"))
-        rs = Tables.getrows(nt, 1:2, view=true)
+        @test Tables.subset(nt, 1, view=true) == (a=1, b=4.0, c="7")
+        rs = Tables.subset(nt, 1:2, view=true)
         @test rs == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test rs.a.parent === nt.a
     end
 
-    @testset "rowtable getrows" begin
-        @test Tables.getrows(rt, 1) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(rt, 1, view=false) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(rt, 1, view=nothing) == (a=1, b=4.0, c="7")
-        @test Tables.getrows(rt, 1:2) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
-        @test Tables.getrows(rt, 1:2, view=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
-        @test Tables.getrows(rt, 1:2, view=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+    @testset "rowtable subset" begin
+        @test Tables.subset(rt, 1) == (a=1, b=4.0, c="7")
+        @test Tables.subset(rt, 1, view=false) == (a=1, b=4.0, c="7")
+        @test Tables.subset(rt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.subset(rt, 1:2) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.subset(rt, 1:2, view=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.subset(rt, 1:2, view=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test_throws ArgumentError Tables.subset(rt, [1:2 1:2])
         
-        @test Tables.getrows(rt, 1, view=true) == fill((a = 1, b = 4.0, c = "7"))
-        rs = Tables.getrows(rt, 1:2, view=true)
+        @test Tables.subset(rt, 1, view=true) == (a=1, b=4.0, c="7")
+        rs = Tables.subset(rt, 1:2, view=true)
         @test rs == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
         @test rs.parent === rt
     end
@@ -714,6 +716,12 @@ end
     @test dct.a == [1, 2, 3]
     @test dct.b == [4.0, 5.0, 6.0]
     @test dct.c == ["7", "8", "9"]
+    # Tables.subset
+    drow = Tables.subset(dct, 1)
+    @test drow.a == 1 && drow.b == 4.0 && drow.c == "7"
+    drows = Tables.subset(dct, [1, 2])
+    @test drows.a == [1, 2] && drows.b == [4.0, 5.0] && drows.c == ["7", "8"]
+    @test Tables.rowcount(drows) == 2
 
     dct = Tables.dictcolumntable(ct)
     @test dct.a == [1, 2, 3]
@@ -760,6 +768,13 @@ end
     # https://github.com/JuliaData/Tables.jl/issues/286
     dta = Tables.dictcolumntable([(; a="hey"), (; b=2)]).a
     @test isequal(dta, ["hey", missing])
+    # Tables.subset
+    drow = Tables.subset(drt, 1)
+    @test drow.a == 1 && drow.b == 2 && drow.c == 3
+    drows = Tables.subset(drt, [1, 2])
+    @test length(drows) == 2
+    drowsv = Tables.subset(drt, [1, 2]; view=true)
+    @test length(drowsv) == 2
 end
 
 # extremely wide tables

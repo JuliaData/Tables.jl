@@ -106,17 +106,17 @@ function rowtable(itr::T) where {T}
     return collect(namedtupleiterator(eltype(r), r))
 end
 
-function getrows(x::RowTable, inds; view::Union{Bool,Nothing} = nothing)
-    if view === true
-        return Base.view(x, inds)
+# NamedTuple of arrays of matching dimensionality
+const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
+
+function subset(x::ColumnTable, inds; view::Union{Bool,Nothing}=nothing)
+    if inds isa Integer
+        return map(c -> c[inds], x)
     else
-        return x[inds]
+        return view === true ? map(c -> vectorcheck(Base.view(c, inds)), x) : map(c -> vectorcheck(c[inds]), x)
     end
 end
-
-# NamedTuple of arrays of matching dimensionality
-const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractArray{S, D} where S}} where {N, D}
-rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 # interface implementation
 istable(::Type{<:ColumnTable}) = true
@@ -181,11 +181,3 @@ function columntable(itr::T) where {T}
     return columntable(schema(cols), cols)
 end
 columntable(x::ColumnTable) = x
-
-function getrows(x::ColumnTable, inds; view::Union{Bool,Nothing} = nothing)
-    if view === true
-        return map(c -> Base.view(c, inds), x)
-    else
-        return map(c -> c[inds], x)
-    end
-end
