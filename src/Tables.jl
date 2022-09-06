@@ -569,15 +569,15 @@ struct Partitioner{T}
 end
 
 """
-    Tables.getrows(x, inds; view=nothing)
+    Tables.subset(x, inds; view=nothing)
 
 Return one or more rows from table `x` according to the position(s) specified by `inds`:
 
 - If `inds` is a single non-boolean integer return a row object.
-- If `inds` is a vector of non-boolean integers, a vector of booleans, or a `:`, return an indexable object of rows. 
+- If `inds` is a vector of non-boolean integers, a vector of booleans, or a `:`, return a subset of the original table according to the indices.
   In this case, the returned type is not necessarily the same as the original table type.
   
-If other type of `inds` is passed than specified above the behavior is undefined.
+If other types of `inds` are passed than specified above the behavior is undefined.
 
 The `view` argument influences whether the returned object is a view of the original table
 or an independent copy:
@@ -587,11 +587,37 @@ or an independent copy:
 - If `view=true` then a view is returned and if `view=false` a copy is returned.
   This applies both to returning a row or a table.
  
-Any specialized implementation of `getrows` must support the `view=nothing` argument. 
+Any specialized implementation of `subset` must support the `view=nothing` argument.
 Support for `view=true` or `view=false` is optional
 (i.e. implementations might error on them if they are not supported).
 """
-function getrows end
+function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
+    # because this method is being called, we know `x` didn't define it's own Tables.subset
+    # first check if it supports column access, and if so, apply inds and wrap columns in a DictColumnTable
+    if columnaccess(x)
+        cols = columns(x)
+        if inds isa Integer
+            return ColumnsRow(cols, inds)
+        else
+            ret = view === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
+            return DictColumnTable(schema(cols), ret)
+        end
+    end
+    # otherwise, let's get the rows and see if we can apply inds to them
+    r = rows(x)
+    if r isa AbstractVector
+        inds isa Integer && return r[inds]
+        ret = view === true ? Base.view(x, inds) : x[inds]
+        (ret isa AbstractVector) || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `AbstractVector` output, got $(typeof(ret))"))
+        return ret
+    end
+    throw(ArgumentError("no default `Tables.subset` implementation for type: $T"))
+end
+
+vectorcheck(x::AbstractVector) = x
+vectorcheck(x) = throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `AbstractVector` output, got $(typeof(x))"))
+_map(f, cols) = OrderedDict(nm => vectorcheck(f(getcolumn(cols, nm))) for nm in columnnames(cols))
+
 
 """
     Tables.partitioner(f, itr)
