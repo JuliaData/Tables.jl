@@ -220,7 +220,7 @@ end
 # invoke the generic AbstractVector function to ensure function is called
 # exactly once for each element
 function (f::ByRow)(cols::AbstractVector...)
-    if !(allequal((length(col) for col in cols)) && all(col -> firstindex(col) == 1, cols))
+    if !(all(col -> ==(length(first(cols)))(length(col)) && firstindex(col) == 1, cols))
         throw(ArgumentError("All passed vectors must have the same length and use 1-based indexing"))
     end
     return invoke(map,
@@ -229,7 +229,7 @@ function (f::ByRow)(cols::AbstractVector...)
 end
 
 function (f::ByRow)(table::ColumnTable)
-    if !(allequal((length(col) for col in table)) && all(col -> firstindex(col) == 1, table))
+    if !(all(col -> ==(length(first(table)))(length(col)) && firstindex(col) == 1, table))
         throw(ArgumentError("All passed vectors must have the same length and use 1-based indexing"))
     end
     return [f.fun(nt) for nt in Tables.namedtupleiterator(table)]
