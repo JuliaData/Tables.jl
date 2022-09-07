@@ -162,27 +162,21 @@ _row_to_named_tuple(row::NamedTuple) = row
 _row_to_named_tuple(row) = NamedTuple(Row(row))
 
 """
-    ByRow
+    ByRow <: Function
 
-`ByRow(f)` is a function that is wrapper around function `f` that vectorizes it.
+`ByRow(f)` returns a function which applies function `f` to each element in a vector.
 
-The standard assumption is that `ByRow(f)` is passed `AbstractVectors` as its
-consecutive arguments. The returned value is a vector that is is a result of
-application of `f` to elements of passed vectors elementwise. The function `f`
-is called exactly once for each element of passed vectors (as opposed to `map`
+`ByRow(f)` can be passed two types of arguments:
+- One or more 1-based `AbstractVector`s of equal length: In this case the returned value
+is a vector resulting from applying `f` to elements of passed vectors element-wise. 
+Function `f` is called exactly once for each element of passed vectors (as opposed to `map`
 which assumes for some types of source vectors (e.g. `SparseVector`) that the
 wrapped function is pure, and may call the function `f` only once for multiple
-equal values).
+equal values.
+- A `Tables.ColumnTable` holding 1-based columns of equal length: In this case the function
+`f` is passed a `NamedTuple` created for each row of passed table.
 
-As a special case `ByRow(f)` also accepts passing a `Tables.ColumnTable` as its
-argument. In this case the function `f` is passed a `NamedTuple` that is created
-from rows of passed table.
-
-The return value of `ByRow` is always a vector.
-
-Vectors passed to `ByRow(f)` must have equal length and use 1-based indexing.
-Also vectors stored in the `Tables.ColumnTable` if it is passed to `ByRow(f)`
-must meet this condition.
+The return value of `ByRow(f)` is always a vector.
 
 `ByRow` expects that at least one argument is passed to it and in the case of
 `Tables.ColumnTable` passed that the table has at least one column. In some
