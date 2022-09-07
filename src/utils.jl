@@ -160,3 +160,81 @@ rowmerge(row; fields_to_merge...) = rowmerge(row, values(fields_to_merge))
 
 _row_to_named_tuple(row::NamedTuple) = row
 _row_to_named_tuple(row) = NamedTuple(Row(row))
+
+"""
+    ByRow
+
+`ByRow(f)` is a function that is wrapper around function `f` that vectorizes it.
+
+The standard assumption is that `ByRow(f)` is passed `AbstractVectors` as its
+consecutive arguments. The returned value is a vector that is is a result of
+application of `f` to elements of passed vectors elementwise. The function `f`
+is called exactly once for each element of passed vectors (as opposed to `map`
+which assumes for some types of source vectors (e.g. `SparseVector`) that the
+wrapped function is pure, and may call the function `f` only once for multiple
+equal values).
+
+As a special case `ByRow(f)` also accepts passing a `Tables.ColumnTable` as its
+argument. In this case the function `f` is passed a `NamedTuple` that is created
+from rows of passed table.
+
+The return value of `ByRow` is always a vector.
+
+Vectors passed to `ByRow(f)` must have equal length and use 1-based indexing.
+Also vectors stored in the `Tables.ColumnTable` if it is passed to `ByRow(f)`
+must meet this condition.
+
+`ByRow` expects that at least one argument is passed to it and in the case of
+`Tables.ColumnTable` passed that the table has at least one column. In some
+contexts of operations on tables (for example `DataFrame`) the user might want
+to pass no arguments (or an empty `Tables.ColumnTable`) to `ByRow`. This case
+must be separately handled by the code implementing the logic of processing the
+`ByRow` operation on this specific parent table (the reason is that passing such
+arguments to `ByRow` does not allow it to determine the number of rows of the
+source table).
+
+# Examples
+```
+julia> ByRow(x -> x^2)(1:3)
+3-element Vector{Int64}:
+ 1
+ 4
+ 9
+
+julia> ByRow((x, y) -> x*y)(1:3, 2:4)
+3-element Vector{Int64}:
+  2
+  6
+ 12
+
+julia> ByRow(x -> x.a)((a=1:2, b=3:4))
+2-element Vector{Int64}:
+ 1
+ 2
+```
+"""
+struct ByRow{T} <: Function
+    fun::T
+end
+
+# invoke the generic AbstractVector function to ensure function is called
+# exactly once for each element
+function (f::ByRow)(cols::AbstractVector...)
+    if !(allequal((length(col) for col in cols)) && all(col -> firstindex(col) == 1, cols))
+        throw(ArgumentError("All passed vectors must have the same length and use 1-based indexing"))
+    end
+    return invoke(map,
+                  Tuple{typeof(f.fun), ntuple(i -> AbstractVector, length(cols))...},
+                  f.fun, cols...)
+end
+
+function (f::ByRow)(table::ColumnTable)
+    if !(allequal((length(col) for col in table)) && all(col -> firstindex(col) == 1, table))
+        throw(ArgumentError("All passed vectors must have the same length and use 1-based indexing"))
+    end
+    return [f.fun(nt) for nt in Tables.namedtupleiterator(table)]
+end
+
+(f::ByRow)() = throw(ArgumentError("no arguments passed"))
+(f::ByRow)(::NamedTuple{(), Tuple{}}) =
+    throw(ArgumentError("no columns passed in Tables.ColumnTable"))

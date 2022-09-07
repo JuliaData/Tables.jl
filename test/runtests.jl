@@ -153,7 +153,7 @@ end
         @test Tables.subset(nt, 1:2, view=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test Tables.subset(nt, 1:2, view=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test_throws ArgumentError Tables.subset(nt, [1:2 1:2])
-        
+
         @test Tables.subset(nt, 1, view=true) == (a=1, b=4.0, c="7")
         rs = Tables.subset(nt, 1:2, view=true)
         @test rs == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
@@ -168,7 +168,7 @@ end
         @test Tables.subset(rt, 1:2, view=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
         @test Tables.subset(rt, 1:2, view=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
         @test_throws ArgumentError Tables.subset(rt, [1:2 1:2])
-        
+
         @test Tables.subset(rt, 1, view=true) == (a=1, b=4.0, c="7")
         rs = Tables.subset(rt, 1:2, view=true)
         @test rs == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
@@ -237,7 +237,7 @@ end
 end
 
 # Table with tuple columns.
-struct MockTable end 
+struct MockTable end
 Tables.istable(::Type{MockTable}) = true
 Tables.columnaccess(::Type{MockTable}) = true
 Tables.columnnames(x::MockTable) = (:a, :b, :c)
@@ -335,7 +335,7 @@ Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test keys(Tables.Columns(Tables.table(x, header=["col1"]))) == [:col1]
     x′ = Tables.matrix(tbl)
     @test x′ == reshape(x, :, 1) == Tables.matrix(Tables.table(x))
-        
+
     # For the case that `Tables.getcolumn` doesn't return an `AbstractVector`
     # e.g Tuple, see #263
     @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
@@ -845,4 +845,37 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
         @test col isa Vector{Float64}
     end
 
+end
+
+@testset "ByRow" begin
+    @test Tables.ByRow(x -> x^2)(1:3) == [1, 4, 9]
+    @test Tables.ByRow((x, y) -> x*y)(1:3, 2:4) == [2, 6, 12]
+    @test Tables.ByRow((x, y, z) -> x*y*z)(1:3, 2:4, 3:5) == [6, 24, 60]
+    let i = 0
+        @test Tables.ByRow(x -> (i += 1; return i))(spzeros(5)) == 1:5
+    end
+    # check that map is not what we want
+    let i = 0
+        @test map(x -> (i += 1; return i), spzeros(5)) == [1, 1, 1, 1, 1]
+    end
+    # equal length test
+    @test_throws ArgumentError Tables.ByRow((x, y) -> x*y)(1:3, 2:5)
+
+    # Tables.ColumnTable case
+    @test Tables.ByRow(x -> x.a)((a=1:2, b=3:4)) == [1, 2]
+    # equal length test
+    @test_throws ArgumentError Tables.ByRow(x -> x.a)((a=1:2, b=3:5))
+    @test_throws ArgumentError Tables.ByRow(x -> x.a)((a=1:10, b=3:5))
+
+    # Table being a vector of structs is treated just as a vector
+    @test Tables.ByRow(identity)([1=>2, 3=>4]) == [1=>2, 3=>4]
+    @test Tables.ByRow(Dict)([1=>2, 3=>4]) == [Dict(1=>2), Dict(3=>4)]
+
+    # empty arguments tests
+    @test_throws ArgumentError Tables.ByRow(() -> 1)()
+    @test_throws ArgumentError Tables.ByRow(() -> 1)(NamedTuple())
+
+    # wrong argument tests
+    @test_throws MethodError Tables.ByRow(identity)(1)
+    @test_throws MethodError Tables.ByRow(identity)([1 2])
 end

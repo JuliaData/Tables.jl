@@ -107,7 +107,7 @@ function rowtable(itr::T) where {T}
 end
 
 # NamedTuple of arrays of matching dimensionality
-const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector}} where {N}
 rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
 function subset(x::ColumnTable, inds; view::Union{Bool,Nothing}=nothing)
@@ -125,7 +125,7 @@ columnaccess(::Type{<:ColumnTable}) = true
 columns(x::ColumnTable) = x
 
 _eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
-Base.@pure function _eltypes(::Type{NT}) where {NT <: NamedTuple{names, T}} where {names, T <: NTuple{N, AbstractVector{S} where S}} where {N}
+Base.@pure function _eltypes(::Type{NT}) where {NT <: ColumnTable}
     return Tuple{Any[ _eltype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
 end
 
