@@ -848,34 +848,34 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
 end
 
 @testset "ByRow" begin
-    @test ByRow(x -> x^2)(1:3) == [1, 4, 9]
-    @test ByRow((x, y) -> x*y)(1:3, 2:4) == [2, 6, 12]
-    @test ByRow((x, y, z) -> x*y*z)(1:3, 2:4, 3:5) == [6, 24, 60]
+    @test Tables.ByRow(x -> x^2)(1:3) == [1, 4, 9]
+    @test Tables.ByRow((x, y) -> x*y)(1:3, 2:4) == [2, 6, 12]
+    @test Tables.ByRow((x, y, z) -> x*y*z)(1:3, 2:4, 3:5) == [6, 24, 60]
     let i = 0
-        @test ByRow(x -> (i += 1; return i))(spzeros(5)) == 1:5
+        @test Tables.ByRow(x -> (i += 1; return i))(spzeros(5)) == 1:5
     end
     # check that map is not what we want
     let i = 0
         @test map(x -> (i += 1; return i), spzeros(5)) == [1, 1, 1, 1, 1]
     end
     # equal length test
-    @test_throws ArgumentError ByRow((x, y) -> x*y)(1:3, 2:5)
+    @test_throws ArgumentError Tables.ByRow((x, y) -> x*y)(1:3, 2:5)
 
     # ColumnTable case
-    @test ByRow(x -> x.a)((a=1:2, b=3:4)) == [1, 2]
+    @test Tables.ByRow(x -> x.a)((a=1:2, b=3:4)) == [1, 2]
     # equal length test
-    @test_throws ArgumentError ByRow(x -> x.a)((a=1:2, b=3:5))
-    @test_throws ArgumentError ByRow(x -> x.a)((a=1:10, b=3:5))
+    @test_throws ArgumentError Tables.ByRow(x -> x.a)((a=1:2, b=3:5))
+    @test_throws ArgumentError Tables.ByRow(x -> x.a)((a=1:10, b=3:5))
 
     # Table being a vector of structs is treated just as a vector
-    @test ByRow(identity)([1=>2, 3=>4]) == [1=>2, 3=>4]
-    @test ByRow(Dict)([1=>2, 3=>4]) == [Dict(1=>2), Dict(3=>4)]
+    @test Tables.ByRow(identity)([1=>2, 3=>4]) == [1=>2, 3=>4]
+    @test Tables.ByRow(Dict)([1=>2, 3=>4]) == [Dict(1=>2), Dict(3=>4)]
 
     # empty arguments tests
-    @test_throws ArgumentError ByRow(() -> 1)()
-    @test_throws ArgumentError ByRow(() -> 1)(NamedTuple())
+    @test_throws ArgumentError Tables.ByRow(() -> 1)()
+    @test_throws ArgumentError Tables.ByRow(() -> 1)(NamedTuple())
 
     # wrong argument tests
-    @test_throws MethodError ByRow(identity)(1)
-    @test_throws MethodError ByRow(identity)([1 2])
+    @test_throws MethodError Tables.ByRow(identity)(1)
+    @test_throws MethodError Tables.ByRow(identity)([1 2])
 end
