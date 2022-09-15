@@ -1,4 +1,4 @@
-using Test, Tables, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
 
 @testset "utils.jl" begin
 
@@ -541,6 +541,27 @@ end
 
     # a Dict w/ scalar values isn't a table
     @test_throws Exception Tables.columns(d)
+
+    # Dicts with String keys
+    d = OrderedDict("a" => 1, "b" => missing, "c" => "7")
+    n = (a=1, b=missing, c="7")
+    drt = [d, d, d]
+    rt = [n, n, n]
+    dct = OrderedDict("a" => [1, 1, 1], "b" => [missing, missing, missing], "c" => ["7", "7", "7"])
+    ct = (a = [1, 1, 1], b = [missing, missing, missing], c = ["7", "7", "7"])
+    @test Tables.istable(drt)
+    @test Tables.rowaccess(drt)
+    @test Tables.rows(drt) === drt
+    @test Tables.schema(drt) === nothing
+    @test isequal(Tables.rowtable(drt), rt)
+    @test isequal(Tables.columntable(drt), ct)
+
+    @test Tables.istable(dct)
+    @test Tables.columnaccess(dct)
+    @test Tables.columns(dct) === dct
+    @test Tables.schema(dct) == Tables.Schema((:a, :b, :c), Tuple{Int, Missing, String})
+    @test isequal(Tables.rowtable(dct), rt)
+    @test isequal(Tables.columntable(dct), ct)
 end
 
 struct Row <: Tables.AbstractRow
