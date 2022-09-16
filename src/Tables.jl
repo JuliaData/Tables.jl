@@ -581,17 +581,17 @@ Return one or more rows from table `x` according to the position(s) specified by
 - If `inds` is a single non-boolean integer return a row object.
 - If `inds` is a vector of non-boolean integers, a vector of booleans, or a `:`, return a subset of the original table according to the indices.
   In this case, the returned type is not necessarily the same as the original table type.
-  
+
 If other types of `inds` are passed than specified above the behavior is undefined.
 
 The `view` argument influences whether the returned object is a view of the original table
 or an independent copy:
 
-- If `view=nothing` (the default) then the implementation for a specific table type 
+- If `view=nothing` (the default) then the implementation for a specific table type
   is free to decide  whether to return a copy or a view.
 - If `view=true` then a view is returned and if `view=false` a copy is returned.
   This applies both to returning a row or a table.
- 
+
 Any specialized implementation of `subset` must support the `view=nothing` argument.
 Support for `view=true` or `view=false` is optional
 (i.e. implementations might error on them if they are not supported).
@@ -664,11 +664,11 @@ Base.iterate(x::Partitioner, st...) = iterate(x.x, st...)
 
 const SPECIALIZATION_THRESHOLD = 100
 
-# helper functions
-include("utils.jl")
-
 # reference implementations: Vector of NamedTuples and NamedTuple of Vectors
 include("namedtuples.jl")
+
+# helper functions
+include("utils.jl")
 
 # generic fallback definitions
 include("fallbacks.jl")
