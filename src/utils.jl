@@ -168,7 +168,7 @@ _row_to_named_tuple(row) = NamedTuple(Row(row))
 
 `ByRow(f)` can be passed two types of arguments:
 - One or more 1-based `AbstractVector`s of equal length: In this case the returned value
-is a vector resulting from applying `f` to elements of passed vectors element-wise. 
+is a vector resulting from applying `f` to elements of passed vectors element-wise.
 Function `f` is called exactly once for each element of passed vectors (as opposed to `map`
 which assumes for some types of source vectors (e.g. `SparseVector`) that the
 wrapped function is pure, and may call the function `f` only once for multiple
@@ -189,24 +189,26 @@ source table).
 
 # Examples
 ```
-julia> ByRow(x -> x^2)(1:3)
+julia> Tables.ByRow(x -> x^2)(1:3)
 3-element Vector{Int64}:
  1
  4
  9
 
-julia> ByRow((x, y) -> x*y)(1:3, 2:4)
+julia> Tables.ByRow((x, y) -> x*y)(1:3, 2:4)
 3-element Vector{Int64}:
   2
   6
  12
 
-julia> ByRow(x -> x.a)((a=1:2, b=3:4))
+julia> Tables.ByRow(x -> x.a)((a=1:2, b=3:4))
 2-element Vector{Int64}:
  1
  2
- 
- julia> ByRow(x -> (a=x.a*2, b=sin(x.b), c=x.c))((a=[1,2,3], b=[1.2, 3.4, 5.6], c=["a","b","c"]))
+
+ julia> Tables.ByRow(x -> (a=x.a*2, b=sin(x.b), c=x.c))((a=[1, 2, 3],
+                                                         b=[1.2, 3.4, 5.6],
+                                                         c=["a", "b", "c"]))
 3-element Vector{NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}}:
  (a = 2, b = 0.9320390859672263, c = "a")
  (a = 4, b = -0.2555411020268312, c = "b")
