@@ -601,12 +601,9 @@ function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
     # first check if it supports column access, and if so, apply inds and wrap columns in a DictColumnTable
     if columnaccess(x)
         cols = columns(x)
-        if inds isa Integer
-            return ColumnsRow(cols, inds)
-        else
-            ret = view === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
-            return DictColumnTable(schema(cols), ret)
-        end
+        colssub = view === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
+        ret = DictColumnTable(schema(cols), colssub)
+        return inds isa Integer ? ColumnsRow(ret, 1) : ret
     end
     # otherwise, let's get the rows and see if we can apply inds to them
     r = rows(x)
