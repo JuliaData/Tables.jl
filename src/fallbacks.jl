@@ -103,6 +103,7 @@ end
 
 Custom column types can override with an appropriate "scalar" element type that should dispatch to their column allocator.
 Alternatively, and more generally, custom scalars can overload `DataAPI.defaultarray` to signal the default array type.
+In this case the signaled array type must support a constructor accepting `undef` for initialization.
 """
 function allocatecolumn(T, len)
     a = DataAPI.defaultarray(T, 1)(undef, len)
