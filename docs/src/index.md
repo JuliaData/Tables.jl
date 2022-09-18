@@ -201,7 +201,7 @@ break to highlight some useful utility functions provided by Tables.jl:
 ```@docs
 Tables.Schema
 Tables.schema
-Tables.getrows
+Tables.subset
 Tables.partitions
 Tables.partitioner
 Tables.rowtable
