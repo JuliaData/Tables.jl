@@ -594,7 +594,7 @@ or an independent copy:
 
 Any specialized implementation of `subset` must support the `view=nothing` argument.
 Support for `view=true` or `view=false` is optional
-(i.e. implementations might error on them if they are not supported).
+(i.e. implementations may ignore the keyword argument and return a view or a copy regardless of `view` value).
 """
 function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
     # because this method is being called, we know `x` didn't define it's own Tables.subset
