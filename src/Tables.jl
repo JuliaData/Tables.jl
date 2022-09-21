@@ -608,7 +608,7 @@ function subset(x::T, inds; viewhint::Union{Bool, Nothing}=nothing, view::Union{
         if inds isa Integer
             return ColumnsRow(cols, inds)
         else
-            ret = view === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
+            ret = viewhint === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
             return DictColumnTable(schema(cols), ret)
         end
     end
@@ -616,7 +616,7 @@ function subset(x::T, inds; viewhint::Union{Bool, Nothing}=nothing, view::Union{
     r = rows(x)
     if r isa AbstractVector
         inds isa Integer && return r[inds]
-        ret = view === true ? Base.view(x, inds) : x[inds]
+        ret = viewhint === true ? Base.view(x, inds) : x[inds]
         (ret isa AbstractVector) || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `AbstractVector` output, got $(typeof(ret))"))
         return ret
     end
