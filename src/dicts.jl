@@ -124,8 +124,12 @@ function Base.iterate(x::DictRowTable, st=1)
     return DictRow(x.names, x.values[st]), st + 1
 end
 
-function subset(x::DictRowTable, inds; view::Union{Bool,Nothing} = nothing)
-    values = view === true ? Base.view(getfield(x, :values), inds) : getfield(x, :values)[inds]
+function subset(x::DictRowTable, inds; viewhint::Union{Bool,Nothing}=nothing, view::Union{Bool,Nothing}=nothing)
+    if view !== nothing
+        @warn "`view` keyword argument is deprecated for `Tables.subset`, use `viewhint` instead"
+        viewhint = view
+    end
+    values = viewhint === true ? Base.view(getfield(x, :values), inds) : getfield(x, :values)[inds]
     if inds isa Integer
         return DictRow(getfield(x, :names), values)
     else
