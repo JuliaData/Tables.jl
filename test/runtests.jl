@@ -147,30 +147,30 @@ end
 
     @testset "columntable subset" begin
         @test Tables.subset(nt, 1) == (a=1, b=4.0, c="7")
-        @test Tables.subset(nt, 1, view=false) == (a=1, b=4.0, c="7")
-        @test Tables.subset(nt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.subset(nt, 1, viewhint=false) == (a=1, b=4.0, c="7")
+        @test Tables.subset(nt, 1, viewhint=nothing) == (a=1, b=4.0, c="7")
         @test Tables.subset(nt, 1:2) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
-        @test Tables.subset(nt, 1:2, view=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
-        @test Tables.subset(nt, 1:2, view=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.subset(nt, 1:2, viewhint=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
+        @test Tables.subset(nt, 1:2, viewhint=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test_throws ArgumentError Tables.subset(nt, [1:2 1:2])
 
-        @test Tables.subset(nt, 1, view=true) == (a=1, b=4.0, c="7")
-        rs = Tables.subset(nt, 1:2, view=true)
+        @test Tables.subset(nt, 1, viewhint=true) == (a=1, b=4.0, c="7")
+        rs = Tables.subset(nt, 1:2, viewhint=true)
         @test rs == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test rs.a.parent === nt.a
     end
 
     @testset "rowtable subset" begin
         @test Tables.subset(rt, 1) == (a=1, b=4.0, c="7")
-        @test Tables.subset(rt, 1, view=false) == (a=1, b=4.0, c="7")
-        @test Tables.subset(rt, 1, view=nothing) == (a=1, b=4.0, c="7")
+        @test Tables.subset(rt, 1, viewhint=false) == (a=1, b=4.0, c="7")
+        @test Tables.subset(rt, 1, viewhint=nothing) == (a=1, b=4.0, c="7")
         @test Tables.subset(rt, 1:2) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
-        @test Tables.subset(rt, 1:2, view=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
-        @test Tables.subset(rt, 1:2, view=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.subset(rt, 1:2, viewhint=false) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
+        @test Tables.subset(rt, 1:2, viewhint=nothing) == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
         @test_throws ArgumentError Tables.subset(rt, [1:2 1:2])
 
-        @test Tables.subset(rt, 1, view=true) == (a=1, b=4.0, c="7")
-        rs = Tables.subset(rt, 1:2, view=true)
+        @test Tables.subset(rt, 1, viewhint=true) == (a=1, b=4.0, c="7")
+        rs = Tables.subset(rt, 1:2, viewhint=true)
         @test rs == [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8")]
         @test rs.parent === rt
     end
@@ -794,7 +794,7 @@ end
     @test drow.a == 1 && drow.b == 2 && drow.c == 3
     drows = Tables.subset(drt, [1, 2])
     @test length(drows) == 2
-    drowsv = Tables.subset(drt, [1, 2]; view=true)
+    drowsv = Tables.subset(drt, [1, 2]; viewhint=true)
     @test length(drowsv) == 2
 end
 

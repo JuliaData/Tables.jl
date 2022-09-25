@@ -110,11 +110,15 @@ end
 const ColumnTable = NamedTuple{names, T} where {names, T <: NTuple{N, AbstractVector}} where {N}
 rowcount(c::ColumnTable) = length(c) == 0 ? 0 : length(c[1])
 
-function subset(x::ColumnTable, inds; view::Union{Bool,Nothing}=nothing)
+function subset(x::ColumnTable, inds; viewhint::Union{Bool,Nothing}=nothing, view::Union{Bool,Nothing}=nothing)
+    if view !== nothing
+        @warn "`view` keyword argument is deprecated for `Tables.subset`, use `viewhint` instead"
+        viewhint = view
+    end
     if inds isa Integer
         return map(c -> c[inds], x)
     else
-        return view === true ? map(c -> vectorcheck(Base.view(c, inds)), x) : map(c -> vectorcheck(c[inds]), x)
+        return viewhint === true ? map(c -> vectorcheck(Base.view(c, inds)), x) : map(c -> vectorcheck(c[inds]), x)
     end
 end
 

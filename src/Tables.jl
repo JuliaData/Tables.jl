@@ -574,7 +574,7 @@ struct Partitioner{T}
 end
 
 """
-    Tables.subset(x, inds; view=nothing)
+    Tables.subset(x, inds; viewhint=nothing)
 
 Return one or more rows from table `x` according to the position(s) specified by `inds`:
 
@@ -584,19 +584,23 @@ Return one or more rows from table `x` according to the position(s) specified by
 
 If other types of `inds` are passed than specified above the behavior is undefined.
 
-The `view` argument influences whether the returned object is a view of the original table
+The `viewhint` argument tries to influence whether the returned object is a view of the original table
 or an independent copy:
 
-- If `view=nothing` (the default) then the implementation for a specific table type
+- If `viewhint=nothing` (the default) then the implementation for a specific table type
   is free to decide  whether to return a copy or a view.
-- If `view=true` then a view is returned and if `view=false` a copy is returned.
+- If `viewhint=true` then a view is returned and if `viewhint=false` a copy is returned.
   This applies both to returning a row or a table.
 
-Any specialized implementation of `subset` must support the `view=nothing` argument.
-Support for `view=true` or `view=false` is optional
-(i.e. implementations may ignore the keyword argument and return a view or a copy regardless of `view` value).
+Any specialized implementation of `subset` must support the `viewhint=nothing` argument.
+Support for `viewhint=true` or `viewhint=false` is optional
+(i.e. implementations may ignore the keyword argument and return a view or a copy regardless of `viewhint` value).
 """
-function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
+function subset(x::T, inds; viewhint::Union{Bool, Nothing}=nothing, view::Union{Bool, Nothing}=nothing) where {T}
+    if view !== nothing
+        @warn "`view` keyword argument is deprecated for `Tables.subset`, use `viewhint` instead"
+        viewhint = view
+    end
     # because this method is being called, we know `x` didn't define it's own Tables.subset
     # first check if it supports column access, and if so, apply inds and wrap columns in a DictColumnTable
     if columnaccess(x)
@@ -604,7 +608,7 @@ function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
         if inds isa Integer
             return ColumnsRow(cols, inds)
         else
-            ret = view === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
+            ret = viewhint === true ? _map(c -> Base.view(c, inds), cols) : _map(c -> c[inds], cols)
             return DictColumnTable(schema(cols), ret)
         end
     end
@@ -612,7 +616,7 @@ function subset(x::T, inds; view::Union{Bool, Nothing}=nothing) where {T}
     r = rows(x)
     if r isa AbstractVector
         inds isa Integer && return r[inds]
-        ret = view === true ? Base.view(x, inds) : x[inds]
+        ret = viewhint === true ? Base.view(x, inds) : x[inds]
         (ret isa AbstractVector) || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `AbstractVector` output, got $(typeof(ret))"))
         return ret
     end
