@@ -58,6 +58,7 @@ Packages currently integrating with Tables.jl:
 * [LazIO](https://github.com/evetion/LazIO.jl.git)
 * [LibPQ](https://github.com/invenia/LibPQ.jl.git)
 * [LightQuery](https://github.com/bramtayl/LightQuery.jl.git)
+* [MarkdownTables](https://github.com/tpapp/MarkdownTables.jl.git)
 * [MCMCChains](https://github.com/TuringLang/MCMCChains.jl.git)
 * [MDTable](https://github.com/TheRoniOne/MDTable.jl.git)
 * [MLJ](https://github.com/alan-turing-institute/MLJ.jl.git)
