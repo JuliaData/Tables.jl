@@ -241,7 +241,7 @@ For a type `MyTable`, the interface to becoming a proper table is straightforwar
 | **Optional methods**                   |                              |                                                                                                                                 |
 | `Tables.schema(x::MyTable)`                     | `Tables.schema(x) = nothing` | Return a [`Tables.Schema`](@ref) object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
 | `Tables.materializer(::Type{MyTable})` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
-| `Tables.getrows(x::MyTable, inds; view)`  |            | Return a row or a sub-table of the original table
+| `Tables.subset(x::MyTable, inds; viewhint)`  |            | Return a row or a sub-table of the original table
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Tables.AbstractRow` iterator
 or `Tables.AbstractColumns` object satisfies the respective interface.
