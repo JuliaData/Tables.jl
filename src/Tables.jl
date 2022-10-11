@@ -144,13 +144,13 @@ getcolumn(x::AbstractDict{Symbol}, nm::Symbol) = x[nm]
 getcolumn(x::AbstractDict{Symbol}, ::Type{T}, i::Int, nm::Symbol) where {T} = x[nm]
 columnnames(x::AbstractDict{Symbol}) = collect(keys(x))
 
-getcolumn(x::AbstractDict{String}, i::Int) = x[String(columnnames(x)[i])]
-getcolumn(x::AbstractDict{String}, nm::Symbol) = x[String(nm)]
-getcolumn(x::AbstractDict{String}, ::Type{T}, i::Int, nm::Symbol) where {T} = x[String(nm)]
-columnnames(x::AbstractDict{String}) = collect(Symbol(k) for k in keys(x))
+getcolumn(x::AbstractDict{<:AbstractString}, i::Int) = x[String(columnnames(x)[i])]
+getcolumn(x::AbstractDict{<:AbstractString}, nm::Symbol) = x[String(nm)]
+getcolumn(x::AbstractDict{<:AbstractString}, ::Type{T}, i::Int, nm::Symbol) where {T} = x[String(nm)]
+columnnames(x::AbstractDict{<:AbstractString}) = collect(Symbol(k) for k in keys(x))
 
 # AbstractVector of Dicts for Tables.rows
-const DictRows = AbstractVector{T} where {T <: Union{AbstractDict{String}, AbstractDict{Symbol}}}
+const DictRows = AbstractVector{T} where {T <: Union{AbstractDict{<:AbstractString}, AbstractDict{Symbol}}}
 isrowtable(::Type{<:DictRows}) = true
 # DictRows doesn't naturally lend itself to the `Tables.schema` requirement
 # we can't just look at the first row, because the types might change,
@@ -159,7 +159,7 @@ isrowtable(::Type{<:DictRows}) = true
 schema(x::DictRows) = nothing
 
 # Dict of AbstractVectors for Tables.columns
-const DictColumns = AbstractDict{K, V} where {K <: Union{Symbol, String}, V <: AbstractVector}
+const DictColumns = Union{<:AbstractDict{<:AbstractString, <:AbstractVector}, <:AbstractDict{Symbol, <:AbstractVector}}
 istable(::Type{<:DictColumns}) = true
 columnaccess(::Type{<:DictColumns}) = true
 columns(x::DictColumns) = x
