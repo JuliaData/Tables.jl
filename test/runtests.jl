@@ -900,3 +900,21 @@ end
     @test_throws MethodError Tables.ByRow(identity)(1)
     @test_throws MethodError Tables.ByRow(identity)([1 2])
 end
+
+@testset "istable on dictionaries" begin
+    @test Tables.istable(Dict{Union{String}, Vector})
+    @test Tables.istable(Dict{Union{Symbol}, Vector})
+    @test Tables.istable(Dict{Union{SubString}, Vector})
+    @test Tables.istable(Dict{Union{AbstractString}, Vector})
+    @test !Tables.istable(Dict{Union{String, Symbol}, Vector})
+    @test Tables.istable(Vector{Dict{Symbol}})
+    @test Tables.istable(Vector{Dict{String}})
+    @test Tables.istable(Vector{Dict{SubString}})
+    @test Tables.istable(Vector{Dict{AbstractString}})
+                                                                                                                                                
+    @test Set(Tables.columnnames(Dict(:a=>1, :b=>2))) == Set([:a, :b])
+    @test Set(Tables.columnnames(Dict("a"=>1, "b"=>2))) == Set([:a, :b])
+    @test Set(Tables.columnnames(Dict("a"=>1, SubString("b")=>2))) == Set([:a, :b])
+    @test Set(Tables.columnnames(Dict(SubString("a")=>1, SubString("b")=>2))) == Set([:a, :b])
+end
+                                                                                                                                               
