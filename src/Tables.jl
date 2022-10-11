@@ -159,7 +159,7 @@ isrowtable(::Type{<:DictRows}) = true
 schema(x::DictRows) = nothing
 
 # Dict of AbstractVectors for Tables.columns
-const DictColumns = D where {D <: Union{AbstractDict{<:AbstractString, <:AbstractVector}, AbstractDict{Symbol, <:AbstractVector}}}
+const DictColumns = Union{<:AbstractDict{<:AbstractString, <:AbstractVector}, <:AbstractDict{Symbol, <:AbstractVector}}}
 istable(::Type{<:DictColumns}) = true
 columnaccess(::Type{<:DictColumns}) = true
 columns(x::DictColumns) = x
