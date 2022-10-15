@@ -54,13 +54,14 @@ end
 end
 
 # RowIterator wraps an AbstractColumns object and provides row iteration via lazy row views
-struct RowIterator{T}
+struct RowIterator{T} <: AbstractVector{ColumnsRow{T}}
     columns::T
     len::Int
 end
 
 Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
 Base.length(x::RowIterator) = getfield(x, :len)
+Base.size(x::RowIterator) = (length(x),)
 Base.getproperty(x::RowIterator, nm::Symbol) = getcolumn(x, nm)
 Base.getproperty(x::RowIterator, i::Int) = getcolumn(x, i)
 Base.propertynames(x::RowIterator) = columnnames(x)
@@ -73,6 +74,11 @@ getcolumn(x::RowIterator, nm::Symbol) = getcolumn(columns(x), nm)
 getcolumn(x::RowIterator, i::Int) = getcolumn(columns(x), i)
 materializer(x::RowIterator) = materializer(columns(x))
 schema(x::RowIterator) = schema(columns(x))
+
+Base.@propagate_inbounds function Base.getindex(x::RowIterator, i::Int)
+    @boundscheck checkbounds(x, i)
+    return ColumnsRow(columns(x), i)
+end
 
 @inline function Base.iterate(rows::RowIterator, st=1)
     st > length(rows) && return nothing
@@ -94,6 +100,16 @@ function rows(x::T) where {T}
         return nondatavaluerows(x)
     end
     throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
+end
+
+# fallback for indexablerows if not overloaded explicitly
+function indexablerows(x::T) where {T}
+    y = rows(x)
+    if y isa AbstractArray
+        return y
+    else
+        throw(ArgumentError("no default `Tables.indexablerows` implementation for type: $T"))
+    end
 end
 
 # for AbstractRow iterators, we define a "collect"-like routine to build up columns from iterated rows
