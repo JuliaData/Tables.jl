@@ -80,6 +80,8 @@ schema(x::RowIterator) = schema(columns(x))
 end
 
 # this is our generic Tables.rows fallback definition
+@noinline nodefault(T) = throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
+
 function rows(x::T) where {T}
     isrowtable(x) && return x
     # because this method is being called, we know `x` didn't define it's own Tables.rows
@@ -93,8 +95,10 @@ function rows(x::T) where {T}
     elseif IteratorInterfaceExtensions.isiterable(x)
         return nondatavaluerows(x)
     end
-    throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
+    nodefault(T)
 end
+
+rows(::Type{T}) where {T} = throw(ArgumentError("no `Tables.rows` implementation for: $T. `Tables.rows` expects to work on a table _instance_ rather than a _type_."))
 
 # for AbstractRow iterators, we define a "collect"-like routine to build up columns from iterated rows
 
