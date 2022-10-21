@@ -397,6 +397,25 @@ function genericcolumntable(x)
 end
 ==(a::GenericColumnTable, b::GenericColumnTable) = getfield(a, 1) == getfield(b, 1) && getfield(a, 2) == getfield(b, 2)
 
+# is both row and column access
+struct GenericTable
+end
+Tables.istable(::Type{GenericTable}) = true
+Tables.rowaccess(::Type{GenericTable}) = true
+Tables.rows(x::GenericTable) = x
+Tables.schema(x::GenericTable) = Tables.Schema((:a, :b, :c), Tuple{Int, Float64, String})
+Tables.columnaccess(::Type{GenericTable}) = true
+Tables.columns(x::GenericTable) = x
+Base.eltype(g::GenericTable) = GenericRow
+Base.length(g::GenericTable) = 1
+Base.size(g::GenericTable) = (1,)
+function Base.iterate(g::GenericTable, st=1)
+    st > 1 && return nothing
+    return GenericRow(1, 2.0, "3"), 2
+end
+Base.getproperty(g::GenericTable, nm::Symbol) = GenericColumn([1, 2, 3])
+Base.propertynames(g::GenericTable) = (:a, :b, :c)
+
 @testset "Tables.jl interface" begin
 
     @test !Tables.istable(1)
@@ -436,6 +455,13 @@ end
     rows = Tuple{Int64, Float64, String}[]
     t = Tables.columns(rows)
     @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int64, Float64, String))
+
+    # 311
+    gt = GenericTable()
+    @test Tables.schema(gt) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
+    @test Tables.columns(gt) == gt
+    @test Tables.rows(gt) == gt
+    @test_throws ArgumentError Tables.rows(GenericTable)
 end
 
 @testset "isless" begin
