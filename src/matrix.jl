@@ -1,7 +1,19 @@
 istable(::Type{<:AbstractMatrix}) = false
 
-rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
-columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+function rows(m::T) where {T <: AbstractMatrix}
+    if columnaccess(m)
+        cols = columns(m)
+        return RowIterator(cols, Int(rowcount(cols)))
+    end
+    throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+end
+function columns(m::T) where {T <: AbstractMatrix}
+    if rowaccess(m)
+        r = rows(m)
+        return CopiedColumns(buildcolumns(schema(r), r))
+    end
+    throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+end
 
 struct MatrixTable{T <: AbstractVecOrMat} <: AbstractColumns
     names::Vector{Symbol}
