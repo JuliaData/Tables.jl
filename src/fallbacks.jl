@@ -82,7 +82,10 @@ end
 # this is our generic Tables.rows fallback definition
 @noinline nodefault(T) = throw(ArgumentError("no default `Tables.rows` implementation for type: $T"))
 
-function rows(x::T) where {T}
+rows(x::T) where {T} = _rows(x)
+
+# split out so we can re-use it in the matrix fallback
+function _rows(x::T) where {T}
     isrowtable(x) && return x
     # because this method is being called, we know `x` didn't define it's own Tables.rows
     # first check if it supports column access, and if so, wrap it in a RowIterator
@@ -252,7 +255,9 @@ getcolumn(x::CopiedColumns, nm::Symbol) = getcolumn(source(x), nm)
 columnnames(x::CopiedColumns) = columnnames(source(x))
 
 # here's our generic fallback Tables.columns definition
-@inline function columns(x::T) where {T}
+columns(x::T) where {T} = _columns(x)
+
+@inline function _columns(x::T) where {T}
     # because this method is being called, we know `x` didn't define it's own Tables.columns method
     # first check if it explicitly supports row access, and if so, build up the desired columns
     if rowaccess(x)

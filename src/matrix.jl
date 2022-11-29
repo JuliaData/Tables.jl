@@ -1,7 +1,9 @@
 istable(::Type{<:AbstractMatrix}) = false
 
-rows(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
-columns(m::T) where {T <: AbstractMatrix} = throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+# for AbstractMatrix types, we don't want to automatically treat them as tables
+# *unless* someone has defined their own w/ appropriate Tables definitions
+rows(m::T) where {T <: AbstractMatrix} = istable(m) ? _rows(m) : throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
+columns(m::T) where {T <: AbstractMatrix} = istable(m) ? _columns(m) : throw(ArgumentError("a '$T' is not a table; see `?Tables.table` for ways to treat an AbstractVecOrMat as a table"))
 
 struct MatrixTable{T <: AbstractVecOrMat} <: AbstractColumns
     names::Vector{Symbol}
