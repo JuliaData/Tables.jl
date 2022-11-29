@@ -255,7 +255,7 @@ getcolumn(x::CopiedColumns, nm::Symbol) = getcolumn(source(x), nm)
 columnnames(x::CopiedColumns) = columnnames(source(x))
 
 # here's our generic fallback Tables.columns definition
-columns(x::T) where {T} = _columns(x)
+@inline columns(x::T) where {T} = _columns(x)
 
 @inline function _columns(x::T) where {T}
     # because this method is being called, we know `x` didn't define it's own Tables.columns method
