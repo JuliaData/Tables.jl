@@ -246,6 +246,16 @@ Tables.getcolumn(x::MockTable, ::Symbol) = (1, 2, 3)
 Tables.getcolumn(x::MockTable, ::Int) = (1, 2, 3)
 Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
+struct TestMatrixTable <: AbstractMatrix{Int}
+end
+Tables.istable(::Type{TestMatrixTable}) = true
+Tables.columnaccess(::Type{TestMatrixTable}) = true
+Tables.columnnames(x::TestMatrixTable) = (:a, :b, :c)
+Tables.columns(x::TestMatrixTable) = x
+Tables.getcolumn(x::TestMatrixTable, ::Symbol) = (1, 2, 3)
+Tables.getcolumn(x::TestMatrixTable, ::Int) = (1, 2, 3)
+Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
+
 @testset "Matrix integration" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0])
@@ -339,6 +349,16 @@ Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     # For the case that `Tables.getcolumn` doesn't return an `AbstractVector`
     # e.g Tuple, see #263
     @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
+
+    tbl = TestMatrixTable()
+    ctbl = columntable(tbl)
+    @test ctbl.a == [1, 2, 3]
+    @test ctbl.b == [1, 2, 3]
+    @test ctbl.c == [1, 2, 3]
+    rtbl = rowtable(tbl)
+    @test rtbl[1].a == 1
+    @test rtbl[1].b == 1
+    @test rtbl[1].c == 1
 end
 
 import Base: ==
