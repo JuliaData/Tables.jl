@@ -357,8 +357,8 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test ctbl.c == [1, 2, 3]
     rtbl = rowtable(tbl)
     @test rtbl[1].a == 1
-    @test rtbl[1].b == 2
-    @test rtbl[1].c == 3
+    @test rtbl[1].b == 1
+    @test rtbl[1].c == 1
 end
 
 import Base: ==
