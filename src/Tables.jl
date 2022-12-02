@@ -521,7 +521,7 @@ to call `Tables.partitions` anywhere they're currently calling `Tables.columns` 
 can use `Tables.partitions` whether or not the user passes a partionable table, since the
 default is to treat a single input as a single, non-partitioned table.
 
-`Tables.partitioner(itr)`(@ref) is a convenience wrapper to provide table partitions
+[`Tables.partitioner(itr)`](@ref) is a convenience wrapper to provide table partitions
 from any table iterator; this allows for easy wrapping of a `Vector` or iterator of tables
 as valid partitions, since by default, they'd be treated as a single table.
 
@@ -532,8 +532,10 @@ Tables.partitions(x...) = x
 That allows passing vararg tables and they'll be treated as separate partitions. Sink
 functions may allow vararg table inputs and can "splat them through" to `partitions`.
 
-For convenience, `Tables.partitions(Iterators.partition(...))` is defined for cases
-where user-controlled partitioning is desired over an applicable input (an input iterator).
+For convenience, `Tables.partitions(x::Iterators.PartitionIterator) = x` and
+`Tables.partitions(x::Tables.Partitioner) = x` are defined to conveniently handle cases
+where user created partititioning with the `Iterators.partition` or
+[`Tables.partitioner`](@ref) functions.
 """
 partitions(x) = (x,)
 partitions(x...) = x
