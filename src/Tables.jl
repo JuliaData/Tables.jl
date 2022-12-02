@@ -533,7 +533,7 @@ That allows passing vararg tables and they'll be treated as separate partitions.
 functions may allow vararg table inputs and can "splat them through" to `partitions`.
 
 For convenience, `Tables.partitions(x::Iterators.PartitionIterator) = x` and
-`Tables.partitions(x::Tables.Partitioner) = x` are defined to conveniently handle cases
+`Tables.partitions(x::Tables.Partitioner) = x` are defined to handle cases
 where user created partititioning with the `Iterators.partition` or
 [`Tables.partitioner`](@ref) functions.
 """
