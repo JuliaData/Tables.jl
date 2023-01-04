@@ -124,6 +124,7 @@ Packages currently integrating with Tables.jl:
 * [Trajectories](https://github.com/mschauer/Trajectories.jl.git)
 * [Transducers](https://github.com/JuliaFolds/Transducers.jl.git)
 * [TypedTables](https://github.com/JuliaData/TypedTables.jl.git)
+* [UnROOT](https://github.com/JuliaHEP/UnROOT.jl.git)
 * [UpROOT](https://github.com/JuliaHEP/UpROOT.jl.git)
 * [ValueShapes](https://github.com/oschulz/ValueShapes.jl.git)
 * [Vcov](https://github.com/matthieugomez/Vcov.jl.git)
