@@ -299,6 +299,10 @@ of knowing that the generator is a table.
 It is recommended that for users implementing `MyType`, they define only
 `istable(::Type{MyType})`. `istable(::MyType)` will then automatically delegate to this
 method.
+
+`istable` calls `TableTraits.isiterabletable` as a fallback. This can have a considerable
+runtime overhead in some contexts. To avoid these and use `istable` as a compile-time trait,
+it can be called on a type as `istable(typeof(obj))`.
 """
 function istable end
 
