@@ -75,7 +75,7 @@ end
     Tables.matrix(table; transpose::Bool=false)
 
 Materialize any table source input as a new `Matrix` or in the case of a `MatrixTable`
-return the originally wrapped matrix. If the table column element types are not homogenous,
+return the originally wrapped matrix. If the table column element types are not homogeneous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are
 ignored in the conversion. By default, input table columns will be materialized as corresponding
 matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows
