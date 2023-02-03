@@ -36,7 +36,7 @@ for row in rows
 end
 
 # access data of input table `x` column-by-column
-# Tables.columns returns an object where individul, entire columns can be accessed
+# Tables.columns returns an object where individual, entire columns can be accessed
 columns = Tables.columns(x)
 
 # iterate through each column name in table
@@ -151,7 +151,7 @@ then still pass to [`Tables.eachcolumn`](@ref) to apply our `bind!` function to 
 
 ### `Tables.columns` usage
 
-Ok, now let's take a look at a case utlizing [`Tables.columns`](@ref).
+Ok, now let's take a look at a case utilizing [`Tables.columns`](@ref).
 The following code is taken from the [DataFrames.jl](https://github.com/JuliaData/DataFrames.jl/blob/master/src/other/tables.jl)
 Tables.jl implementation:
 ```julia

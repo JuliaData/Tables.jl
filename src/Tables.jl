@@ -529,7 +529,7 @@ default is to treat a single input as a single, non-partitioned table.
 from any table iterator; this allows for easy wrapping of a `Vector` or iterator of tables
 as valid partitions, since by default, they'd be treated as a single table.
 
-A 2nd convenience method is provided with the defintion:
+A 2nd convenience method is provided with the definition:
 ```julia
 Tables.partitions(x...) = x
 ```
@@ -538,7 +538,7 @@ functions may allow vararg table inputs and can "splat them through" to `partiti
 
 For convenience, `Tables.partitions(x::Iterators.PartitionIterator) = x` and
 `Tables.partitions(x::Tables.Partitioner) = x` are defined to handle cases
-where user created partititioning with the `Iterators.partition` or
+where user created partitioning with the `Iterators.partition` or
 [`Tables.partitioner`](@ref) functions.
 """
 partitions(x) = (x,)
