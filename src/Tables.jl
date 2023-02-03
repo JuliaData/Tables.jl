@@ -404,6 +404,9 @@ which may return `nothing` if the schema is unknown.
 Column names can always be queried by calling `Tables.columnnames(columns)`, and individual columns
 can be accessed by calling `Tables.getcolumn(columns, i::Int )` or `Tables.getcolumn(columns, nm::Symbol)`
 with a column index or name, respectively.
+
+Note that if `x` is an object in which columns are stored as vectors, the check that
+these vectors use 1-based indexing is not performed (it should be ensured when `x` is constructed).
 """
 function columns end
 

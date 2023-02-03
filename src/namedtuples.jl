@@ -143,12 +143,15 @@ getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
 
 """
-    Tables.columntable(x) => NamedTuple of Vectors
+    Tables.columntable(x) => NamedTuple of AbstractVectors
 
-Takes any input table source `x` and returns a `NamedTuple` of `Vector`s,
+Takes any input table source `x` and returns a `NamedTuple` of `AbstractVector`s,
 also known as a "column table". A "column table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl column interface
 naturally.
+
+Note that if `x` is an object in which columns are stored as vectors, the check that
+these vectors use 1-based indexing is not performed (it should be ensured when `x` is constructed).
 
 Not for use with extremely wide tables with # of columns > 67K; current fundamental compiler limits
 prevent constructing `NamedTuple`s that large.
@@ -174,10 +177,12 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
 end
 
 # extremely large tables
-columntable(sch::Schema{nothing, nothing}, cols) = throw(ArgumentError("input table too wide ($(length(sch.names)) columns) to convert to `NamedTuple` of `Vector`s"))
+columntable(sch::Schema{nothing, nothing}, cols) =
+    throw(ArgumentError("input table too wide ($(length(sch.names)) columns) to convert to `NamedTuple` of `AbstractVector`s"))
 
 # unknown schema case
-columntable(::Nothing, cols) = NamedTuple{Tuple(map(Symbol, columnnames(cols)))}(Tuple(getarray(getcolumn(cols, col)) for col in columnnames(cols)))
+columntable(::Nothing, cols) =
+    NamedTuple{Tuple(map(Symbol, columnnames(cols)))}(Tuple(getarray(getcolumn(cols, col)) for col in columnnames(cols)))
 
 function columntable(itr::T) where {T}
     cols = columns(itr)
