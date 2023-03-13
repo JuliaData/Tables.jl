@@ -26,7 +26,7 @@ Base.@propagate_inbounds getcolumn(c::ColumnsRow, i::Int) = getcolumn(getcolumns
 Base.@propagate_inbounds getcolumn(c::ColumnsRow, nm::Symbol) = getcolumn(getcolumns(c), nm)[getrow(c)]
 columnnames(c::ColumnsRow) = columnnames(getcolumns(c))
 
-@generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+@generated function Base.isless(c::ColumnsRow{T}, d::ColumnsRow{T}) where {names, T <: NamedTuple{names}}
     exprs = Expr[]
     for n in names
         var1 = Expr(:., :c, QuoteNode(n))
@@ -42,7 +42,7 @@ columnnames(c::ColumnsRow) = columnnames(getcolumns(c))
     Expr(:block, exprs...)
 end
 
-@generated function Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {T <: NamedTuple{names}} where names
+@generated function Base.isequal(c::ColumnsRow{T}, d::ColumnsRow{T}) where {names, T <: NamedTuple{names}}
     exprs = Expr[]
     for n in names
         var1 = Expr(:., :c, QuoteNode(n))
@@ -59,7 +59,7 @@ struct RowIterator{T}
     len::Int
 end
 
-Base.eltype(x::RowIterator{T}) where {T} = ColumnsRow{T}
+Base.eltype(::Type{R}) where {T,R<:RowIterator{T}} = ColumnsRow{T}
 Base.length(x::RowIterator) = getfield(x, :len)
 Base.getproperty(x::RowIterator, nm::Symbol) = getcolumn(x, nm)
 Base.getproperty(x::RowIterator, i::Int) = getcolumn(x, i)

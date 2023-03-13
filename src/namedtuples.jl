@@ -31,10 +31,10 @@ end
 namedtupleiterator(::Type{T}, x) where {T <: NamedTuple} = x
 namedtupleiterator(T, x) = namedtupleiterator(x)
 
-Base.IteratorEltype(::Type{NamedTupleIterator{Schema{names, types}, T}}) where {names, types, T} = Base.HasEltype()
-Base.IteratorEltype(::Type{NamedTupleIterator{Nothing, T}}) where {T} = Base.EltypeUnknown()
-Base.eltype(::Type{NamedTupleIterator{Schema{names, types}, T}}) where {names, types, T} = NamedTuple{map(Symbol, names), types}
-Base.IteratorSize(::Type{NamedTupleIterator{sch, T}}) where {sch, T} = Base.IteratorSize(T)
+Base.IteratorEltype(::Type{NT}) where {names, types, T, NT<:NamedTupleIterator{Schema{names, types}, T}} = Base.HasEltype()
+Base.IteratorEltype(::Type{NT}) where {T, NT<:NamedTupleIterator{Nothing, T}} = Base.EltypeUnknown()
+Base.eltype(::Type{NT}) where {names, types, T, NT<:NamedTupleIterator{Schema{names, types}, T}} = NamedTuple{map(Symbol, names), types}
+Base.IteratorSize(::Type{NT}) where {sch, T, NT<:NamedTupleIterator{sch, T}} = Base.IteratorSize(T)
 Base.length(nt::NamedTupleIterator) = length(nt.x)
 Base.size(nt::NamedTupleIterator) = (length(nt.x),)
 
@@ -128,13 +128,13 @@ columnaccess(::Type{<:ColumnTable}) = true
 # a NamedTuple of AbstractVectors is itself a `Columns` object
 columns(x::ColumnTable) = x
 
-_eltype(::Type{A}) where {A <: AbstractVector{T}} where {T} = T
+_eltype(::Type{A}) where {T, A <: AbstractVector{T}} = T
 Base.@pure function _eltypes(::Type{NT}) where {NT <: ColumnTable}
     return Tuple{Any[ _eltype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
 end
 
-names(::Type{NamedTuple{nms, T}}) where {nms, T} = nms
-types(::Type{NamedTuple{nms, T}}) where {nms, T} = T
+names(::Type{NT}) where {nms, T, NT<:NamedTuple{nms, T}} = nms
+types(::Type{NT}) where {nms, T, NT<:NamedTuple{nms, T}} = T
 
 schema(x::T) where {T <: ColumnTable} = Schema(names(T), _eltypes(T))
 materializer(x::ColumnTable) = columntable
