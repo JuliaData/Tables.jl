@@ -667,10 +667,9 @@ partitioner(f, itr) = partitioner((LazyTable(f, x) for x in itr))
 
 partitions(x::Partitioner) = x
 
-Base.IteratorEltype(::Type{Partitioner{S}}) where {S} = Base.IteratorEltype(S)
-Base.eltype(x::Partitioner{S}) where {S} = eltype(x.x)
-Base.eltype(::Type{Partitioner{S}}) where {S} = eltype(S)
-Base.IteratorSize(::Type{Partitioner{S}}) where {S} = Base.IteratorSize(S)
+Base.IteratorEltype(::Type{P}) where {S,P<:Partitioner{S}} = Base.IteratorEltype(S)
+Base.eltype(::Type{P}) where {S,P<:Partitioner{S}} = eltype(S)
+Base.IteratorSize(::Type{P}) where {S,P<:Partitioner{S}} = Base.IteratorSize(S)
 Base.length(x::Partitioner) = length(x.x)
 Base.size(x::Partitioner) = size(x.x)
 Base.iterate(x::Partitioner, st...) = iterate(x.x, st...)

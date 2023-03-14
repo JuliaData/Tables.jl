@@ -117,7 +117,7 @@ getcolumn(x::DictRow, nm::Symbol) = get(getfield(x, :row), nm, missing)
 Base.IteratorSize(::Type{DictRowTable}) = Base.HasLength()
 Base.length(x::DictRowTable) = length(getfield(x, :values))
 Base.IteratorEltype(::Type{DictRowTable}) = Base.HasEltype()
-Base.eltype(x::DictRowTable) = DictRow
+Base.eltype(::Type{DictRowTable}) = DictRow
 
 function Base.iterate(x::DictRowTable, st=1)
     st > length(x) && return nothing

@@ -1,4 +1,4 @@
-Base.@pure function nondatavaluenamedtuple(::Type{NT}) where {NT <: NamedTuple{names}} where {names}
+Base.@pure function nondatavaluenamedtuple(::Type{NT}) where {names, NT <: NamedTuple{names}}
     TT = Tuple{Any[ DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
     return NamedTuple{names, TT}
 end
@@ -32,10 +32,9 @@ function Tables.schema(dv::IteratorWrapper{S}) where {S}
     return Tables.Schema(nondatavaluenamedtuple(eT))
 end
 
-Base.IteratorEltype(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorEltype(S)
-Base.eltype(x::IteratorWrapper{S}) where {S} = IteratorRow{eltype(x.x)}
-Base.eltype(::Type{IteratorWrapper{S}}) where {S} = IteratorRow{eltype(S)}
-Base.IteratorSize(::Type{IteratorWrapper{S}}) where {S} = Base.IteratorSize(S)
+Base.IteratorEltype(::Type{I}) where {S, I<:IteratorWrapper{S}} = Base.IteratorEltype(S)
+Base.eltype(::Type{I}) where {S, I<:IteratorWrapper{S}} = IteratorRow{eltype(S)}
+Base.IteratorSize(::Type{I}) where {S, I<:IteratorWrapper{S}} = Base.IteratorSize(S)
 Base.length(rows::IteratorWrapper) = length(rows.x)
 Base.size(rows::IteratorWrapper) = size(rows.x)
 
@@ -61,7 +60,7 @@ struct IteratorRow{T} <: AbstractRow
 end
 
 getrow(r::IteratorRow) = getfield(r, :row)
-wrappedtype(::Type{IteratorRow{T}}) where {T} = T
+wrappedtype(::Type{I}) where {T, I<:IteratorRow{T}} = T
 wrappedtype(::Type{T}) where {T} = T
 
 unwrap(::Type{T}, x) where {T} = convert(T, x)
@@ -99,8 +98,8 @@ function datavaluerows(x)
     return DataValueRowIterator{datavaluenamedtuple(s), typeof(s), typeof(r)}(r)
 end
 
-Base.eltype(rows::DataValueRowIterator{NT}) where {NT} = NT
-Base.IteratorSize(::Type{DataValueRowIterator{NT, sch, S}}) where {NT, sch, S} = Base.IteratorSize(S)
+Base.eltype(::Type{D}) where {NT, D<:DataValueRowIterator{NT}} = NT
+Base.IteratorSize(::Type{D}) where {NT, sch, S, D<:DataValueRowIterator{NT, sch, S}} = Base.IteratorSize(S)
 Base.length(rows::DataValueRowIterator) = length(rows.x)
 Base.size(rows::DataValueRowIterator) = size(rows.x)
 
