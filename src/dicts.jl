@@ -108,12 +108,13 @@ schema(x::DictRowTable) = Schema(getfield(x, :names), [getfield(x, :types)[nm] f
 struct DictRow <: AbstractRow
     names::Vector{Symbol}
     row::Dict{Symbol, Any}
+    rownumber::Int
 end
 
-rownumber(x::DictRow) = getfield(x, :row)
+rownumber(x::DictRow) = getfield(x, :rownumber)
 columnnames(x::DictRow) = getfield(x, :names)
-getcolumn(x::DictRow, i::Int) = get(rownumber(x), columnnames(x)[i], missing)
-getcolumn(x::DictRow, nm::Symbol) = get(rownumber(x), nm, missing)
+getcolumn(x::DictRow, i::Int) = get(getfield(x, :row), columnnames(x)[i], missing)
+getcolumn(x::DictRow, nm::Symbol) = get(getfield(x, :row), nm, missing)
 
 Base.IteratorSize(::Type{DictRowTable}) = Base.HasLength()
 Base.length(x::DictRowTable) = length(getfield(x, :values))
@@ -122,7 +123,7 @@ Base.eltype(::Type{DictRowTable}) = DictRow
 
 function Base.iterate(x::DictRowTable, st=1)
     st > length(x) && return nothing
-    return DictRow(x.names, x.values[st]), st + 1
+    return DictRow(x.names, x.values[st], st), st + 1
 end
 
 function subset(x::DictRowTable, inds; viewhint::Union{Bool,Nothing}=nothing, view::Union{Bool,Nothing}=nothing)
@@ -132,7 +133,7 @@ function subset(x::DictRowTable, inds; viewhint::Union{Bool,Nothing}=nothing, vi
     end
     values = viewhint === true ? Base.view(getfield(x, :values), inds) : getfield(x, :values)[inds]
     if inds isa Integer
-        return DictRow(getfield(x, :names), values)
+        return DictRow(getfield(x, :names), values, inds)
     else
         values isa AbstractVector || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `RowTable` output, got $(typeof(ret))"))
         return DictRowTable(getfield(x, :names), getfield(x, :types), values)

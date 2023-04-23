@@ -83,7 +83,8 @@ using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators,
     @test Tables.columnaccess(rows)
     @test Tables.columns(rows) === nt
     @test Tables.materializer(rows) === Tables.materializer(nt)
-
+    @test Tables.rownumber(Tables.IteratorRow(row)) == 1
+    
     @test Tables.rowmerge(row; b=200, hey="hello") == (a=1, b=200, hey="hello")
     @test Tables.rowmerge(row, (hey="hello", a=200)) == (a=200, b=4, hey="hello")
     @test Tables.rowmerge(row, (hey="hello", a=200), row, (x=:x, y=:y, hey="bye")) == (a=1, b=4, hey="bye", x=:x, y=:y)
@@ -826,6 +827,10 @@ end
     @test isequal(ct.c, [3, missing, missing, 10, 10])
     @test isequal(ct.d, [missing, 5, 7, missing, 11])
 
+    for (i,row) in enumerate(drt)
+        @test Tables.rownumber(row) == i
+    end
+    
     dct = Tables.dictcolumntable(rt)
     @test isequal(dct.a, [1, missing, 6, 8, 8])
     @test isequal(ct.b, Union{Int, Float64, Missing}[2, 4.0, missing, 9, 9])
