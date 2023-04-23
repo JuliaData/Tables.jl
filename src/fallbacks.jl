@@ -19,6 +19,7 @@ end
 
 getcolumns(c::ColumnsRow) = getfield(c, :columns)
 getrow(c::ColumnsRow) = getfield(c, :row)
+rownumber(c::ColumnsRow) = getrow(c)
 
 # AbstractRow interface
 Base.@propagate_inbounds getcolumn(c::ColumnsRow, ::Type{T}, col::Int, nm::Symbol) where {T} = getcolumn(getcolumns(c), T, col, nm)[getrow(c)]

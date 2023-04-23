@@ -110,9 +110,10 @@ struct DictRow <: AbstractRow
     row::Dict{Symbol, Any}
 end
 
+rownumber(x::DictRow) = getfield(x, :row)
 columnnames(x::DictRow) = getfield(x, :names)
-getcolumn(x::DictRow, i::Int) = get(getfield(x, :row), columnnames(x)[i], missing)
-getcolumn(x::DictRow, nm::Symbol) = get(getfield(x, :row), nm, missing)
+getcolumn(x::DictRow, i::Int) = get(rownumber(x), columnnames(x)[i], missing)
+getcolumn(x::DictRow, nm::Symbol) = get(rownumber(x), nm, missing)
 
 Base.IteratorSize(::Type{DictRowTable}) = Base.HasLength()
 Base.length(x::DictRowTable) = length(getfield(x, :values))
