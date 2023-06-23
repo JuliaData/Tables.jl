@@ -1,4 +1,4 @@
-using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, DataAPI
 
 @testset "utils.jl" begin
 
@@ -977,3 +977,15 @@ end
     @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), Int, 1, :a) == 1
 end
                                                                                                                                                
+@testset "DataAPI.nrow for different table types" begin
+    matrix = rand(5, 4)
+    matrixtable = Tables.table(matrix)
+    @test DataAPI.nrow(matrixtable) == size(matrix, 1)
+    dictrowtable = Tables.dictrowtable(matrixtable)
+    @test DataAPI.nrow(dictrowtable) == size(matrix, 1)
+    dictcolumntable = Tables.dictcolumntable(matrixtable)
+    @test DataAPI.nrow(dictcolumntable) == size(matrix, 1)
+end
+    
+    
+
