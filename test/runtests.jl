@@ -987,5 +987,13 @@ end
     @test DataAPI.nrow(dictcolumntable) == size(matrix, 1)
 end
     
-    
+@testset "DataAPI.ncol for different table types" begin
+    matrix = rand(5, 4)
+    matrixtable = Tables.table(matrix)
+    @test DataAPI.ncol(matrixtable) == size(matrix, 2)
+    dictrowtable = Tables.dictrowtable(matrixtable)
+    @test DataAPI.ncol(dictrowtable) == size(matrix, 2)
+    dictcolumntable = Tables.dictcolumntable(matrixtable)
+    @test DataAPI.ncol(dictcolumntable) == size(matrix, 2)
+end
 

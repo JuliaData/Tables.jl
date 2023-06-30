@@ -21,6 +21,7 @@ const MatrixTables{T} = Union{MatrixTable{T}, MatrixRowTable{T}}
 
 names(m::MatrixTables) = getfield(m, :names)
 DataAPI.nrow(m::T) where {T <: Union{MatrixTable, MatrixRowTable}} = size(getfield(m, :matrix), 1)
+DataAPI.ncol(m::T) where {T <: Union{MatrixTable, MatrixRowTable}} = size(getfield(m, :matrix), 2)
 
 # row interface
 istable(::Type{<:MatrixTable}) = true
