@@ -94,6 +94,8 @@ schema(x::DictColumnTable) = getfield(x, :schema)
 columnnames(x::DictColumnTable) = getfield(x, :schema).names
 getcolumn(x::DictColumnTable, i::Int) = getfield(x, :values)[columnnames(x)[i]]
 getcolumn(x::DictColumnTable, nm::Symbol) = getfield(x, :values)[nm]
+DataAPI.nrow(x::DictColumnTable) = length(getfield(x, :values)[columnnames(x)[1]])
+DataAPI.ncol(x::DictColumnTable) = length(getfield(x, :values))
 
 # Vector of Dicts as table
 struct DictRowTable
@@ -113,6 +115,8 @@ end
 columnnames(x::DictRow) = getfield(x, :names)
 getcolumn(x::DictRow, i::Int) = get(getfield(x, :row), columnnames(x)[i], missing)
 getcolumn(x::DictRow, nm::Symbol) = get(getfield(x, :row), nm, missing)
+DataAPI.nrow(x::DictRowTable) = length(getfield(x, :values))
+DataAPI.ncol(x::DictRowTable) = length(getfield(x, :names))
 
 Base.IteratorSize(::Type{DictRowTable}) = Base.HasLength()
 Base.length(x::DictRowTable) = length(getfield(x, :values))
