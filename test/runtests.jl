@@ -211,6 +211,12 @@ end
 
     # 228
     @test Tables.columntable(NamedTuple[]) === NamedTuple()
+
+    @testset "Type stability of schema(x).types" begin
+        _get_types(X) = Tables.schema(X).types
+        x = (a=[1.0], b=[1.0])
+        @inferred _get_types(x)
+    end
 end
 
 @testset "Materializer" begin
