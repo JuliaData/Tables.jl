@@ -500,7 +500,17 @@ function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names
         return names === nothing ? getfield(sch, :storednames) : names
     elseif field === :types
         T = getfield(sch, :storedtypes)
-        return types === nothing ? (T !== nothing ? T : nothing) : ntuple(i -> fieldtype(types, i), Val(fieldcount(types)))
+        if types === nothing
+            return (T !== nothing ? T : nothing)
+        else
+            ncol = fieldcount(types)
+            if ncol <= 512
+                # Type stable, but slower to compile
+                return ntuple(i -> fieldtype(types, i), Val(ncol))
+            else
+                return Tuple(fieldtype(types, i) for i=1:ncol)
+            end
+        end
     else
         throw(ArgumentError("unsupported property for Tables.Schema"))
     end
