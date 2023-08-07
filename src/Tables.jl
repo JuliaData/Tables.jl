@@ -499,8 +499,8 @@ function Base.getproperty(sch::Schema{names, types}, field::Symbol) where {names
     if field === :names
         return names === nothing ? getfield(sch, :storednames) : names
     elseif field === :types
-        T = getfield(sch, :storedtypes)
         if types === nothing
+            T = getfield(sch, :storedtypes)
             return (T !== nothing ? T : nothing)
         else
             ncol = fieldcount(types)
