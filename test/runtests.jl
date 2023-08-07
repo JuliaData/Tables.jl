@@ -214,8 +214,13 @@ end
 
     @testset "Type stability of schema(x).types" begin
         _get_types(X) = Tables.schema(X).types
+
         x = (a=[1.0], b=[1.0])
-        @inferred _get_types(x)
+        @inferred Tuple{Type{Float64},Type{Float64}} _get_types(x)
+
+        # Trigger other branch which lacks type stability:
+        x_wide = NamedTuple([Symbol("x$(i)") => [1.0] for i=1:513])
+        @inferred NTuple{513,DataType} _get_types(x_wide)
     end
 end
 
