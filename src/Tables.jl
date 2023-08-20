@@ -29,7 +29,7 @@ Interface definition:
 |----------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(table, i::Int)`                        | getfield(table, i)          | Retrieve a column by index                                                                                                                                   |
 | `Tables.getcolumn(table, nm::Symbol)`                    | getproperty(table, nm)      | Retrieve a column by name                                                                                                                                    |
-| `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as an indexable collection                                                                                                   |
+| `Tables.columnnames(table)`                              | propertynames(table)        | Return column names for a table as a 1-based indexable collection                                                                                                   |
 | **Optional methods**                                     |                             |                                                                                                                                                              |
 | `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(table, nm) | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
@@ -62,7 +62,7 @@ Interface definition:
 |--------------------------------------------------------|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tables.getcolumn(row, i::Int)`                        | getfield(row, i)          | Retrieve a column value by index                                                                                                                                 |
 | `Tables.getcolumn(row, nm::Symbol)`                    | getproperty(row, nm)      | Retrieve a column value by name                                                                                                                                  |
-| `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as an indexable collection                                                                                                         |
+| `Tables.columnnames(row)`                              | propertynames(row)        | Return column names for a row as a 1-based indexable collection                                                                                                         |
 | **Optional methods**                                   |                           |                                                                                                                                                                  |
 | `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | Tables.getcolumn(row, nm) | Given a column element type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
 
@@ -90,7 +90,7 @@ abstract type AbstractRow end
 
 Retrieve an entire column (from `AbstractColumns`) or single row column value (from an `AbstractRow`) by column name (`nm`), index (`i`),
 or if desired, by column element type (`T`), index (`i`), and name (`nm`). When called on a `AbstractColumns` interface object,
-the returned object should be an indexable collection with known length. When called on a `AbstractRow` interface
+the returned object should be a 1-based indexable collection with known length. When called on a `AbstractRow` interface
 object, it returns the single column value. The methods taking a single `Symbol` or `Int` are both required
 for the `AbstractColumns` and `AbstractRow` interfaces; the third method is optional if type stability is possible.
 The default definition of `Tables.getcolumn(x, i::Int)` is `getfield(x, i)`. The default definition of
@@ -106,7 +106,7 @@ getcolumn(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {nam
 """
     Tables.columnnames(::Union{AbstractColumns, AbstractRow}) => Indexable collection
 
-Retrieves the list of column names as an indexable collection (like a `Tuple` or `Vector`)
+Retrieves the list of column names as a 1-based indexable collection (like a `Tuple` or `Vector`)
 for a `AbstractColumns` or `AbstractRow` interface object.
 The default definition calls `propertynames(x)`.
 The returned column names must be unique.
