@@ -11,6 +11,10 @@ function rowcount(cols)
     return length(getcolumn(cols, names[1]))
 end
 
+# implement default methods for DataAPI.jl
+DataAPI.nrow(table) = rowcount(table)
+DataAPI.ncol(table) = length(columnnames(cols))
+
 # a lazy row view into a AbstractColumns object
 struct ColumnsRow{T} <: AbstractRow
     columns::T # an `AbstractColumns`-compatible object
