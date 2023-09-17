@@ -229,19 +229,21 @@ make my custom type valid for Tables.jl consumers?
 
 For a type `MyTable`, the interface to becoming a proper table is straightforward:
 
-| Required Methods                       | Default Definition           | Brief Description                                                                                                               |
-|----------------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| `Tables.istable(::Type{MyTable})`      |                              | Declare that your table type implements the interface                                                                           |
-|  **One of:**                           |                              |                                                                                                                                 |
-| `Tables.rowaccess(::Type{MyTable})`    |                              | Declare that your table type defines a `Tables.rows(::MyTable)` method                                                              |
-| `Tables.rows(x::MyTable)`                   |                              | Return an `Tables.AbstractRow`-compatible iterator from your table                                                              |
-| **Or:**                                |                              |                                                                                                                                 |
-| `Tables.columnaccess(::Type{MyTable})` |                              | Declare that your table type defines a `Tables.columns(::MyTable)` method                                                           |
-| `Tables.columns(x::MyTable)`                |                              | Return an `Tables.AbstractColumns`-compatible object from your table                                                            | 
-| **Optional methods**                   |                              |                                                                                                                                 |
-| `Tables.schema(x::MyTable)`                     | `Tables.schema(x) = nothing` | Return a [`Tables.Schema`](@ref) object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
-| `Tables.materializer(::Type{MyTable})` | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input |
-| `Tables.subset(x::MyTable, inds; viewhint)`  |            | Return a row or a sub-table of the original table
+| Required Methods                             | Default Definition           | Brief Description                                                                                                                                   |
+|----------------------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Tables.istable(::Type{MyTable})`            |                              | Declare that your table type implements the interface                                                                                               |
+|  **One of:**                                 |                              |                                                                                                                                                     |
+| `Tables.rowaccess(::Type{MyTable})`          |                              | Declare that your table type defines a `Tables.rows(::MyTable)` method                                                                              |
+| `Tables.rows(x::MyTable)`                    |                              | Return an `Tables.AbstractRow`-compatible iterator from your table                                                                                  |
+| **Or:**                                      |                              |                                                                                                                                                     |
+| `Tables.columnaccess(::Type{MyTable})`       |                              | Declare that your table type defines a `Tables.columns(::MyTable)` method                                                                           |
+| `Tables.columns(x::MyTable)`                 |                              | Return an `Tables.AbstractColumns`-compatible object from your table                                                                                |
+| **Optional methods**                         |                              |                                                                                                                                                     |
+| `Tables.schema(x::MyTable)`                  | `Tables.schema(x) = nothing` | Return a [`Tables.Schema`](@ref) object from your `Tables.AbstractRow` iterator or `Tables.AbstractColumns` object; or `nothing` for unknown schema |
+| `Tables.materializer(::Type{MyTable})`       | `Tables.columntable`         | Declare a "materializer" sink function for your table type that can construct an instance of your type from any Tables.jl input                     |
+| `Tables.subset(x::MyTable, inds; viewhint)`  |                              | Return a row or a sub-table of the original table                                                                                                   |
+| `DataAPI.nrow(x::MyTable)`                   |                              | Return number of rows of table `x`                                                                                                                  |
+| `DataAPI.ncol(x::MyTable)`                   |                              | Return number of columns of table `x`                                                                                                               |
 
 Based on whether your table type has defined `Tables.rows` or `Tables.columns`, you then ensure that the `Tables.AbstractRow` iterator
 or `Tables.AbstractColumns` object satisfies the respective interface.
