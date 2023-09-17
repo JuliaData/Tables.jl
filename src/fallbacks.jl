@@ -11,10 +11,6 @@ function rowcount(cols)
     return length(getcolumn(cols, names[1]))
 end
 
-# implement default methods for DataAPI.jl
-DataAPI.nrow(table) = rowcount(table)
-DataAPI.ncol(table) = length(columnnames(cols))
-
 # a lazy row view into a AbstractColumns object
 struct ColumnsRow{T} <: AbstractRow
     columns::T # an `AbstractColumns`-compatible object
@@ -279,3 +275,24 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
     end
     throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
 end
+
+# implement default nrow and ncol methods for DataAPI.jl
+
+# this covers also MatrixTable
+DataAPI.nrow(table::AbstractColumns) = rowcount(table)
+DataAPI.ncol(table::AbstractColumns) = length(columnnames(table))
+
+DataAPI.nrow(table::ColumnTable) = isempty(table) ? 0 : length(first(table))
+DataAPI.ncol(table::ColumnTable) = length(table)
+
+DataAPI.nrow(table::AbstractRowTable) = length(table)
+DataAPI.ncol(table::AbstractRowTable) = isempty(table) ? 0 : length(columnnames(first(table)))
+
+DataAPI.nrow(table::RowTable) = length(table)
+DataAPI.ncol(table::RowTable) = isempty(table) ? 0 : length(first(table))
+
+DataAPI.nrow(table::MatrixRowTable) = length(table)
+DataAPI.ncol(table::MatrixRowTable) = size(getfield(m, :matrix), 2) # this is correct even if m is a vector
+
+DataAPI.nrow(table::DictRowTable) = length(table)
+DataAPI.ncol(table::DictRowTable) = length(columnnames(table))
