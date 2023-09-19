@@ -201,4 +201,4 @@ end
 # implement default nrow and ncol methods for DataAPI.jl
 
 DataAPI.nrow(table::DictRowTable) = length(table)
-DataAPI.ncol(table::DictRowTable) = length(columnnames(table))
+DataAPI.ncol(table::DictRowTable) = length(getfield(table, :names))
