@@ -1,4 +1,4 @@
-using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, DataAPI
 
 @testset "utils.jl" begin
 
@@ -979,52 +979,52 @@ end
 
 @testset "test nrow and ncol" begin
     # AbstractColumns
-    @test nrow(Tables.CopiedColumns((;))) == 0
-    @test ncol(Tables.CopiedColumns((;))) == 0
-    @test nrow(Tables.CopiedColumns((a=1:3, b=2:4))) == 3
-    @test ncol(Tables.CopiedColumns((a=1:3, b=2:4))) == 2
+    @test DataAPI.nrow(Tables.CopiedColumns((;))) == 0
+    @test DataAPI.ncol(Tables.CopiedColumns((;))) == 0
+    @test DataAPI.nrow(Tables.CopiedColumns((a=1:3, b=2:4))) == 3
+    @test DataAPI.ncol(Tables.CopiedColumns((a=1:3, b=2:4))) == 2
 
     # ColumnTable
-    @test nrow((;)) == 0
-    @test ncol((;)) == 0
-    @test nrow((a=1:3, b=2:4)) == 3
-    @test ncol((a=1:3, b=2:4)) == 2
+    @test DataAPI.nrow((;)) == 0
+    @test DataAPI.ncol((;)) == 0
+    @test DataAPI.nrow((a=1:3, b=2:4)) == 3
+    @test DataAPI.ncol((a=1:3, b=2:4)) == 2
 
     # AbstractRowTable
-    @test nrow(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
-    @test ncol(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
-    @test nrow(collect(Tables.rows(Tables.table(ones(2, 3))))) == 2
-    @test ncol(collect(Tables.rows(Tables.table(ones(2, 3))))) == 3
+    @test DataAPI.nrow(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
+    @test DataAPI.ncol(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
+    @test DataAPI.nrow(collect(Tables.rows(Tables.table(ones(2, 3))))) == 2
+    @test DataAPI.ncol(collect(Tables.rows(Tables.table(ones(2, 3))))) == 3
 
     # RowTable
-    @test nrow(NamedTuple[]) == 0
-    @test ncol(NamedTuple[]) == 0
-    @test nrow([(a=1,b=2), (a=3, b=4), (a=5, b=6)]) == 3
-    @test ncol([(a=1, b=2), (a=3, b=4), (a=5, b=6)]) == 2
+    @test DataAPI.nrow(NamedTuple[]) == 0
+    @test DataAPI.ncol(NamedTuple[]) == 0
+    @test DataAPI.nrow([(a=1,b=2), (a=3, b=4), (a=5, b=6)]) == 3
+    @test DataAPI.ncol([(a=1, b=2), (a=3, b=4), (a=5, b=6)]) == 2
 
     # MatrixTable
-    @test nrow(Tables.table(ones(0, 0))) == 0
-    @test ncol(Tables.table(ones(0, 0))) == 0
-    @test nrow(Tables.table(ones(2, 3))) == 2
-    @test ncol(Tables.table(ones(2, 3))) == 3
-    @test nrow(Tables.table([])) == 0
-    @test ncol(Tables.table([])) == 1
-    @test nrow(Tables.table([1, 2])) == 2
-    @test ncol(Tables.table([1, 2])) == 1
+    @test DataAPI.nrow(Tables.table(ones(0, 0))) == 0
+    @test DataAPI.ncol(Tables.table(ones(0, 0))) == 0
+    @test DataAPI.nrow(Tables.table(ones(2, 3))) == 2
+    @test DataAPI.ncol(Tables.table(ones(2, 3))) == 3
+    @test DataAPI.nrow(Tables.table([])) == 0
+    @test DataAPI.ncol(Tables.table([])) == 1
+    @test DataAPI.nrow(Tables.table([1, 2])) == 2
+    @test DataAPI.ncol(Tables.table([1, 2])) == 1
 
     # MatrixRowTable
-    @test nrow(Tables.rows(Tables.table(ones(0, 0)))) == 0
-    @test ncol(Tables.rows(Tables.table(ones(0, 0)))) == 0
-    @test nrow(Tables.rows(Tables.table(ones(2, 3)))) == 2
-    @test ncol(Tables.rows(Tables.table(ones(2, 3)))) == 3
-    @test nrow(Tables.rows(Tables.table([]))) == 0
-    @test ncol(Tables.rows(Tables.table([]))) == 1
-    @test nrow(Tables.rows(Tables.table([1, 2]))) == 2
-    @test ncol(Tables.rows(Tables.table([1, 2]))) == 1
+    @test DataAPI.nrow(Tables.rows(Tables.table(ones(0, 0)))) == 0
+    @test DataAPI.ncol(Tables.rows(Tables.table(ones(0, 0)))) == 0
+    @test DataAPI.nrow(Tables.rows(Tables.table(ones(2, 3)))) == 2
+    @test DataAPI.ncol(Tables.rows(Tables.table(ones(2, 3)))) == 3
+    @test DataAPI.nrow(Tables.rows(Tables.table([]))) == 0
+    @test DataAPI.ncol(Tables.rows(Tables.table([]))) == 1
+    @test DataAPI.nrow(Tables.rows(Tables.table([1, 2]))) == 2
+    @test DataAPI.ncol(Tables.rows(Tables.table([1, 2]))) == 1
 
     # DictRowTable
-    @test nrow(Tables.dictrowtable(NamedTuple[])) == 0
-    @test ncol(Tables.dictrowtable(NamedTuple[])) == 0
-    @test nrow(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 3
-    @test ncol(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 2
+    @test DataAPI.nrow(Tables.dictrowtable(NamedTuple[])) == 0
+    @test DataAPI.ncol(Tables.dictrowtable(NamedTuple[])) == 0
+    @test DataAPI.nrow(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 3
+    @test DataAPI.ncol(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 2
 end
