@@ -190,3 +190,11 @@ function columntable(itr::T) where {T}
     return columntable(schema(cols), cols)
 end
 columntable(x::ColumnTable) = x
+
+# implement default nrow and ncol methods for DataAPI.jl
+
+DataAPI.nrow(table::ColumnTable) = isempty(table) ? 0 : length(first(table))
+DataAPI.ncol(table::ColumnTable) = length(table)
+
+DataAPI.nrow(table::RowTable) = length(table)
+DataAPI.ncol(table::RowTable) = isempty(table) ? 0 : length(first(table))

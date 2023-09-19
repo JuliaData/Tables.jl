@@ -282,17 +282,5 @@ end
 DataAPI.nrow(table::AbstractColumns) = rowcount(table)
 DataAPI.ncol(table::AbstractColumns) = length(columnnames(table))
 
-DataAPI.nrow(table::ColumnTable) = isempty(table) ? 0 : length(first(table))
-DataAPI.ncol(table::ColumnTable) = length(table)
-
 DataAPI.nrow(table::AbstractRowTable) = length(table)
 DataAPI.ncol(table::AbstractRowTable) = isempty(table) ? 0 : length(columnnames(first(table)))
-
-DataAPI.nrow(table::RowTable) = length(table)
-DataAPI.ncol(table::RowTable) = isempty(table) ? 0 : length(first(table))
-
-DataAPI.nrow(table::MatrixRowTable) = length(table)
-DataAPI.ncol(table::MatrixRowTable) = size(getfield(m, :matrix), 2) # this is correct even if m is a vector
-
-DataAPI.nrow(table::DictRowTable) = length(table)
-DataAPI.ncol(table::DictRowTable) = length(columnnames(table))

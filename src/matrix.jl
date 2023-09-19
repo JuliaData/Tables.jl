@@ -111,3 +111,8 @@ function matrix(table::MatrixTable; transpose::Bool=false)
         return matrix
     end
 end
+
+# implement default nrow and ncol methods for DataAPI.jl
+
+DataAPI.nrow(table::MatrixRowTable) = length(table)
+DataAPI.ncol(table::MatrixRowTable) = size(getfield(m, :matrix), 2) # this is correct even if m is a vector
