@@ -979,14 +979,14 @@ end
 
 @testset "test nrow and ncol" begin
     # AbstractColumns
-    @test DataAPI.nrow(Tables.CopiedColumns((;))) == 0
-    @test DataAPI.ncol(Tables.CopiedColumns((;))) == 0
+    @test DataAPI.nrow(Tables.CopiedColumns(NamedTuple())) == 0
+    @test DataAPI.ncol(Tables.CopiedColumns(NamedTuple())) == 0
     @test DataAPI.nrow(Tables.CopiedColumns((a=1:3, b=2:4))) == 3
     @test DataAPI.ncol(Tables.CopiedColumns((a=1:3, b=2:4))) == 2
 
     # ColumnTable
-    @test DataAPI.nrow((;)) == 0
-    @test DataAPI.ncol((;)) == 0
+    @test DataAPI.nrow(NamedTuple()) == 0
+    @test DataAPI.ncol(NamedTuple()) == 0
     @test DataAPI.nrow((a=1:3, b=2:4)) == 3
     @test DataAPI.ncol((a=1:3, b=2:4)) == 2
 
