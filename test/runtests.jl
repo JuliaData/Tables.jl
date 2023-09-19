@@ -1,4 +1,4 @@
-using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays
+using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, DataAPI
 
 @testset "utils.jl" begin
 
@@ -957,7 +957,7 @@ end
     @test Tables.istable(Vector{Dict{String}})
     @test Tables.istable(Vector{Dict{SubString}})
     @test Tables.istable(Vector{Dict{AbstractString}})
-                                                                                                                                                
+
     @test Set(Tables.columnnames(Dict(:a=>1, :b=>2))) == Set([:a, :b])
     @test Set(Tables.columnnames(Dict("a"=>1, "b"=>2))) == Set([:a, :b])
     @test Set(Tables.columnnames(Dict("a"=>1, SubString("b")=>2))) == Set([:a, :b])
@@ -976,4 +976,55 @@ end
     @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), Int, 1, :a) == 1
     @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), Int, 1, :a) == 1
 end
-                                                                                                                                               
+
+@testset "test nrow and ncol" begin
+    # AbstractColumns
+    @test DataAPI.nrow(Tables.CopiedColumns(NamedTuple())) == 0
+    @test DataAPI.ncol(Tables.CopiedColumns(NamedTuple())) == 0
+    @test DataAPI.nrow(Tables.CopiedColumns((a=1:3, b=2:4))) == 3
+    @test DataAPI.ncol(Tables.CopiedColumns((a=1:3, b=2:4))) == 2
+
+    # ColumnTable
+    @test DataAPI.nrow(NamedTuple()) == 0
+    @test DataAPI.ncol(NamedTuple()) == 0
+    @test DataAPI.nrow((a=1:3, b=2:4)) == 3
+    @test DataAPI.ncol((a=1:3, b=2:4)) == 2
+
+    # AbstractRowTable
+    @test DataAPI.nrow(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
+    @test DataAPI.ncol(collect(Tables.rows(Tables.table(ones(0, 0))))) == 0
+    @test DataAPI.nrow(collect(Tables.rows(Tables.table(ones(2, 3))))) == 2
+    @test DataAPI.ncol(collect(Tables.rows(Tables.table(ones(2, 3))))) == 3
+
+    # RowTable
+    @test DataAPI.nrow(NamedTuple[]) == 0
+    @test DataAPI.ncol(NamedTuple[]) == 0
+    @test DataAPI.nrow([(a=1,b=2), (a=3, b=4), (a=5, b=6)]) == 3
+    @test DataAPI.ncol([(a=1, b=2), (a=3, b=4), (a=5, b=6)]) == 2
+
+    # MatrixTable
+    @test DataAPI.nrow(Tables.table(ones(0, 0))) == 0
+    @test DataAPI.ncol(Tables.table(ones(0, 0))) == 0
+    @test DataAPI.nrow(Tables.table(ones(2, 3))) == 2
+    @test DataAPI.ncol(Tables.table(ones(2, 3))) == 3
+    @test DataAPI.nrow(Tables.table([])) == 0
+    @test DataAPI.ncol(Tables.table([])) == 1
+    @test DataAPI.nrow(Tables.table([1, 2])) == 2
+    @test DataAPI.ncol(Tables.table([1, 2])) == 1
+
+    # MatrixRowTable
+    @test DataAPI.nrow(Tables.rows(Tables.table(ones(0, 0)))) == 0
+    @test DataAPI.ncol(Tables.rows(Tables.table(ones(0, 0)))) == 0
+    @test DataAPI.nrow(Tables.rows(Tables.table(ones(2, 3)))) == 2
+    @test DataAPI.ncol(Tables.rows(Tables.table(ones(2, 3)))) == 3
+    @test DataAPI.nrow(Tables.rows(Tables.table([]))) == 0
+    @test DataAPI.ncol(Tables.rows(Tables.table([]))) == 1
+    @test DataAPI.nrow(Tables.rows(Tables.table([1, 2]))) == 2
+    @test DataAPI.ncol(Tables.rows(Tables.table([1, 2]))) == 1
+
+    # DictRowTable
+    @test DataAPI.nrow(Tables.dictrowtable(NamedTuple[])) == 0
+    @test DataAPI.ncol(Tables.dictrowtable(NamedTuple[])) == 0
+    @test DataAPI.nrow(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 3
+    @test DataAPI.ncol(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 2
+end

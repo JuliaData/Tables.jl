@@ -275,3 +275,12 @@ columnnames(x::CopiedColumns) = columnnames(source(x))
     end
     throw(ArgumentError("no default `Tables.columns` implementation for type: $T"))
 end
+
+# implement default nrow and ncol methods for DataAPI.jl
+
+# this covers also MatrixTable
+DataAPI.nrow(table::AbstractColumns) = rowcount(table)
+DataAPI.ncol(table::AbstractColumns) = length(columnnames(table))
+
+DataAPI.nrow(table::AbstractRowTable) = length(table)
+DataAPI.ncol(table::AbstractRowTable) = isempty(table) ? 0 : length(columnnames(first(table)))
