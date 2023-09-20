@@ -439,7 +439,7 @@ as well as provide a convenient "structural" type for code generation.
 
 To get a table's schema, one can call `Tables.schema` on the result of `Tables.rows` or `Tables.columns`,
 but also note that a table may return `nothing`, indicating that its column names and/or column element types
-are unknown (usually not inferrable). This is similar to the `Base.EltypeUnknown()` trait for iterators
+are unknown (usually not inferable). This is similar to the `Base.EltypeUnknown()` trait for iterators
 when `Base.IteratorEltype` is called. Users should account for the `Tables.schema(tbl) => nothing` case
 by using the properties of the results of `Tables.rows(x)` and `Tables.columns(x)` directly.
 
