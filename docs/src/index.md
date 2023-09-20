@@ -346,7 +346,7 @@ we say that a `MatrixTable` iterates our own custom row type, `MatrixRow`. `Matr
 `Tables.AbstractRow`, which provides interface implementations for several useful behaviors (indexing,
 iteration, property-access, etc.); essentially it makes our custom `MatrixRow` type more convenient to work with.
 
-Implementing the `Tables.AbstractRow` interface is straightfoward, and very similar to our implementation
+Implementing the `Tables.AbstractRow` interface is straightforward, and very similar to our implementation
 of `Tables.AbstractColumns` previously (i.e. the same methods for `getcolumn` and `columnnames`).
 
 And that's it. Our `MatrixTable` type is now a fully fledged, valid Tables.jl source and can be used throughout
