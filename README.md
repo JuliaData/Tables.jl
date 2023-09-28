@@ -6,7 +6,7 @@
 [![version](https://juliahub.com/docs/Tables/version.svg)](https://juliahub.com/ui/Packages/Tables/Z804B)
 [![pkgeval](https://juliahub.com/docs/Tables/pkgeval.svg)](https://juliahub.com/ui/Packages/Tables/Z804B)
 
-The Tables.jl package provides simple, yet powerful interface functions for working with all kinds tabular data.
+The Tables.jl package provides simple, yet powerful interface functions for working with all kinds of tabular data.
 
 **Installation**: at the Julia REPL, `import Pkg; Pkg.add("Tables")`
 
