@@ -1,7 +1,7 @@
 module Tables
 
 using LinearAlgebra, DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions, OrderedCollections
-
+import DataAPI: rownumber
 export rowtable, columntable
 
 if !hasmethod(getproperty, Tuple{Tuple, Int})
@@ -250,6 +250,7 @@ struct Row{T} <: AbstractRow
 end
 
 Row(x::Row) = x
+rownumber(x::Row) = rownumber(x.x)
 
 """
     Tables.Columns(tbl)

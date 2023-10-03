@@ -31,6 +31,8 @@ struct MatrixRow{T} <: AbstractRow
     source::MatrixRowTable{T}
 end
 
+rownumber(x::MatrixRow) = getfield(x, :row)
+
 getcolumn(m::MatrixRow, ::Type, col::Int, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), col]
 getcolumn(m::MatrixRow, i::Int) =

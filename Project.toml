@@ -12,7 +12,7 @@ OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 
 [compat]
-DataAPI = "1"
+DataAPI = "1.15"
 DataValueInterfaces = "1"
 IteratorInterfaceExtensions = "0.1.1, 1"
 OrderedCollections = "1"

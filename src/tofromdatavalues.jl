@@ -60,6 +60,7 @@ struct IteratorRow{T} <: AbstractRow
 end
 
 getrow(r::IteratorRow) = getfield(r, :row)
+rownumber(r::IteratorRow) = getrow(r)
 wrappedtype(::Type{I}) where {T, I<:IteratorRow{T}} = T
 wrappedtype(::Type{T}) where {T} = T
 
