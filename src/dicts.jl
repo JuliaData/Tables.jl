@@ -126,14 +126,14 @@ end
 
 function subset(x::DictRowTable, inds; viewhint::Union{Bool,Nothing}=nothing, view::Union{Bool,Nothing}=nothing)
     if view !== nothing
-        @warn "`view` keyword argument is deprecated for `Tables.subset`, use `viewhint` instead"
+        @warn "`view` keyword argument is deprecated for `Tables.subset`, use `viewhint` instead" maxlog=10
         viewhint = view
     end
     values = viewhint === true ? Base.view(getfield(x, :values), inds) : getfield(x, :values)[inds]
     if inds isa Integer
         return DictRow(getfield(x, :names), values)
     else
-        values isa AbstractVector || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `RowTable` output, got $(typeof(ret))"))
+        values isa AbstractVector || throw(ArgumentError("`Tables.subset`: invalid `inds` argument, expected `RowTable` output, got $(typeof(values))"))
         return DictRowTable(getfield(x, :names), getfield(x, :types), values)
     end
 end
