@@ -153,6 +153,7 @@ end
         @test Tables.subset(nt, 1:2, viewhint=false) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test Tables.subset(nt, 1:2, viewhint=nothing) == (a=[1,2], b=[4.0, 5.0], c=["7","8"])
         @test_throws ArgumentError Tables.subset(nt, [1:2 1:2])
+        @test_throws ArgumentError Tables.subset(Tables.dictrowtable(nt), [1:2 1:2])
 
         @test Tables.subset(nt, 1, viewhint=true) == (a=1, b=4.0, c="7")
         rs = Tables.subset(nt, 1:2, viewhint=true)
