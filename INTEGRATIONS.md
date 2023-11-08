@@ -96,6 +96,6 @@ Packages currently integrating with Tables.jl:
 * [Trajectories](https://github.com/mschauer/Trajectories.jl.git)
 * [Transducers](https://github.com/JuliaFolds/Transducers.jl.git)
 * [TypedTables](https://github.com/FugroRoames/TypedTables.jl.git)
-* [UpROOT](https://github.com/JuliaHEP/UpROOT.jl.git)
+* [UnROOT](https://github.com/JuliaHEP/UnROOT.jl)
 * [ValueShapes](https://github.com/oschulz/ValueShapes.jl.git)
 * [XLSX](https://github.com/felipenoris/XLSX.jl.git)
