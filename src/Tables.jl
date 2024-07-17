@@ -1,6 +1,6 @@
 module Tables
 
-using LinearAlgebra, DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions, OrderedCollections
+using DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions, OrderedCollections
 
 export rowtable, columntable
 
