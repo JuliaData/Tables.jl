@@ -120,6 +120,11 @@ using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators,
     sch = Tables.Schema((), ())
     @test sch.names == ()
     @test sch.types == ()
+
+    # Empty vector of Vector or their view
+    @test Tables.columntable(Vector{Any}[]) == NamedTuple()
+    T = typeof(view(Vector{Any}[], :))
+    @test Tables.columntable(T[]) == NamedTuple()
 end
 
 @testset "namedtuples.jl" begin
