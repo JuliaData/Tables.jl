@@ -163,7 +163,7 @@ fromcolumns(x::Tables.CopiedColumns, names; copycols::Bool=true) =
     DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm) for nm in names],
               Index(names),
               copycols=false)
-fromcolumns(x; copycols::Bool=true) =
+fromcolumns(x, names; copycols::Bool=true) =
     DataFrame(AbstractVector[getvector(Tables.getcolumn(x, nm) for nm in names],
               Index(names),
               copycols=copycols)
