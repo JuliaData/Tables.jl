@@ -168,13 +168,13 @@ _row_to_named_tuple(row) = NamedTuple(Row(row))
 
 `ByRow(f)` can be passed two types of arguments:
 - One or more 1-based `AbstractVector`s of equal length: In this case the returned value
-is a vector resulting from applying `f` to elements of passed vectors element-wise.
-Function `f` is called exactly once for each element of passed vectors (as opposed to `map`
-which assumes for some types of source vectors (e.g. `SparseVector`) that the
-wrapped function is pure, and may call the function `f` only once for multiple
-equal values.
+  is a vector resulting from applying `f` to elements of passed vectors element-wise.
+  Function `f` is called exactly once for each element of passed vectors (as opposed to `map`
+  which assumes for some types of source vectors (e.g. `SparseVector`) that the
+  wrapped function is pure, and may call the function `f` only once for multiple
+  equal values.
 - A `Tables.ColumnTable` holding 1-based columns of equal length: In this case the function
-`f` is passed a `NamedTuple` created for each row of passed table.
+  `f` is passed a `NamedTuple` created for each row of passed table.
 
 The return value of `ByRow(f)` is always a vector.
 
