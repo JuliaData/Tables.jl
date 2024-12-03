@@ -176,9 +176,14 @@ function columntable(sch::Schema{names, types}, cols) where {names, types}
     end
 end
 
-# extremely large tables
-columntable(sch::Schema{nothing, nothing}, cols) =
-    throw(ArgumentError("input table too wide ($(length(sch.names)) columns) to convert to `NamedTuple` of `AbstractVector`s"))
+# extremely large tables or schema explicitly stored
+function columntable(sch::Schema{nothing, nothing}, cols)
+    nms = sch.names
+    if nms !== nothing && length(nms) > SPECIALIZATION_THRESHOLD
+        throw(ArgumentError("input table too wide ($(length(nms)) columns) to convert to `NamedTuple` of `AbstractVector`s"))
+    end
+    return NamedTuple{Tuple(map(Symbol, nms))}(Tuple(getarray(getcolumn(cols, nms[i])) for i = 1:length(nms)))
+end
 
 # unknown schema case
 columntable(::Nothing, cols) =

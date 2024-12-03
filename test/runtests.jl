@@ -1040,3 +1040,14 @@ end
     @test DataAPI.nrow(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 3
     @test DataAPI.ncol(Tables.dictrowtable([(a=1, b=2), (a=3, b=4), (a=5, b=6)])) == 2
 end
+
+@testset "#357" begin
+    dct = Tables.dictcolumntable((a=1:3, b=4.0:6.0, c=["7", "8", "9"]))
+    sch = Tables.schema(dct)
+    sch = Tables.Schema(sch.names, sch.types, stored=true)
+    dct = Tables.DictColumnTable(sch, getfield(dct, :values))
+    nt = Tables.columntable(dct)
+    @test nt.a == [1, 2, 3]
+    @test nt.b == [4.0, 5.0, 6.0]
+    @test nt.c == ["7", "8", "9"]
+end
