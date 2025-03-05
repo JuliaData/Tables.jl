@@ -1065,13 +1065,16 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     tbl = [MockRow(1, 2, 3), MockRow(4, 5, 6)]
 
     expected = """
-        MockRow[MockRow:
+        MockRow[
+        MockRow:
          :a  1
          :b  2
-         :c  3, MockRow:
+         :c  3,
+        MockRow:
          :a  4
          :b  5
          :c  6]"""
+    expected = replace(expected, "," => ", ")  # Add trailing spaces
     @test sprint(show, tbl, context=:compact => false) == expected
 
     expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
