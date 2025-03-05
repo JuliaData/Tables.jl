@@ -202,7 +202,7 @@ end
 
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
-        print(io, "$T: ")
+        isnothing(get(io, :typeinfo, nothing)) && print(io, "$T: ")
         show(io, NamedTuple(x))
     else
         println(io, "$T:")
