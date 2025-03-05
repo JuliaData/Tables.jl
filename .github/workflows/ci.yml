@@ -12,8 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.0'
-          - '1' # automatically expands to the latest stable 1.x release of Julia
+          - 'min'  # Oldest supported version
+          - '1'    # Latest release
           - 'nightly'
         os:
           - ubuntu-latest
