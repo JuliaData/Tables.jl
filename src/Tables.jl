@@ -202,11 +202,11 @@ end
 
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
-        isnothing(get(io, :typeinfo, nothing)) && print(io, "$T: ")
+        get(io, :typeinfo, nothing) === nothing && print(io, "$T: ")
         show(io, NamedTuple(x))
     else
         # Assume typeinfo is set when printing from within a container's show ()
-        !isnothing(get(io, :typeinfo, nothing)) && println(io)
+        get(io, :typeinfo, nothing) !== nothing && println(io)
 
         println(io, "$T:")
         names = collect(columnnames(x))
