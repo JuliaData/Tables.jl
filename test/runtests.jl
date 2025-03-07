@@ -1051,3 +1051,32 @@ end
     @test nt.b == [4.0, 5.0, 6.0]
     @test nt.c == ["7", "8", "9"]
 end
+
+struct MockRow <: Tables.AbstractRow
+    a
+    b
+    c
+end
+
+Tables.getcolumn(row::MockRow, name::Symbol) = getfield(row, name)
+Tables.columnnames(::MockRow) = fieldnames(MockRow)
+
+@testset "Issue #361" begin
+    tbl = [MockRow(1, 2, 3), MockRow(4, 5, 6)]
+
+    expected = """
+        MockRow[
+        MockRow:
+         :a  1
+         :b  2
+         :c  3,
+        MockRow:
+         :a  4
+         :b  5
+         :c  6]"""
+    expected = replace(expected, "," => ", ")  # Add trailing spaces
+    @test sprint(show, tbl, context=:compact => false) == expected
+
+    expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
+    @test sprint(show, tbl, context=:compact => true) == expected_compact
+end
