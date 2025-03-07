@@ -205,7 +205,7 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
         get(io, :typeinfo, nothing) === nothing && print(io, "$T: ")
         show(io, NamedTuple(x))
     else
-        # Assume typeinfo is set when printing from within a container's show ()
+        # Assume we are called from within a container show method when typeinfo is set.
         get(io, :typeinfo, nothing) !== nothing && println(io)
 
         println(io, "$T:")
