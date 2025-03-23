@@ -5,6 +5,8 @@ makedocs(;
     format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",
+        "Using the Interface" => "using-the-interface.md",
+        "Implementing the Interface" => "implementing-the-interface.md",
     ],
     repo="https://github.com/JuliaData/Tables.jl/blob/{commit}{path}#L{line}",
     sitename="Tables.jl",
