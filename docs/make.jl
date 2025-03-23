@@ -11,7 +11,7 @@ makedocs(;
     repo="https://github.com/JuliaData/Tables.jl/blob/{commit}{path}#L{line}",
     sitename="Tables.jl",
     authors="Jacob Quinn",
-    assets=String[],
+    checkdocs=:none,
 )
 
 deploydocs(;
