@@ -16,4 +16,10 @@ Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperation
 
 ```@contents
 Depth = 3
+Pages = [
+    "index.md",
+    "using-the-interface.md",
+    "implementing-the-interface.md",
+    "api.md",
+]
 ```

@@ -28,13 +28,13 @@ As an additional source of documentation, see [this discourse post](https://disc
 
 ## `Tables.AbstractRow`
 
-```@docs
+```@docs; canonical = false
 Tables.AbstractRow
 ```
 
 ## `Tables.AbstractColumns`
 
-```@docs
+```@docs; canonical = false
 Tables.AbstractColumns
 ```
 
@@ -134,7 +134,7 @@ implementations tend to be fairly simple, given the other behaviors that are alr
 
 One option for certain table types is to define `Tables.isrowtable` to automatically satisfy the Tables.jl interface.
 This can be convenient for "natural" table types that already iterate rows.
-```@docs
+```@docs; canonical = false
 Tables.isrowtable
 ```
 
@@ -214,5 +214,3 @@ tbl2 = Tables.table(mat2) |> rowtable
 @test length(tbl2) == 3
 @test map(x->x.Column1, tbl2) == [1.0, 2.0, 3.0]
 ```
-
-

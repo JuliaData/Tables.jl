@@ -9,6 +9,7 @@ makedocs(;
         "Home" => "index.md",
         "Using the Interface" => "using-the-interface.md",
         "Implementing the Interface" => "implementing-the-interface.md",
+        "API Reference" => "api.md",
     ],
     repo=GitHub("JuliaData/Tables.jl"),
     sitename="Tables.jl",

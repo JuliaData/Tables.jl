@@ -31,7 +31,7 @@ end
 
 So we see two high-level functions here, [`Tables.rows`](@ref), and [`Tables.columns`](@ref).
 
-```@docs
+```@docs; canonical = false
 Tables.rows
 Tables.columns
 ```
@@ -178,7 +178,7 @@ the table-specific use-case, knowing that it will Just Work™️.
 Before moving on to _implementing_ the Tables.jl interfaces, we take a quick
 break to highlight some useful utility functions provided by Tables.jl:
 
-```@docs
+```@docs; canonical = false
 Tables.Schema
 Tables.schema
 Tables.subset
@@ -201,4 +201,3 @@ Tables.rowmerge
 Tables.Row
 Tables.Columns
 ```
-
