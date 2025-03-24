@@ -1,4 +1,6 @@
-using Documenter, Tables
+using Tables
+using Documenter
+using Documenter.Remotes: GitHub
 
 makedocs(;
     modules=[Tables],
@@ -8,7 +10,7 @@ makedocs(;
         "Using the Interface" => "using-the-interface.md",
         "Implementing the Interface" => "implementing-the-interface.md",
     ],
-    repo="https://github.com/JuliaData/Tables.jl/blob/{commit}{path}#L{line}",
+    repo=GitHub("JuliaData/Tables.jl"),
     sitename="Tables.jl",
     authors="Jacob Quinn",
     checkdocs=:none,
