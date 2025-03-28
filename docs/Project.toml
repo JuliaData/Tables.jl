@@ -1,5 +1,9 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [compat]
-Documenter = "~0.27"
+Documenter = "1"
+
+[sources.Tables]
+path = ".."
