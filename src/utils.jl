@@ -206,14 +206,13 @@ julia> Tables.ByRow(x -> x.a)((a=1:2, b=3:4))
  1
  2
 
- julia> Tables.ByRow(x -> (a=x.a*2, b=sin(x.b), c=x.c))((a=[1, 2, 3],
-                                                         b=[1.2, 3.4, 5.6],
-                                                         c=["a", "b", "c"]))
+julia> Tables.ByRow(x -> (a=x.a*2, b=sin(x.b), c=x.c))((a=[1, 2, 3],
+                                                        b=[1.2, 3.4, 5.6],
+                                                        c=["a", "b", "c"]))
 3-element Vector{NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}}:
  (a = 2, b = 0.9320390859672263, c = "a")
  (a = 4, b = -0.2555411020268312, c = "b")
  (a = 6, b = -0.6312666378723216, c = "c")
-
 ```
 """
 struct ByRow{T} <: Function
