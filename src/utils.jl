@@ -188,7 +188,7 @@ arguments to `ByRow` does not allow it to determine the number of rows of the
 source table).
 
 # Examples
-```
+```jldoctest
 julia> Tables.ByRow(x -> x^2)(1:3)
 3-element Vector{Int64}:
  1
