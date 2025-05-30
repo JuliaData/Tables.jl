@@ -20,10 +20,6 @@ Responsiveness to pull requests and issues can vary, depending on the availabili
 
 List of packages which support Tables.jl interface can be found in [INTEGRATIONS.md](INTEGRATIONS.md).
 
-### Additional Resources
-
-Please refer to [TableOperations.jl](https://github.com/JuliaData/TableOperations.jl) for common table operations (`select`, `filter`, `transform`, `map`, etc.)
-
 ### Zenodo Link
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4458977.svg)](https://doi.org/10.5281/zenodo.4458977)
