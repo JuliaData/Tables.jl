@@ -230,7 +230,7 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
             h = h - 1
             perblock = div(h, 2)
             front_inds = 1:perblock
-            back_inds = N:(-1):(N-perblock)
+            back_inds = (N-perblock):N
             _print_cols(io, front_inds, nms, max_width, w, h, x)
             println(io, lpad("⋮", max_width + 10, ' '))
             _print_cols(io, back_inds, nms, max_width, w, h, x)
