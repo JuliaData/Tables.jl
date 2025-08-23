@@ -200,15 +200,51 @@ function Base.NamedTuple(r::RorC)
     return NamedTuple{Tuple(map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
+function _print_cols(io, inds, nms, max_width, w, h, x)
+    max_ind = maximum(inds)
+    for i in inds
+        n = nms[i]
+        v = x[n]
+        s = string(v)
+        print(io, rpad(n, max_width + 10, ' '))
+        width_renaining = w - 10 - max_width
+        if length(s) >= width_renaining
+            s = s[1:(width_renaining)-1] * '⋯'
+        end
+        if i < max_ind
+            println(io, s)
+        else
+            print(io, s)
+        end
+
+    end
+end
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
-        get(io, :typeinfo, nothing) === nothing && print(io, "$T: ")
-        show(io, NamedTuple(x))
+        (h, w) = displaysize(io)
+        h = h - 5
+        get(io, :typeinfo, nothing) === nothing && print(io, "$(Base.nameof(T)): ")
+        nms = propertynames(x)
+        N = length(nms)
+        max_width = maximum(length ∘ string, nms)
+        print(io, "\n")
+        if N <= 20 || N < h
+            _print_cols(io, 1:N, nms, max_width, w, h, x)
+        else
+            h = h - 1
+            perblock = div(h, 2)
+            front_inds = 1:perblock
+            back_inds = (N-perblock):N
+            _print_cols(io, front_inds, nms, max_width, w, h, x)
+            println()
+            println(io, lpad("⋮", max_width + 10, ' '))
+            _print_cols(io, back_inds, nms, max_width, w, h, x)
+        end
     else
         # Assume we are called from within a container show method when typeinfo is set.
         get(io, :typeinfo, nothing) !== nothing && println(io)
 
-        println(io, "$T:")
+        println(io, "$(Base.nameof(T)):")
         names = collect(columnnames(x))
         values = [getcolumn(x, nm) for nm in names]
         Base.print_matrix(io, hcat(names, values))
