@@ -201,18 +201,22 @@ function Base.NamedTuple(r::RorC)
 end
 
 function _print_cols(io, inds, nms, max_width, w, h, x)
+    max_ind = maximum(inds)
     for i in inds
         n = nms[i]
         v = x[n]
         s = string(v)
         print(io, rpad(n, max_width + 10, ' '))
         width_renaining = w - 10 - max_width
-        if length(s) < width_renaining
+        if length(s) >= width_renaining
+            s = s[1:(width_renaining)-1] * '⋯'
+        end
+        if i < max_ind
             println(io, s)
         else
-            s_sub = s[1:(width_renaining)-1] * '⋯'
-            println(io, s)
+            print(io, s)
         end
+
     end
 end
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
@@ -232,6 +236,7 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
             front_inds = 1:perblock
             back_inds = (N-perblock):N
             _print_cols(io, front_inds, nms, max_width, w, h, x)
+            println()
             println(io, lpad("⋮", max_width + 10, ' '))
             _print_cols(io, back_inds, nms, max_width, w, h, x)
         end
