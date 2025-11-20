@@ -2,6 +2,8 @@ using Tables
 using Documenter
 using Documenter.Remotes: GitHub
 
+DocMeta.setdocmeta!(Tables, :DocTestSetup, :(using Tables); recursive=true)
+
 makedocs(;
     modules=[Tables],
     format=Documenter.HTML(),
