@@ -14,7 +14,7 @@ TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 DataAPI = "1"
 DataValueInterfaces = "1"
 IteratorInterfaceExtensions = "0.1.1, 1"
-OrderedCollections = "1"
+OrderedCollections = "1, 2"
 TableTraits = "0.4.1, 1"
 julia = "1"
 
