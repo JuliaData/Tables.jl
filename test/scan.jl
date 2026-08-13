@@ -69,6 +69,8 @@
         # validate=false silently drops unmatched, keeps the rest
         b = T.bind(T.Scan(select = (:nope, :a), validate = false), names)
         @test [c.index for c in b.columns] == [1]
+        b = T.bind(T.Scan(select = (9, :a), validate = false), names)
+        @test [c.index for c in b.columns] == [1]
         b = T.bind(T.Scan(select = T.Not((r"^nope", :b)), validate = false), names)
         @test [c.index for c in b.columns] == [1, 3, 4, 5]
         b = T.bind(T.Scan(filter = T.col(:nope) > 1, validate = false), names)
@@ -88,6 +90,16 @@
         @test out.b == ["x", "x", "w"]
         out = T.finish(nt, T.Scan(filter = startswith(T.col(:b), "z") | endswith(T.col(:b), "y")))
         @test out.b == ["yy", "zzz"]
+        missingvals = (a = Union{Int, Missing}[1, missing, 3],
+                       b = Union{String, Missing}["x", missing, "z"])
+        @test T.filtermask(T.in_(T.col(:a), (1, missing)), missingvals) ==
+              [true, false, false]
+        @test T.filtermask(T.in_(T.col(:a), (2, missing)), missingvals) ==
+              [false, false, false]
+        @test T.filtermask(startswith(T.col(:b), "x"), missingvals) ==
+              [true, false, false]
+        @test T.filtermask(!T.in_(T.col(:a), (1, missing)), missingvals) ==
+              [false, false, false]
         out = T.finish(nt, T.Scan(limit = 2, offset = 1))
         @test isequal(out.a, [2, 3])
         out = T.finish(nt, T.Scan(filter = T.col(:c) > 2.0, limit = 2))
@@ -102,6 +114,9 @@
         out = T.finish(nt, T.Scan(select = (:a => Float64,)))
         @test isequal(out.a, [1.0, 2.0, 3.0, 4.0, missing])
         @test eltype(out.a) == Union{Float64, Missing}
+        converted = Union{Float64, Missing}[1.0, missing]
+        @test T._converted(Float64, converted) === converted
+        @test_throws InexactError T.finish((a = [1.5],), T.Scan(select = (:a => Int,)))
         # empty residual = identity
         @test T.finish(nt, T.Scan()) === nt
     end
