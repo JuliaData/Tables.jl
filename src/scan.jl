@@ -30,8 +30,8 @@
     Tables.All()
 
 Selection item matching every column (in file order). Useful combined with
-renames: `select = (:id => :key, Tables.All())` is an error (duplicate `id`) —
-use `Tables.Not(:id)` alongside instead.
+renames. `select = (:id, Tables.All())` is an error because it produces the
+output name `id` twice; renaming the explicit selection avoids that conflict.
 """
 struct All end
 
@@ -288,7 +288,9 @@ _refstr(r) = r isa Regex ? "r$(repr(r.pattern))" : repr(r)
 
 function _expand!(out::Vector{BoundColumn}, names, it::SelectItem, validate::Bool)
     r = it.ref
-    if r isa Regex
+    if r isa All
+        append!(out, BoundColumn(i, nm, it.type) for (i, nm) in enumerate(names))
+    elseif r isa Regex
         found = false
         for (i, nm) in enumerate(names)
             if occursin(r, String(nm))
@@ -349,9 +351,15 @@ function bind(scan::Scan, names)
         excluded = Set{Int}()
         for it in scan.select, r in _notrefs((it.ref::Not).ref)
             if r isa Regex
+                found = false
                 for (i, nm) in enumerate(nms)
-                    occursin(r, String(nm)) && push!(excluded, i)
+                    if occursin(r, String(nm))
+                        push!(excluded, i)
+                        found = true
+                    end
                 end
+                scan.validate && !found &&
+                    throw(ArgumentError("Not pattern $(_refstr(r)) matches no column"))
             else
                 i = _findcol(nms, r)
                 i === nothing && scan.validate &&

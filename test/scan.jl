@@ -50,6 +50,10 @@
         @test [c.index for c in b.columns] == 1:5
         b = T.bind(T.Scan(select = (r"^x_", :a => :first)), names)
         @test [(c.index, c.name) for c in b.columns] == [(4, :x_one), (5, :x_two), (1, :first)]
+        b = T.bind(T.Scan(select = (:a => :first, T.All())), names)
+        @test [(c.index, c.name) for c in b.columns] ==
+              [(1, :first), (1, :a), (2, :b), (3, :c), (4, :x_one), (5, :x_two)]
+        @test_throws ArgumentError T.bind(T.Scan(select = (:a, T.All())), names)
         b = T.bind(T.Scan(select = T.Not((r"^x_", :b))), names)
         @test [c.index for c in b.columns] == [1, 3]
         b = T.bind(T.Scan(filter = (T.col(:a) > 1) & T.isnull(T.col(:c))), names)
@@ -57,6 +61,7 @@
         @test_throws ArgumentError T.bind(T.Scan(select = :nope), names)
         @test_throws ArgumentError T.bind(T.Scan(select = 6), names)
         @test_throws ArgumentError T.bind(T.Scan(select = r"^nope"), names)
+        @test_throws ArgumentError T.bind(T.Scan(select = T.Not(r"^nope")), names)
         @test_throws ArgumentError T.bind(T.Scan(select = (:a, :b => :a)), names)   # dup output
         @test_throws ArgumentError T.bind(T.Scan(select = r"^x_" => :same), names)  # multi rename
         @test_throws ArgumentError T.bind(T.Scan(filter = T.col(:nope) > 1), names)
@@ -64,6 +69,8 @@
         # validate=false silently drops unmatched, keeps the rest
         b = T.bind(T.Scan(select = (:nope, :a), validate = false), names)
         @test [c.index for c in b.columns] == [1]
+        b = T.bind(T.Scan(select = T.Not((r"^nope", :b)), validate = false), names)
+        @test [c.index for c in b.columns] == [1, 3, 4, 5]
         b = T.bind(T.Scan(filter = T.col(:nope) > 1, validate = false), names)
         @test isempty(b.filtercols)
     end
