@@ -1080,3 +1080,4 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
     @test sprint(show, tbl, context=:compact => true) == expected_compact
 end
+include("scan.jl")
