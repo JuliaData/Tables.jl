@@ -121,6 +121,61 @@
         @test T.finish(nt, T.Scan()) === nt
     end
 
+    @testset "finish: validate=false filters treat unmatched refs as all-missing" begin
+        nt2 = (a = [1, 2, 3], b = ["x", "y", "z"])
+        # strict (default): unknown filter refs error, matching bind
+        @test_throws ArgumentError T.finish(nt2, T.Scan(filter = T.col(:gone) > 1))
+        @test_throws ArgumentError T.filtermask(T.col(:gone) > 1, nt2)
+        # lenient: comparisons/membership/strings against the absent column
+        # evaluate to missing → rows excluded, SQL-style
+        for f in (T.col(:gone) > 1, T.in_(T.col(:gone), (1, 2)),
+                  startswith(T.col(:gone), "x"))
+            out = T.finish(nt2, T.Scan(filter = f, validate = false))
+            @test isempty(out.a)
+        end
+        # the absent column reads as null: isnull keeps all, !isnull keeps none
+        out = T.finish(nt2, T.Scan(filter = T.isnull(T.col(:gone)), validate = false))
+        @test out.a == [1, 2, 3]
+        out = T.finish(nt2, T.Scan(filter = !T.isnull(T.col(:gone)), validate = false))
+        @test isempty(out.a)
+        # three-valued composition with a matched predicate
+        out = T.finish(nt2, T.Scan(filter = (T.col(:gone) > 1) | (T.col(:a) >= 3),
+                                   validate = false))
+        @test out.a == [3]
+        out = T.finish(nt2, T.Scan(filter = (T.col(:gone) > 1) & (T.col(:a) >= 1),
+                                   validate = false))
+        @test isempty(out.a)
+        # the Scan form of filtermask follows validate; bind still omits the
+        # unmatched ref from filtercols
+        @test T.filtermask(T.Scan(filter = T.isnull(T.col(:gone)), validate = false),
+                           nt2) == [true, true, true]
+        b = T.bind(T.Scan(filter = (T.col(:gone) > 1) & (T.col(:a) > 1),
+                          validate = false), (:a, :b))
+        @test b.filtercols == [1]
+    end
+
+    @testset "finish: collection-valued rows compare whole-value per row" begin
+        lists = (l = [[1, 2], [3], [1, 2]], n = [10, 20, 30])
+        # equality against a vector literal is per-row whole-value equality —
+        # never an elementwise broadcast into the rows (which zips silently
+        # when lengths happen to match and throws DimensionMismatch when not)
+        out = T.finish(lists, T.Scan(filter = T.col(:l) == [1, 2]))
+        @test out.n == [10, 30]
+        out = T.finish(lists, T.Scan(filter = T.col(:l) != [1, 2]))
+        @test out.n == [20]
+        @test T.filtermask(T.in_(T.col(:l), ([[3]], [[1, 2]])), lists) ==
+              [false, false, false]
+        @test T.filtermask(T.in_(T.col(:l), ([3],)), lists) == [false, true, false]
+        # a 2-row column against a 2-element literal must still be whole-value
+        two = (l = [[1, 2], [5, 6]], n = [1, 2])
+        out = T.finish(two, T.Scan(filter = T.col(:l) == [5, 6]))
+        @test out.n == [2]
+        # missing rows keep SQL semantics through the Ref-wrapped comparison
+        lm = (l = Union{Missing, Vector{Int}}[[1], missing, [2]], n = [1, 2, 3])
+        out = T.finish(lm, T.Scan(filter = T.col(:l) == [2]))
+        @test out.n == [3]
+    end
+
     @testset "apply/read protocol" begin
         t, residual = T.apply(nt, T.Scan(limit = 2))
         @test t === nt && residual.limit == 2                          # fallback pushes nothing

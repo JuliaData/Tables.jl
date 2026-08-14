@@ -213,8 +213,11 @@ qualify, and how many. Plain data all the way down — see `Tables.apply`,
     predicate evaluates to exactly `true` (`missing` excludes, SQL-style).
     Filters see source column names, before renames.
   * `limit`/`offset`: applied to qualifying rows, after the filter.
-  * `validate`: error on select/filter references that match no column
-    (`false` silently drops unmatched names — the schema-evolution knob).
+  * `validate`: error on select/filter references that match no column.
+    `false` is the schema-evolution knob: unmatched SELECT references are
+    silently dropped, and an unmatched FILTER reference evaluates as an
+    all-missing column (`isnull(col(:gone))` keeps every row; comparisons
+    against it exclude, SQL-style).
 """
 struct Scan
     select::Union{Nothing, Vector{SelectItem}}
@@ -388,33 +391,54 @@ _getcol(cols, ref::Symbol) = getcolumn(cols, ref)
 _getcol(cols, ref::String) = getcolumn(cols, Symbol(ref))
 _getcol(cols, ref::Int) = getcolumn(cols, ref)
 
+# Resolve a filter leaf's column. Under `strict` an unknown reference is an
+# error; otherwise it resolves to `nothing` and the leaf evaluates as an
+# ALL-MISSING column — the schema-evolution semantics: a column this table
+# does not have reads as null everywhere (`isnull` keeps every row, every
+# comparison excludes, and three-valued `&`/`|` compose from there).
+function _resolvecol(cols, ref, strict::Bool)
+    i = _findcol(columnnames(cols), ref)
+    i === nothing || return getcolumn(cols, i)
+    strict && throw(ArgumentError("filter references unknown column $(_refstr(ref))"))
+    return nothing
+end
+
 # three-valued vectorized evaluation; the top level keeps rows where the
-# result is exactly `true` (SQL WHERE)
-function _evalexpr(e::ScanExpr, cols)
+# result is exactly `true` (SQL WHERE). Comparison literals are `Ref`-wrapped
+# so collection-valued rows compare WHOLE-VALUE per row — a bare vector
+# literal must never broadcast elementwise against the column (silent
+# row-zipping when the lengths happen to match, `DimensionMismatch` when
+# they don't).
+function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
     if e isa Cmp
-        a = _getcol(cols, e.lhs.ref)
-        v = e.rhs
+        a = _resolvecol(cols, e.lhs.ref, strict)
+        a === nothing && return fill(missing, rowcount(cols))
+        v = Ref(e.rhs)
         return e.op == OP_EQ ? (a .== v) :
                e.op == OP_LT ? (a .< v) :
                e.op == OP_LE ? (a .<= v) :
                e.op == OP_GT ? (a .> v) : (a .>= v)
     elseif e isa In
-        a = _getcol(cols, e.lhs.ref)
+        a = _resolvecol(cols, e.lhs.ref, strict)
+        a === nothing && return fill(missing, rowcount(cols))
         return in.(a, Ref(e.values))
     elseif e isa IsNull
-        a = _getcol(cols, e.lhs.ref)
+        a = _resolvecol(cols, e.lhs.ref, strict)
+        a === nothing &&
+            return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
         return e.negated ? .!ismissing.(a) : ismissing.(a)
     elseif e isa StrPred
-        a = _getcol(cols, e.lhs.ref)
+        a = _resolvecol(cols, e.lhs.ref, strict)
+        a === nothing && return fill(missing, rowcount(cols))
         f = e.kind == STR_STARTSWITH ? startswith :
             e.kind == STR_ENDSWITH ? endswith : contains
         return map(x -> ismissing(x) ? missing : f(x, e.s), a)
     elseif e isa AndExpr
-        return mapreduce(a -> _evalexpr(a, cols), (x, y) -> x .& y, e.args)
+        return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .& y, e.args)
     elseif e isa OrExpr
-        return mapreduce(a -> _evalexpr(a, cols), (x, y) -> x .| y, e.args)
+        return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .| y, e.args)
     elseif e isa NotExpr
-        return .!_evalexpr(e.arg, cols)
+        return .!_evalexpr(e.arg, cols, strict)
     elseif e isa AlwaysTrue
         return trues(rowcount(cols))
     elseif e isa AlwaysFalse
@@ -428,11 +452,15 @@ end
 
 Evaluate a scan's filter over a table's columns: `mask[i]` is `true` iff row
 `i` qualifies (a `missing` predicate result excludes the row). Sources use
-this for their own pushdown implementations.
+this for their own pushdown implementations. The bare-expression form is
+strict about unknown column references; the `Scan` form follows the scan's
+`validate` — under `validate=false` an unmatched reference evaluates as an
+all-missing column.
 """
 filtermask(e::ScanExpr, table) = Bool[x === true for x in _evalexpr(e, columns(table))]
 filtermask(s::Scan, table) = s.filter === nothing ?
-    trues(rowcount(columns(table))) : filtermask(s.filter, table)
+    trues(rowcount(columns(table))) :
+    Bool[x === true for x in _evalexpr(s.filter, columns(table), s.validate)]
 
 _converted(::Nothing, c::AbstractVector) = c
 function _converted(::Type{T}, c::AbstractVector) where {T}
@@ -456,7 +484,7 @@ function finish(table, scan::Scan)
     cols = columns(table)
     b = bind(scan, columnnames(cols))
     if scan.filter !== nothing
-        keep = Bool[x === true for x in _evalexpr(scan.filter, cols)]
+        keep = Bool[x === true for x in _evalexpr(scan.filter, cols, scan.validate)]
         idx = findall(keep)
     else
         idx = collect(1:rowcount(cols))
