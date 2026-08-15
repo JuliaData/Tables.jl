@@ -18,8 +18,8 @@
 #     prunes by a predicate but cannot guarantee exactness keeps the filter in
 #     the residual).
 #   * Missing follows SQL WHERE: a predicate evaluating to `missing` excludes
-#     the row. `isnull`/`!isnull` are first-class nodes; `==` never matches
-#     missing.
+#     the row. `ismissing`/`!ismissing` are first-class nodes; `coleq` never
+#     matches missing.
 #   * Filters reference SOURCE column names (pre-rename); the pipeline order
 #     is fixed: bind → filter → offset/limit → project/rename/type.
 #   * Selection order defines output order.
@@ -62,6 +62,12 @@ struct SelectItem
     rename::Union{Nothing, Symbol}
 end
 
+function _selectitem(x::Not)
+    refs = x.ref isa Union{Tuple, AbstractVector} ? x.ref : (x.ref,)
+    all(r -> r isa ColRef, refs) ||
+        throw(ArgumentError("Not references must be Symbol/String/Int/Regex values"))
+    return SelectItem(x, nothing, nothing)
+end
 _selectitem(x::Union{Symbol, String, Int, Regex, Not, All}) = SelectItem(x, nothing, nothing)
 _selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, Symbol}) = SelectItem(p.first, nothing, p.second)
 _selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, String}) = SelectItem(p.first, nothing, Symbol(p.second))
@@ -83,7 +89,7 @@ abstract type ScanExpr end
     Tables.col(ref)
 
 A column reference inside a `Scan` filter: `col(:price) > 100`. Comparisons
-against literals, `in_`, `isnull`, `startswith`/`endswith`/`contains`, and
+against literals, `in_`, `ismissing`, `startswith`/`endswith`/`contains`, and
 `&`/`|`/`!` build plain expression values.
 """
 struct Col <: ScanExpr
@@ -98,7 +104,32 @@ struct Cmp{T} <: ScanExpr
     op::UInt8
     lhs::Col
     rhs::T
+    function Cmp(op::Integer, lhs::Col, rhs::T) where {T}
+        OP_EQ <= op <= OP_GE ||
+            throw(ArgumentError("unknown comparison operator code $op"))
+        return new{T}(UInt8(op), lhs, rhs)
+    end
 end
+
+"""
+    Tables.coleq(col, value)
+    Tables.colne(col, value)
+    Tables.collt(col, value)
+    Tables.colle(col, value)
+    Tables.colgt(col, value)
+    Tables.colge(col, value)
+
+Build a comparison predicate for a column and a literal value. These named
+constructors accept any literal type. `<`, `<=`, `>`, and `>=` provide shorthand
+for numeric, string, and character values. Equality uses `coleq` and `colne` so
+`Base.isequal` keeps its Boolean contract.
+"""
+coleq(c::Col, value) = Cmp(OP_EQ, c, value)
+colne(c::Col, value) = Cmp(OP_NE, c, value)
+collt(c::Col, value) = Cmp(OP_LT, c, value)
+colle(c::Col, value) = Cmp(OP_LE, c, value)
+colgt(c::Col, value) = Cmp(OP_GT, c, value)
+colge(c::Col, value) = Cmp(OP_GE, c, value)
 
 struct In{T} <: ScanExpr
     lhs::Col
@@ -112,18 +143,21 @@ Membership predicate: `in_(col(:status), ("active", "trial"))`.
 """
 in_(c::Col, values) = In(c, values)
 
-struct IsNull <: ScanExpr
+struct IsMissing <: ScanExpr
     lhs::Col
     negated::Bool
 end
 
 """
-    Tables.isnull(col)
+    Tables.ismissing(col)
 
-Missing-ness predicate. Use this — never `col(:x) == missing`, which follows
-SQL semantics and matches no row.
+Missing-ness predicate. Use this rather than `coleq(col(:x), missing)`, which
+follows SQL semantics and matches no row.
 """
-isnull(c::Col) = IsNull(c, false)
+# Keep this function Tables-local. Base.ismissing has an Any fallback, so a Col
+# method there invalidates unrelated precompiled code.
+function ismissing end
+ismissing(c::Col) = IsMissing(c, false)
 
 const STR_STARTSWITH, STR_ENDSWITH, STR_CONTAINS = 0x01, 0x02, 0x03
 
@@ -131,6 +165,11 @@ struct StrPred <: ScanExpr
     kind::UInt8
     lhs::Col
     s::String
+    function StrPred(kind::Integer, lhs::Col, s::AbstractString)
+        STR_STARTSWITH <= kind <= STR_CONTAINS ||
+            throw(ArgumentError("unknown string predicate code $kind"))
+        return new(UInt8(kind), lhs, String(s))
+    end
 end
 
 struct AndExpr <: ScanExpr
@@ -159,24 +198,26 @@ end
 
 _colcolerr() = throw(ArgumentError("column-to-column comparisons are not supported; " *
                                    "compare a column against a literal value"))
-for (f, op) in ((:(==), :OP_EQ), (:<, :OP_LT), (:<=, :OP_LE), (:>, :OP_GT), (:>=, :OP_GE))
-    revop = f === :(==) ? :OP_EQ : f === :< ? :OP_GT : f === :<= ? :OP_GE :
-            f === :> ? :OP_LT : :OP_LE
+for f in (:coleq, :colne, :collt, :colle, :colgt, :colge)
+    @eval $f(::Col, ::Col) = _colcolerr()
+end
+for T in (Number, AbstractString, AbstractChar)
     @eval begin
-        Base.$f(c::Col, v) = Cmp($op, c, v)
-        Base.$f(v, c::Col) = Cmp($revop, c, v)
-        Base.$f(::Col, ::Col) = _colcolerr()
+        Base.:<(c::Col, v::$T) = collt(c, v)
+        Base.:<(v::$T, c::Col) = colgt(c, v)
+        Base.:<=(c::Col, v::$T) = colle(c, v)
+        Base.:<=(v::$T, c::Col) = colge(c, v)
     end
 end
-Base.:(!=)(c::Col, v) = NotExpr(Cmp(OP_EQ, c, v))
-Base.:(!=)(v, c::Col) = NotExpr(Cmp(OP_EQ, c, v))
-Base.:(!=)(::Col, ::Col) = _colcolerr()
-Base.isequal(c::Col, v) = Cmp(OP_EQ, c, v)   # convenience alias; == semantics
+Base.:(==)(a::Col, b::Col) = a.ref == b.ref
+Base.isequal(a::Col, b::Col) = isequal(a.ref, b.ref)
+Base.hash(c::Col, h::UInt) = hash(c.ref, hash(:TablesCol, h))
+Base.:<(::Col, ::Col) = _colcolerr()
+Base.:<=(::Col, ::Col) = _colcolerr()
 
 Base.startswith(c::Col, s::AbstractString) = StrPred(STR_STARTSWITH, c, String(s))
 Base.endswith(c::Col, s::AbstractString) = StrPred(STR_ENDSWITH, c, String(s))
 Base.contains(c::Col, s::AbstractString) = StrPred(STR_CONTAINS, c, String(s))
-Base.in(c::Col, values) = In(c, values)
 
 _ands(e::AndExpr) = e.args
 _ands(e::ScanExpr) = ScanExpr[e]
@@ -186,7 +227,7 @@ Base.:&(a::ScanExpr, b::ScanExpr) = AndExpr(vcat(_ands(a), _ands(b)))
 Base.:|(a::ScanExpr, b::ScanExpr) = OrExpr(vcat(_ors(a), _ors(b)))
 Base.:!(e::ScanExpr) = NotExpr(e)
 Base.:!(e::NotExpr) = e.arg
-Base.:!(e::IsNull) = IsNull(e.lhs, !e.negated)
+Base.:!(e::IsMissing) = IsMissing(e.lhs, !e.negated)
 
 # a bare Col is not a predicate; catch the likely mistake early
 _checkpredicate(::Nothing) = nothing
@@ -216,7 +257,7 @@ qualify, and how many. Plain data all the way down — see `Tables.apply`,
   * `validate`: error on select/filter references that match no column.
     `false` is the schema-evolution knob: unmatched SELECT references are
     silently dropped, and an unmatched FILTER reference evaluates as an
-    all-missing column (`isnull(col(:gone))` keeps every row; comparisons
+    all-missing column (`ismissing(col(:gone))` keeps every row; comparisons
     against it exclude, SQL-style).
 """
 struct Scan
@@ -274,7 +315,7 @@ end
 
 A `Scan` resolved against a concrete schema: output columns in order, the
 (validated) filter with the source column indices it references, and the
-row bounds. Sources consume this, not the raw `Scan`.
+row bounds. Sources can use this after binding a raw `Scan`.
 """
 struct BoundScan
     columns::Vector{BoundColumn}
@@ -321,7 +362,7 @@ _notrefs(x::Union{Tuple, AbstractVector}) = collect(Any, x)
 _notrefs(x) = Any[x]
 
 function _filterrefs!(refs::Vector{Int}, e::ScanExpr, names, validate::Bool)
-    if e isa Union{Cmp, In, IsNull, StrPred}
+    if e isa Union{Cmp, In, IsMissing, StrPred}
         i = _findcol(names, e.lhs.ref)
         i === nothing && validate &&
             throw(ArgumentError("filter references unknown column $(_refstr(e.lhs.ref))"))
@@ -394,7 +435,7 @@ _getcol(cols, ref::Int) = getcolumn(cols, ref)
 # Resolve a filter leaf's column. Under `strict` an unknown reference is an
 # error; otherwise it resolves to `nothing` and the leaf evaluates as an
 # ALL-MISSING column — the schema-evolution semantics: a column this table
-# does not have reads as null everywhere (`isnull` keeps every row, every
+# does not have reads as missing everywhere (`ismissing` keeps every row, every
 # comparison excludes, and three-valued `&`/`|` compose from there).
 function _resolvecol(cols, ref, strict::Bool)
     i = _findcol(columnnames(cols), ref)
@@ -415,27 +456,34 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
         a === nothing && return fill(missing, rowcount(cols))
         v = Ref(e.rhs)
         return e.op == OP_EQ ? (a .== v) :
+               e.op == OP_NE ? (a .!= v) :
                e.op == OP_LT ? (a .< v) :
                e.op == OP_LE ? (a .<= v) :
-               e.op == OP_GT ? (a .> v) : (a .>= v)
+               e.op == OP_GT ? (a .> v) :
+               e.op == OP_GE ? (a .>= v) :
+               throw(ArgumentError("unknown comparison operator code $(e.op)"))
     elseif e isa In
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
         return in.(a, Ref(e.values))
-    elseif e isa IsNull
+    elseif e isa IsMissing
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing &&
             return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
-        return e.negated ? .!ismissing.(a) : ismissing.(a)
+        return e.negated ? .!Base.ismissing.(a) : Base.ismissing.(a)
     elseif e isa StrPred
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
         f = e.kind == STR_STARTSWITH ? startswith :
-            e.kind == STR_ENDSWITH ? endswith : contains
-        return map(x -> ismissing(x) ? missing : f(x, e.s), a)
+            e.kind == STR_ENDSWITH ? endswith :
+            e.kind == STR_CONTAINS ? contains :
+            throw(ArgumentError("unknown string predicate code $(e.kind)"))
+        return map(x -> Base.ismissing(x) ? missing : f(x, e.s), a)
     elseif e isa AndExpr
+        isempty(e.args) && return trues(rowcount(cols))
         return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .& y, e.args)
     elseif e isa OrExpr
+        isempty(e.args) && return falses(rowcount(cols))
         return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .| y, e.args)
     elseif e isa NotExpr
         return .!_evalexpr(e.arg, cols, strict)
@@ -448,7 +496,7 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
 end
 
 """
-    Tables.filtermask(scan_or_expr, table) -> Vector{Bool}
+    Tables.filtermask(scan_or_expr, table) -> AbstractVector{Bool}
 
 Evaluate a scan's filter over a table's columns: `mask[i]` is `true` iff row
 `i` qualifies (a `missing` predicate result excludes the row). Sources use
@@ -465,10 +513,13 @@ filtermask(s::Scan, table) = s.filter === nothing ?
 _converted(::Nothing, c::AbstractVector) = c
 function _converted(::Type{T}, c::AbstractVector) where {T}
     eltype(c) <: Union{T, Missing} && return c
-    anymissing = any(ismissing, c)
+    anymissing = any(Base.ismissing, c)
     E = anymissing ? Union{T, Missing} : T
-    return E[ismissing(x) ? missing : convert(T, x) for x in c]
+    return E[Base.ismissing(x) ? missing : convert(T, x) for x in c]
 end
+
+_takecolumn(c::AbstractVector, idx) = c[idx]
+_takecolumn(c, idx) = [c[i] for i in idx]
 
 """
     Tables.finish(table, residual::Scan) -> table′
@@ -489,11 +540,12 @@ function finish(table, scan::Scan)
     else
         idx = collect(1:rowcount(cols))
     end
-    lo = scan.offset + 1
-    hi = scan.limit === nothing ? length(idx) : min(length(idx), scan.offset + scan.limit)
-    idx = idx[lo:max(hi, lo - 1)]
+    skipped = min(scan.offset, length(idx))
+    available = length(idx) - skipped
+    taken = scan.limit === nothing ? available : min(scan.limit, available)
+    idx = idx[(skipped + 1):(skipped + taken)]
     outnames = Tuple(c.name for c in b.columns)
-    outcols = Tuple(_converted(c.type, getcolumn(cols, c.index)[idx]) for c in b.columns)
+    outcols = Tuple(_converted(c.type, _takecolumn(getcolumn(cols, c.index), idx)) for c in b.columns)
     return NamedTuple{outnames}(outcols)
 end
 
@@ -536,12 +588,14 @@ end
 function _exprstr(e::ScanExpr)
     e isa Cmp && return "col($(repr(e.lhs.ref))) $(_OPNAMES[e.op]) $(repr(e.rhs))"
     e isa In && return "in_(col($(repr(e.lhs.ref))), $(repr(e.values)))"
-    e isa IsNull && return (e.negated ? "!isnull(" : "isnull(") * "col($(repr(e.lhs.ref))))"
+    e isa IsMissing && return (e.negated ? "!ismissing(" : "ismissing(") * "col($(repr(e.lhs.ref))))"
     e isa StrPred && return (e.kind == STR_STARTSWITH ? "startswith" :
                              e.kind == STR_ENDSWITH ? "endswith" : "contains") *
                             "(col($(repr(e.lhs.ref))), $(repr(e.s)))"
-    e isa AndExpr && return join(("(" * _exprstr(a) * ")" for a in e.args), " & ")
-    e isa OrExpr && return join(("(" * _exprstr(a) * ")" for a in e.args), " | ")
+    e isa AndExpr && return isempty(e.args) ? "true" :
+        join(("(" * _exprstr(a) * ")" for a in e.args), " & ")
+    e isa OrExpr && return isempty(e.args) ? "false" :
+        join(("(" * _exprstr(a) * ")" for a in e.args), " | ")
     e isa NotExpr && return "!(" * _exprstr(e.arg) * ")"
     e isa AlwaysTrue && return "true"
     e isa AlwaysFalse && return "false"

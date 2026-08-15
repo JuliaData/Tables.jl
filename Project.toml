@@ -16,7 +16,7 @@ DataValueInterfaces = "1"
 IteratorInterfaceExtensions = "0.1.1, 1"
 OrderedCollections = "1"
 TableTraits = "0.4.1, 1"
-julia = "1"
+julia = "1.9"
 
 [extras]
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
