@@ -180,10 +180,10 @@
         t, residual = T.apply(nt, T.Scan(limit = 2))
         @test t === nt && residual.limit == 2                          # fallback pushes nothing
         s = T.Scan(select = (:b, :a), filter = T.col(:a) >= 2, limit = 1)
-        @test isequal(T.read(nt, s), T.finish(nt, s))                  # protocol equivalence
+        @test isequal(T.scan(nt, s), T.finish(nt, s))                  # protocol equivalence
         # works through any Tables.jl source, e.g. a row iterator
         rows = Tables.rowtable(nt)
-        out = T.read(rows, s)
+        out = T.scan(rows, s)
         @test out.b == ["yy"] && out.a == [2]
         @test T.filtermask(s, nt) == [false, true, true, true, false]
     end

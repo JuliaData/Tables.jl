@@ -5,7 +5,7 @@
 #     table, residual = Tables.apply(source, scan)   # source consumes what it can
 #     table′          = Tables.finish(table, residual)  # generic layer does the rest
 #
-# with `Tables.read(source, scan)` composing the two. The default `apply`
+# with `Tables.scan(source, scan)` composing the two. The default `apply`
 # pushes nothing (everything lands in the residual), so every existing
 # Tables.jl source already works — sources override `apply` to earn
 # performance, never correctness.
@@ -203,7 +203,7 @@ _checkpredicate(x) =
 
 A scan request: what to keep, what to call it, how to type it, which rows
 qualify, and how many. Plain data all the way down — see `Tables.apply`,
-`Tables.finish`, and `Tables.read` for the protocol.
+`Tables.finish`, and `Tables.scan` for the protocol.
 
   * `select`: a column reference or tuple/vector of select items
     (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`;
@@ -519,12 +519,15 @@ nothing, so every Tables.jl source works unmodified. Contract:
 apply(source, scan::Scan) = (source, scan)
 
 """
-    Tables.read(source, scan::Scan)
+    Tables.scan(source, scan::Scan)
 
 `Tables.finish(Tables.apply(source, scan)...)` — the one-call entry point.
+Sources that push scans down (a CSV reader, a database) implement
+`Tables.apply`; `Tables.scan` composes it with the generic `finish` so
+callers never see the residual.
 """
-function read(source, scan::Scan)
-    t, residual = apply(source, scan)
+function scan(source, s::Scan)
+    t, residual = apply(source, s)
     return finish(t, residual)
 end
 
