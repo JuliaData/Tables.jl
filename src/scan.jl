@@ -18,7 +18,7 @@
 #     prunes by a predicate but cannot guarantee exactness keeps the filter in
 #     the residual).
 #   * Missing follows SQL WHERE: a predicate evaluating to `missing` excludes
-#     the row. `ismissing`/`!ismissing` are first-class nodes; `coleq` never
+#     the row. `isnull`/`!isnull` are first-class nodes; `coleq` never
 #     matches missing.
 #   * Filters reference SOURCE column names (pre-rename); the pipeline order
 #     is fixed: bind → filter → offset/limit → project/rename/type.
@@ -89,7 +89,7 @@ abstract type ScanExpr end
     Tables.col(ref)
 
 A column reference inside a `Scan` filter: `col(:price) > 100`. Comparisons
-against literals, `in_`, `ismissing`, `startswith`/`endswith`/`contains`, and
+against literals, `in_`, `isnull`, `startswith`/`endswith`/`contains`, and
 `&`/`|`/`!` build plain expression values.
 """
 struct Col <: ScanExpr
@@ -143,21 +143,24 @@ Membership predicate: `in_(col(:status), ("active", "trial"))`.
 """
 in_(c::Col, values) = In(c, values)
 
-struct IsMissing <: ScanExpr
+struct IsNull <: ScanExpr
     lhs::Col
     negated::Bool
 end
 
 """
-    Tables.ismissing(col)
+    Tables.isnull(col)
 
-Missing-ness predicate. Use this rather than `coleq(col(:x), missing)`, which
+Build a predicate that is true when the column value is Julia's `missing`.
+Use `!Tables.isnull(col)` to match values that are not `missing`.
+
+The `isnull` name is deliberate. Defining `Base.ismissing(::Col)` would
+specialize Base's broad fallback and invalidate unrelated precompiled code
+when Tables loads. Use `isnull` rather than `coleq(col(:x), missing)`, which
 follows SQL semantics and matches no row.
 """
-# Keep this function Tables-local. Base.ismissing has an Any fallback, so a Col
-# method there invalidates unrelated precompiled code.
-function ismissing end
-ismissing(c::Col) = IsMissing(c, false)
+function isnull end
+isnull(c::Col) = IsNull(c, false)
 
 const STR_STARTSWITH, STR_ENDSWITH, STR_CONTAINS = 0x01, 0x02, 0x03
 
@@ -227,7 +230,7 @@ Base.:&(a::ScanExpr, b::ScanExpr) = AndExpr(vcat(_ands(a), _ands(b)))
 Base.:|(a::ScanExpr, b::ScanExpr) = OrExpr(vcat(_ors(a), _ors(b)))
 Base.:!(e::ScanExpr) = NotExpr(e)
 Base.:!(e::NotExpr) = e.arg
-Base.:!(e::IsMissing) = IsMissing(e.lhs, !e.negated)
+Base.:!(e::IsNull) = IsNull(e.lhs, !e.negated)
 
 # a bare Col is not a predicate; catch the likely mistake early
 _checkpredicate(::Nothing) = nothing
@@ -257,7 +260,7 @@ qualify, and how many. Plain data all the way down — see `Tables.apply`,
   * `validate`: error on select/filter references that match no column.
     `false` is the schema-evolution knob: unmatched SELECT references are
     silently dropped, and an unmatched FILTER reference evaluates as an
-    all-missing column (`ismissing(col(:gone))` keeps every row; comparisons
+    all-missing column (`isnull(col(:gone))` keeps every row; comparisons
     against it exclude, SQL-style).
 """
 struct Scan
@@ -362,7 +365,7 @@ _notrefs(x::Union{Tuple, AbstractVector}) = collect(Any, x)
 _notrefs(x) = Any[x]
 
 function _filterrefs!(refs::Vector{Int}, e::ScanExpr, names, validate::Bool)
-    if e isa Union{Cmp, In, IsMissing, StrPred}
+    if e isa Union{Cmp, In, IsNull, StrPred}
         i = _findcol(names, e.lhs.ref)
         i === nothing && validate &&
             throw(ArgumentError("filter references unknown column $(_refstr(e.lhs.ref))"))
@@ -435,7 +438,7 @@ _getcol(cols, ref::Int) = getcolumn(cols, ref)
 # Resolve a filter leaf's column. Under `strict` an unknown reference is an
 # error; otherwise it resolves to `nothing` and the leaf evaluates as an
 # ALL-MISSING column — the schema-evolution semantics: a column this table
-# does not have reads as missing everywhere (`ismissing` keeps every row, every
+# does not have reads as missing everywhere (`isnull` keeps every row, every
 # comparison excludes, and three-valued `&`/`|` compose from there).
 function _resolvecol(cols, ref, strict::Bool)
     i = _findcol(columnnames(cols), ref)
@@ -466,7 +469,7 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
         return in.(a, Ref(e.values))
-    elseif e isa IsMissing
+    elseif e isa IsNull
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing &&
             return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
@@ -588,7 +591,7 @@ end
 function _exprstr(e::ScanExpr)
     e isa Cmp && return "col($(repr(e.lhs.ref))) $(_OPNAMES[e.op]) $(repr(e.rhs))"
     e isa In && return "in_(col($(repr(e.lhs.ref))), $(repr(e.values)))"
-    e isa IsMissing && return (e.negated ? "!ismissing(" : "ismissing(") * "col($(repr(e.lhs.ref))))"
+    e isa IsNull && return (e.negated ? "!isnull(" : "isnull(") * "col($(repr(e.lhs.ref))))"
     e isa StrPred && return (e.kind == STR_STARTSWITH ? "startswith" :
                              e.kind == STR_ENDSWITH ? "endswith" : "contains") *
                             "(col($(repr(e.lhs.ref))), $(repr(e.s)))"

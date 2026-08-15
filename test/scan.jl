@@ -53,17 +53,18 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test T.colgt(c, 1).op == T.OP_GT
         @test T.colge(c, 1).op == T.OP_GE
         @test T.coleq(c, :ready).rhs == :ready                         # general literal form
-        @test T.ismissing !== Base.ismissing
+        @test T.isnull(c) == T.IsNull(T.Col(:a), false)
         @test Base.ismissing(c) === false
+        @test which(Base.ismissing, (typeof(c),)) === which(Base.ismissing, (Any,))
         @test Base.isequal(c, c) === true
         @test Base.isequal(c, 1) === false
-        @test !T.ismissing(c) == T.IsMissing(T.Col(:a), true)
+        @test !T.isnull(c) == T.IsNull(T.Col(:a), true)
         @test c == T.col(:a)
         @test c != T.col(:b)
         @test_throws ArgumentError T.coleq(T.col(:a), T.col(:b))      # col-to-col filter
         e = (c > 1) & (c < 5) & T.in_(T.col(:b), ("x", "w"))
         @test e isa T.AndExpr && length(e.args) == 3                  # flattened
-        o = (c > 1) | (c < 0) | T.ismissing(c)
+        o = (c > 1) | (c < 0) | T.isnull(c)
         @test o isa T.OrExpr && length(o.args) == 3
         @test T.in_(T.col(:b), ["x"]) isa T.In
         @test startswith(T.col(:b), "z") isa T.StrPred
@@ -81,7 +82,7 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test_throws ArgumentError T.bind(T.Scan(select = (:a, T.All())), names)
         b = T.bind(T.Scan(select = T.Not((r"^x_", :b))), names)
         @test [c.index for c in b.columns] == [1, 3]
-        b = T.bind(T.Scan(filter = (T.col(:a) > 1) & T.ismissing(T.col(:c))), names)
+        b = T.bind(T.Scan(filter = (T.col(:a) > 1) & T.isnull(T.col(:c))), names)
         @test sort(b.filtercols) == [1, 3]
         @test_throws ArgumentError T.bind(T.Scan(select = :nope), names)
         @test_throws ArgumentError T.bind(T.Scan(select = 6), names)
@@ -105,9 +106,9 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
     @testset "finish: filter semantics (SQL missing), limit/offset, projection" begin
         out = T.finish(nt, T.Scan(filter = T.col(:a) > 1))
         @test out.a == [2, 3, 4]                                      # missing row EXCLUDED
-        out = T.finish(nt, T.Scan(filter = T.ismissing(T.col(:a))))
+        out = T.finish(nt, T.Scan(filter = T.isnull(T.col(:a))))
         @test length(out.a) == 1 && ismissing(out.a[1])
-        out = T.finish(nt, T.Scan(filter = !T.ismissing(T.col(:a))))
+        out = T.finish(nt, T.Scan(filter = !T.isnull(T.col(:a))))
         @test out.a == [1, 2, 3, 4]
         out = T.finish(nt, T.Scan(filter = T.colne(T.col(:a), 1)))
         @test out.a == [2, 3, 4]                                      # colne never matches missing
@@ -170,10 +171,10 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
             out = T.finish(nt2, T.Scan(filter = f, validate = false))
             @test isempty(out.a)
         end
-        # the absent column reads as missing: ismissing keeps all, !ismissing keeps none
-        out = T.finish(nt2, T.Scan(filter = T.ismissing(T.col(:gone)), validate = false))
+        # the absent column reads as missing: isnull keeps all, !isnull keeps none
+        out = T.finish(nt2, T.Scan(filter = T.isnull(T.col(:gone)), validate = false))
         @test out.a == [1, 2, 3]
-        out = T.finish(nt2, T.Scan(filter = !T.ismissing(T.col(:gone)), validate = false))
+        out = T.finish(nt2, T.Scan(filter = !T.isnull(T.col(:gone)), validate = false))
         @test isempty(out.a)
         # three-valued composition with a matched predicate
         out = T.finish(nt2, T.Scan(filter = (T.col(:gone) > 1) | (T.col(:a) >= 3),
@@ -184,7 +185,7 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test isempty(out.a)
         # the Scan form of filtermask follows validate; bind still omits the
         # unmatched ref from filtercols
-        @test T.filtermask(T.Scan(filter = T.ismissing(T.col(:gone)), validate = false),
+        @test T.filtermask(T.Scan(filter = T.isnull(T.col(:gone)), validate = false),
                            nt2) == [true, true, true]
         b = T.bind(T.Scan(filter = (T.col(:gone) > 1) & (T.col(:a) > 1),
                           validate = false), (:a, :b))
@@ -226,10 +227,10 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
     end
 
     @testset "display" begin
-        s = T.Scan(select = (:a => Int64 => :z, T.All()), filter = !T.ismissing(T.col(:a)), limit = 3)
+        s = T.Scan(select = (:a => Int64 => :z, T.All()), filter = !T.isnull(T.col(:a)), limit = 3)
         str = sprint(show, s)
         @test occursin("select =", str) && occursin("limit = 3", str)
-        @test occursin("ismissing", sprint(show, T.Scan(filter = T.ismissing(T.col(:x)))))
+        @test occursin("isnull", sprint(show, T.Scan(filter = T.isnull(T.col(:x)))))
         @test occursin("filter = true", sprint(show, T.Scan(filter = T.AndExpr(T.ScanExpr[]))))
         @test occursin("filter = false", sprint(show, T.Scan(filter = T.OrExpr(T.ScanExpr[]))))
         io = IOBuffer()
