@@ -130,6 +130,13 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
               [false, false, true]
         @test T.filtermask(T.AndExpr(T.ScanExpr[]), missingvals) == [true, true, true]
         @test T.filtermask(T.OrExpr(T.ScanExpr[]), missingvals) == [false, false, false]
+        # the final function barrier keeps only exact `true` (SQL WHERE)
+        @test T._boolmask(BitVector([true, false])) == [true, false]
+        @test T._boolmask(Bool[false, true]) == [false, true]
+        @test T._boolmask(Union{Bool, Missing}[true, missing, false]) ==
+              [true, false, false]
+        @test T._boolmask(Any[true, 1, missing, nothing]) ==
+              [true, false, false, false]
         @test_throws ArgumentError T.Cmp(0xff, T.col(:a), 1)
         @test_throws ArgumentError T.StrPred(0xff, T.col(:b), "x")
         out = T.finish(nt, T.Scan(limit = 2, offset = 1))
