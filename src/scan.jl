@@ -1,14 +1,18 @@
 # Tables.Scan: a plain-data scan request — column selection/renaming/type
-# overrides, row predicates, and limits — that any Tables.jl source can accept
-# and push down. The protocol is two functions:
+# overrides, row predicates, and limits — one shared vocabulary that any
+# data source can accept and push down. Two pieces:
 #
-#     table, residual = Tables.apply(source, scan)   # source consumes what it can
-#     table′          = Tables.finish(table, residual)  # generic layer does the rest
+#     Tables.Scan(...)             the request (a value; no Function fields)
+#     Tables.scan(table, scan)     the generic executor over any Tables.jl table
 #
-# with `Tables.scan(source, scan)` composing the two. The default `apply`
-# pushes nothing (everything lands in the residual), so every existing
-# Tables.jl source already works — sources override `apply` to earn
-# performance, never correctness.
+# Sources that can push a scan down accept it as a keyword — `CSV.File(path;
+# scan=Tables.Scan(...))`, `Arrow.Table(path; scan=...)` — and apply what they
+# can WHILE materializing (skipping columns never parsed, rows never decoded).
+# What a source cannot push down it either rejects with an ArgumentError, or
+# hands to `Tables.scan` as a residual (`Tables.Scan(scan; select=nothing)`
+# strips the axes it already handled). Sources are free to support only a
+# subset — the value is the shared vocabulary and the pushdown, not a
+# capability-negotiation protocol.
 #
 # Design commitments (each learned the hard way by prior systems):
 #   * Every node is a plain value — no `Function` fields anywhere. Closures are
@@ -246,8 +250,8 @@ _checkpredicate(x) =
     Tables.Scan(; select=nothing, filter=nothing, limit=nothing, offset=nothing, validate=true)
 
 A scan request: what to keep, what to call it, how to type it, which rows
-qualify, and how many. Plain data all the way down — see `Tables.apply`,
-`Tables.finish`, and `Tables.scan` for the protocol.
+qualify, and how many. Plain data all the way down — see `Tables.scan` for
+the generic executor and the module comment for how sources push it down.
 
   * `select`: a column reference or tuple/vector of select items
     (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`;
@@ -288,16 +292,28 @@ function Scan(; select=nothing, filter=nothing, limit::Union{Nothing, Integer}=n
 end
 
 """
+    Tables.Scan(scan::Scan; select=scan.select, filter=scan.filter,
+                limit=scan.limit, offset=scan.offset, validate=scan.validate)
+
+Copy a scan with some axes replaced — how a source builds the RESIDUAL it
+hands to `Tables.scan` after pushing the rest down: a reader that handled
+projection, types and limits itself but cannot filter does
+`Tables.scan(table, Tables.Scan(scan; select=nothing, limit=nothing, offset=0))`.
+"""
+Scan(s::Scan; select=s.select, filter=s.filter, limit=s.limit, offset=s.offset,
+     validate=s.validate) = Scan(select isa Union{Nothing, Vector{SelectItem}} ? select :
+                                  Scan(; select).select,
+                                  _checkpredicate(filter), limit, Int(offset), validate)
+
+"""
     isempty(scan::Tables.Scan)
 
 `true` when the scan requests nothing: no selection, no filter, no limit or
-offset. `Tables.finish` returns the table unchanged for an empty residual.
+offset. `Tables.scan` returns the table unchanged for an empty scan.
 """
 Base.isempty(s::Scan) =
     s.select === nothing && s.filter === nothing && s.limit === nothing && s.offset == 0
 
-# an all-consumed residual, for sources that push everything down
-const EMPTYSCAN = Scan(nothing, nothing, nothing, 0, true)
 
 # --- binding ---------------------------------------------------------------------
 
@@ -534,15 +550,16 @@ _takecolumn(c::AbstractVector, idx) = c[idx]
 _takecolumn(c, idx) = [c[i] for i in idx]
 
 """
-    Tables.finish(table, residual::Scan) -> table′
+    Tables.scan(table, scan::Scan) -> table′
 
-Apply whatever a source did NOT push down, generically, over any Tables.jl
-table: filter (SQL missing semantics), offset/limit, projection, renames, and
-type overrides (elementwise `convert` — a source that consumes `types` itself,
-like a CSV parser, never leaves them in the residual). Returns the table
-unchanged when the residual is empty; otherwise a `NamedTuple` of columns.
+Apply a `Scan` generically over ANY Tables.jl table: filter (SQL missing
+semantics: a predicate evaluating to `missing` excludes the row), then
+offset/limit, then projection, renames, and type overrides (elementwise
+`convert`). Returns the table unchanged when the scan is empty; otherwise a
+`NamedTuple` of columns. This is the reference semantics every pushdown
+must agree with, and the executor sources hand their residual to.
 """
-function finish(table, scan::Scan)
+function scan(table, scan::Scan)
     isempty(scan) && return table
     cols = columns(table)
     b = bind(scan, columnnames(cols))
@@ -559,40 +576,6 @@ function finish(table, scan::Scan)
     outnames = Tuple(c.name for c in b.columns)
     outcols = Tuple(_converted(c.type, _takecolumn(getcolumn(cols, c.index), idx)) for c in b.columns)
     return NamedTuple{outnames}(outcols)
-end
-
-# --- the protocol -----------------------------------------------------------------
-
-"""
-    Tables.apply(source, scan::Scan) -> (table, residual::Scan)
-
-Sources override this to push down whatever parts of `scan` they can, and
-return the rest as a residual for `Tables.finish`. The fallback pushes
-nothing, so every Tables.jl source works unmodified. Contract:
-
-  * `Tables.finish(Tables.apply(src, scan)...)` must equal
-    `Tables.finish(Tables.columns(src), scan)` (up to table type).
-  * Pushed and residual work may overlap: a source that used a predicate to
-    prune inexactly (chunks, row groups) keeps that predicate in the residual.
-  * A source may consume `limit`/`offset` only if every filter it applied was
-    exact — inexact filtering poisons limit pushdown.
-  * Contradictions error (an unknown selected column under `validate`, a type
-    override conflicting with a source-fixed schema); mere inability never
-    errors — it lands in the residual.
-"""
-apply(source, scan::Scan) = (source, scan)
-
-"""
-    Tables.scan(source, scan::Scan)
-
-`Tables.finish(Tables.apply(source, scan)...)` — the one-call entry point.
-Sources that push scans down (a CSV reader, a database) implement
-`Tables.apply`; `Tables.scan` composes it with the generic `finish` so
-callers never see the residual.
-"""
-function scan(source, s::Scan)
-    t, residual = apply(source, s)
-    return finish(t, residual)
 end
 
 # --- display -----------------------------------------------------------------------
@@ -638,8 +621,8 @@ end
 """
     Tables.describe([io,] scan, residual)
 
-Print what a source pushed down versus what remains for the generic layer —
-the EXPLAIN affordance for pushdown debugging.
+Print a scan next to the residual a source handed to `Tables.scan` — the
+EXPLAIN affordance for pushdown debugging.
 """
 function describe(io::IO, scan::Scan, residual::Scan)
     println(io, "scan:     ", scan)

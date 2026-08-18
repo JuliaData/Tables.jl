@@ -103,18 +103,18 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test isempty(b.filtercols)
     end
 
-    @testset "finish: filter semantics (SQL missing), limit/offset, projection" begin
-        out = T.finish(nt, T.Scan(filter = T.col(:a) > 1))
+    @testset "scan: filter semantics (SQL missing), limit/offset, projection" begin
+        out = T.scan(nt, T.Scan(filter = T.col(:a) > 1))
         @test out.a == [2, 3, 4]                                      # missing row EXCLUDED
-        out = T.finish(nt, T.Scan(filter = T.isnull(T.col(:a))))
+        out = T.scan(nt, T.Scan(filter = T.isnull(T.col(:a))))
         @test length(out.a) == 1 && ismissing(out.a[1])
-        out = T.finish(nt, T.Scan(filter = !T.isnull(T.col(:a))))
+        out = T.scan(nt, T.Scan(filter = !T.isnull(T.col(:a))))
         @test out.a == [1, 2, 3, 4]
-        out = T.finish(nt, T.Scan(filter = T.colne(T.col(:a), 1)))
+        out = T.scan(nt, T.Scan(filter = T.colne(T.col(:a), 1)))
         @test out.a == [2, 3, 4]                                      # colne never matches missing
-        out = T.finish(nt, T.Scan(filter = T.in_(T.col(:b), ("x", "w"))))
+        out = T.scan(nt, T.Scan(filter = T.in_(T.col(:b), ("x", "w"))))
         @test out.b == ["x", "x", "w"]
-        out = T.finish(nt, T.Scan(filter = startswith(T.col(:b), "z") | endswith(T.col(:b), "y")))
+        out = T.scan(nt, T.Scan(filter = startswith(T.col(:b), "z") | endswith(T.col(:b), "y")))
         @test out.b == ["yy", "zzz"]
         missingvals = (a = Union{Int, Missing}[1, missing, 3],
                        b = Union{String, Missing}["x", missing, "z"])
@@ -139,55 +139,55 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
               [true, false, false, false]
         @test_throws ArgumentError T.Cmp(0xff, T.col(:a), 1)
         @test_throws ArgumentError T.StrPred(0xff, T.col(:b), "x")
-        out = T.finish(nt, T.Scan(limit = 2, offset = 1))
+        out = T.scan(nt, T.Scan(limit = 2, offset = 1))
         @test isequal(out.a, [2, 3])
-        out = T.finish(nt, T.Scan(filter = T.col(:c) > 2.0, limit = 2))
+        out = T.scan(nt, T.Scan(filter = T.col(:c) > 2.0, limit = 2))
         @test out.c == [2.5, 3.5]
-        out = T.finish(nt, T.Scan(offset = 10))
+        out = T.scan(nt, T.Scan(offset = 10))
         @test isempty(out.a)
-        out = T.finish(nt, T.Scan(offset = typemax(Int)))
+        out = T.scan(nt, T.Scan(offset = typemax(Int)))
         @test isempty(out.a)
-        out = T.finish(nt, T.Scan(offset = 1, limit = typemax(Int)))
+        out = T.scan(nt, T.Scan(offset = 1, limit = typemax(Int)))
         @test isequal(out.a, [2, 3, 4, missing])
         # projection order, rename, type override
-        out = T.finish(nt, T.Scan(select = (:c => Float32 => :cf, 1)))
+        out = T.scan(nt, T.Scan(select = (:c => Float32 => :cf, 1)))
         @test keys(out) == (:cf, :a)
         @test out.cf isa Vector{Float32}
         # type override preserves missing
-        out = T.finish(nt, T.Scan(select = (:a => Float64,)))
+        out = T.scan(nt, T.Scan(select = (:a => Float64,)))
         @test isequal(out.a, [1.0, 2.0, 3.0, 4.0, missing])
         @test eltype(out.a) == Union{Float64, Missing}
         converted = Union{Float64, Missing}[1.0, missing]
         @test T._converted(Float64, converted) === converted
-        @test_throws InexactError T.finish((a = [1.5],), T.Scan(select = (:a => Int,)))
+        @test_throws InexactError T.scan((a = [1.5],), T.Scan(select = (:a => Int,)))
         indexonly = IndexOnlyTable(IndexOnlyColumn([10, 20, 30, 40]))
-        @test T.finish(indexonly, T.Scan(select = :a, offset = 1, limit = 2)).a == [20, 30]
+        @test T.scan(indexonly, T.Scan(select = :a, offset = 1, limit = 2)).a == [20, 30]
         # empty residual = identity
-        @test T.finish(nt, T.Scan()) === nt
+        @test T.scan(nt, T.Scan()) === nt
     end
 
-    @testset "finish: validate=false filters treat unmatched refs as all-missing" begin
+    @testset "scan: validate=false filters treat unmatched refs as all-missing" begin
         nt2 = (a = [1, 2, 3], b = ["x", "y", "z"])
         # strict (default): unknown filter refs error, matching bind
-        @test_throws ArgumentError T.finish(nt2, T.Scan(filter = T.col(:gone) > 1))
+        @test_throws ArgumentError T.scan(nt2, T.Scan(filter = T.col(:gone) > 1))
         @test_throws ArgumentError T.filtermask(T.col(:gone) > 1, nt2)
         # lenient: comparisons/membership/strings against the absent column
         # evaluate to missing → rows excluded, SQL-style
         for f in (T.col(:gone) > 1, T.in_(T.col(:gone), (1, 2)),
                   startswith(T.col(:gone), "x"))
-            out = T.finish(nt2, T.Scan(filter = f, validate = false))
+            out = T.scan(nt2, T.Scan(filter = f, validate = false))
             @test isempty(out.a)
         end
         # the absent column reads as missing: isnull keeps all, !isnull keeps none
-        out = T.finish(nt2, T.Scan(filter = T.isnull(T.col(:gone)), validate = false))
+        out = T.scan(nt2, T.Scan(filter = T.isnull(T.col(:gone)), validate = false))
         @test out.a == [1, 2, 3]
-        out = T.finish(nt2, T.Scan(filter = !T.isnull(T.col(:gone)), validate = false))
+        out = T.scan(nt2, T.Scan(filter = !T.isnull(T.col(:gone)), validate = false))
         @test isempty(out.a)
         # three-valued composition with a matched predicate
-        out = T.finish(nt2, T.Scan(filter = (T.col(:gone) > 1) | (T.col(:a) >= 3),
+        out = T.scan(nt2, T.Scan(filter = (T.col(:gone) > 1) | (T.col(:a) >= 3),
                                    validate = false))
         @test out.a == [3]
-        out = T.finish(nt2, T.Scan(filter = (T.col(:gone) > 1) & (T.col(:a) >= 1),
+        out = T.scan(nt2, T.Scan(filter = (T.col(:gone) > 1) & (T.col(:a) >= 1),
                                    validate = false))
         @test isempty(out.a)
         # the Scan form of filtermask follows validate; bind still omits the
@@ -199,38 +199,44 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test b.filtercols == [1]
     end
 
-    @testset "finish: collection-valued rows compare whole-value per row" begin
+    @testset "scan: collection-valued rows compare whole-value per row" begin
         lists = (l = [[1, 2], [3], [1, 2]], n = [10, 20, 30])
         # equality against a vector literal is per-row whole-value equality —
         # never an elementwise broadcast into the rows (which zips silently
         # when lengths happen to match and throws DimensionMismatch when not)
-        out = T.finish(lists, T.Scan(filter = T.coleq(T.col(:l), [1, 2])))
+        out = T.scan(lists, T.Scan(filter = T.coleq(T.col(:l), [1, 2])))
         @test out.n == [10, 30]
-        out = T.finish(lists, T.Scan(filter = T.colne(T.col(:l), [1, 2])))
+        out = T.scan(lists, T.Scan(filter = T.colne(T.col(:l), [1, 2])))
         @test out.n == [20]
         @test T.filtermask(T.in_(T.col(:l), ([[3]], [[1, 2]])), lists) ==
               [false, false, false]
         @test T.filtermask(T.in_(T.col(:l), ([3],)), lists) == [false, true, false]
         # a 2-row column against a 2-element literal must still be whole-value
         two = (l = [[1, 2], [5, 6]], n = [1, 2])
-        out = T.finish(two, T.Scan(filter = T.coleq(T.col(:l), [5, 6])))
+        out = T.scan(two, T.Scan(filter = T.coleq(T.col(:l), [5, 6])))
         @test out.n == [2]
         # missing rows keep SQL semantics through the Ref-wrapped comparison
         lm = (l = Union{Missing, Vector{Int}}[[1], missing, [2]], n = [1, 2, 3])
-        out = T.finish(lm, T.Scan(filter = T.coleq(T.col(:l), [2])))
+        out = T.scan(lm, T.Scan(filter = T.coleq(T.col(:l), [2])))
         @test out.n == [3]
     end
 
-    @testset "apply/scan protocol" begin
-        t, residual = T.apply(nt, T.Scan(limit = 2))
-        @test t === nt && residual.limit == 2                          # fallback pushes nothing
+    @testset "generic executor + residual construction" begin
         s = T.Scan(select = (:b, :a), filter = T.col(:a) >= 2, limit = 1)
-        @test isequal(T.scan(nt, s), T.finish(nt, s))                  # protocol equivalence
+        out = T.scan(nt, s)
+        @test out.b == ["yy"] && out.a == [2]
         # works through any Tables.jl source, e.g. a row iterator
         rows = Tables.rowtable(nt)
         out = T.scan(rows, s)
         @test out.b == ["yy"] && out.a == [2]
         @test T.filtermask(s, nt) == [false, true, true, true, false]
+        # a source that pushed select/limit down hands the filter to Tables.scan
+        residual = T.Scan(s; select = nothing, limit = nothing, offset = 0)
+        @test residual.select === nothing && residual.limit === nothing && residual.filter === s.filter
+        pushed = (b = nt.b, a = nt.a)                # what the source materialized (projection done)
+        @test isequal(T.scan(pushed, residual).a, [2, 3, 4])   # filter applied generically
+        @test isempty(T.Scan(s; select = nothing, filter = nothing, limit = nothing))
+        @test T.Scan(s; select = (:c,)).select == T.Scan(select = (:c,)).select
     end
 
     @testset "display" begin
@@ -241,7 +247,7 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test occursin("filter = true", sprint(show, T.Scan(filter = T.AndExpr(T.ScanExpr[]))))
         @test occursin("filter = false", sprint(show, T.Scan(filter = T.OrExpr(T.ScanExpr[]))))
         io = IOBuffer()
-        T.describe(io, s, T.EMPTYSCAN)
+        T.describe(io, s, T.Scan())
         @test occursin("fully pushed down", String(take!(io)))
     end
 
