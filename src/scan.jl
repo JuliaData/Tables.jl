@@ -103,6 +103,8 @@ col(r::Union{Symbol, AbstractString, Int}) = Col(r isa AbstractString ? String(r
 
 const OP_EQ, OP_NE, OP_LT, OP_LE, OP_GT, OP_GE = 0x01, 0x02, 0x03, 0x04, 0x05, 0x06
 const _OPNAMES = ("==", "!=", "<", "<=", ">", ">=")
+_colcolerr() = throw(ArgumentError("column-to-column comparisons are not supported; " *
+                                   "compare a column against a literal value"))
 
 struct Cmp{T} <: ScanExpr
     op::UInt8
@@ -111,6 +113,7 @@ struct Cmp{T} <: ScanExpr
     function Cmp(op::Integer, lhs::Col, rhs::T) where {T}
         OP_EQ <= op <= OP_GE ||
             throw(ArgumentError("unknown comparison operator code $op"))
+        rhs isa Col && _colcolerr()
         return new{T}(UInt8(op), lhs, rhs)
     end
 end
@@ -138,6 +141,10 @@ colge(c::Col, value) = Cmp(OP_GE, c, value)
 struct In{T} <: ScanExpr
     lhs::Col
     values::T
+    function In(lhs::Col, values::T) where {T}
+        values isa Col && _colcolerr()
+        return new{T}(lhs, values)
+    end
 end
 
 """
@@ -203,8 +210,6 @@ struct OpNode <: ScanExpr
     args::Vector{Any}
 end
 
-_colcolerr() = throw(ArgumentError("column-to-column comparisons are not supported; " *
-                                   "compare a column against a literal value"))
 for f in (:coleq, :colne, :collt, :colle, :colgt, :colge)
     @eval $f(::Col, ::Col) = _colcolerr()
 end
@@ -238,6 +243,14 @@ Base.:!(e::IsNull) = IsNull(e.lhs, !e.negated)
 
 # a bare Col is not a predicate; catch the likely mistake early
 _checkpredicate(::Nothing) = nothing
+function _checkpredicate(e::Union{AndExpr, OrExpr})
+    foreach(_checkpredicate, e.args)
+    return e
+end
+function _checkpredicate(e::NotExpr)
+    _checkpredicate(e.arg)
+    return e
+end
 _checkpredicate(e::ScanExpr) = e
 _checkpredicate(e::Col) =
     throw(ArgumentError("a bare column reference is not a predicate; compare it against a value"))
@@ -273,6 +286,19 @@ struct Scan
     limit::Union{Nothing, Int}
     offset::Int
     validate::Bool
+    function Scan(select::Union{Nothing, Vector{SelectItem}},
+                  filter, limit::Union{Nothing, Int},
+                  offset::Int, validate::Bool)
+        limit === nothing || limit >= 0 ||
+            throw(ArgumentError("limit must be ≥ 0 (got $limit)"))
+        offset >= 0 || throw(ArgumentError("offset must be ≥ 0 (got $offset)"))
+        if select !== nothing
+            nots = count(it -> it.ref isa Not, select)
+            0 < nots < length(select) &&
+                throw(ArgumentError("Not(...) selections cannot be mixed with positive selections"))
+        end
+        return new(select, _checkpredicate(filter), limit, offset, validate)
+    end
 end
 
 function Scan(; select=nothing, filter=nothing, limit::Union{Nothing, Integer}=nothing,
@@ -280,15 +306,9 @@ function Scan(; select=nothing, filter=nothing, limit::Union{Nothing, Integer}=n
     items = select === nothing ? nothing :
             select isa Union{Tuple, AbstractVector} ? SelectItem[_selectitem(x) for x in select] :
             SelectItem[_selectitem(select)]
-    limit === nothing || limit >= 0 || throw(ArgumentError("limit must be ≥ 0 (got $limit)"))
+    lim = limit === nothing ? nothing : Int(limit)
     off = offset === nothing ? 0 : Int(offset)
-    off >= 0 || throw(ArgumentError("offset must be ≥ 0 (got $offset)"))
-    if items !== nothing
-        nots = count(it -> it.ref isa Not, items)
-        0 < nots < length(items) &&
-            throw(ArgumentError("Not(...) selections cannot be mixed with positive selections"))
-    end
-    return Scan(items, _checkpredicate(filter), limit === nothing ? nothing : Int(limit), off, validate)
+    return Scan(items, filter, lim, off, validate)
 end
 
 """
@@ -300,10 +320,14 @@ hands to `Tables.scan` after pushing the rest down: a reader that handled
 projection, types and limits itself but cannot filter does
 `Tables.scan(table, Tables.Scan(scan; select=nothing, limit=nothing, offset=0))`.
 """
-Scan(s::Scan; select=s.select, filter=s.filter, limit=s.limit, offset=s.offset,
-     validate=s.validate) = Scan(select isa Union{Nothing, Vector{SelectItem}} ? select :
-                                  Scan(; select).select,
-                                  _checkpredicate(filter), limit, Int(offset), validate)
+function Scan(s::Scan; select=s.select, filter=s.filter,
+              limit::Union{Nothing, Integer}=s.limit,
+              offset::Union{Nothing, Integer}=s.offset, validate::Bool=s.validate)
+    items = select isa Union{Nothing, Vector{SelectItem}} ? select : Scan(; select).select
+    lim = limit === nothing ? nothing : Int(limit)
+    off = offset === nothing ? 0 : Int(offset)
+    return Scan(items, filter, lim, off, validate)
+end
 
 """
     isempty(scan::Tables.Scan)
@@ -463,33 +487,37 @@ function _resolvecol(cols, ref, strict::Bool)
     return nothing
 end
 
-# three-valued vectorized evaluation; the top level keeps rows where the
-# result is exactly `true` (SQL WHERE). Comparison literals are `Ref`-wrapped
-# so collection-valued rows compare WHOLE-VALUE per row — a bare vector
-# literal must never broadcast elementwise against the column (silent
-# row-zipping when the lengths happen to match, `DimensionMismatch` when
-# they don't).
+# Three-valued vectorized evaluation; the top level keeps rows where the
+# result is exactly `true` (SQL WHERE). Comparison kernels close over their
+# literal so collection-valued rows compare whole values per row instead of
+# broadcasting the literal against the column. The fallback uses only the
+# scalar-indexing contract required by Tables.jl; the AbstractVector path
+# keeps broadcast's optimized kernels.
+_columnmap(f, c::AbstractVector, ::Int) = f.(c)
+_columnmap(f, c, n::Int) = [f(c[i]) for i in 1:n]
+
 function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
     if e isa Cmp
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
-        v = Ref(e.rhs)
-        return e.op == OP_EQ ? (a .== v) :
-               e.op == OP_NE ? (a .!= v) :
-               e.op == OP_LT ? (a .< v) :
-               e.op == OP_LE ? (a .<= v) :
-               e.op == OP_GT ? (a .> v) :
-               e.op == OP_GE ? (a .>= v) :
+        n = rowcount(cols)
+        return e.op == OP_EQ ? _columnmap(x -> x == e.rhs, a, n) :
+               e.op == OP_NE ? _columnmap(x -> x != e.rhs, a, n) :
+               e.op == OP_LT ? _columnmap(x -> x < e.rhs, a, n) :
+               e.op == OP_LE ? _columnmap(x -> x <= e.rhs, a, n) :
+               e.op == OP_GT ? _columnmap(x -> x > e.rhs, a, n) :
+               e.op == OP_GE ? _columnmap(x -> x >= e.rhs, a, n) :
                throw(ArgumentError("unknown comparison operator code $(e.op)"))
     elseif e isa In
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
-        return in.(a, Ref(e.values))
+        return _columnmap(x -> in(x, e.values), a, rowcount(cols))
     elseif e isa IsNull
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing &&
             return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
-        return e.negated ? .!Base.ismissing.(a) : Base.ismissing.(a)
+        return e.negated ? _columnmap(x -> !Base.ismissing(x), a, rowcount(cols)) :
+                           _columnmap(Base.ismissing, a, rowcount(cols))
     elseif e isa StrPred
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
@@ -497,7 +525,7 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
             e.kind == STR_ENDSWITH ? endswith :
             e.kind == STR_CONTAINS ? contains :
             throw(ArgumentError("unknown string predicate code $(e.kind)"))
-        return map(x -> Base.ismissing(x) ? missing : f(x, e.s), a)
+        return _columnmap(x -> Base.ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
     elseif e isa AndExpr
         isempty(e.args) && return trues(rowcount(cols))
         return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .& y, e.args)
@@ -529,11 +557,11 @@ all-missing column.
 # expression tree), and `Bool[x === true for x in v]` over an abstract `v`
 # melts into per-element dynamic dispatch — measured 100× slower than the
 # same loop behind a barrier (62 ms → 0.6 ms over a 1M-row mask). The
-# barrier costs ONE dynamic dispatch per mask instead. The vectorized
-# kernels inside `_evalexpr` need no such treatment: broadcast and `map`
-# already specialize on the concrete container at their own call boundary.
+# barrier costs ONE dynamic dispatch per mask instead. The column kernels
+# inside `_evalexpr` specialize on the concrete container at their own call
+# boundary.
 _boolmask(v::AbstractVector) = Bool[x === true for x in v]
-filtermask(e::ScanExpr, table) = _boolmask(_evalexpr(e, columns(table)))
+filtermask(e::ScanExpr, table) = _boolmask(_evalexpr(_checkpredicate(e), columns(table)))
 filtermask(s::Scan, table) = s.filter === nothing ?
     trues(rowcount(columns(table))) :
     _boolmask(_evalexpr(s.filter, columns(table), s.validate))
@@ -567,7 +595,7 @@ function scan(table, scan::Scan)
         keep = _boolmask(_evalexpr(scan.filter, cols, scan.validate))
         idx = findall(keep)
     else
-        idx = collect(1:rowcount(cols))
+        idx = 1:rowcount(cols)
     end
     skipped = min(scan.offset, length(idx))
     available = length(idx) - skipped

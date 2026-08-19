@@ -4,8 +4,8 @@ end
 Base.length(c::IndexOnlyColumn) = length(c.data)
 Base.getindex(c::IndexOnlyColumn, i::Int) = c.data[i]
 
-struct IndexOnlyTable <: Tables.AbstractColumns
-    a::IndexOnlyColumn{Int}
+struct IndexOnlyTable{T} <: Tables.AbstractColumns
+    a::IndexOnlyColumn{T}
 end
 Tables.columnnames(::IndexOnlyTable) = (:a,)
 Tables.getcolumn(t::IndexOnlyTable, ::Int) = getfield(t, :a)
@@ -38,7 +38,13 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test_throws ArgumentError T.Scan(select = T.Not(1.5))
         @test_throws ArgumentError T.Scan(limit = -1)
         @test_throws ArgumentError T.Scan(offset = -1)
+        @test_throws ArgumentError T.Scan(T.Scan(); limit = -1)
+        @test_throws ArgumentError T.Scan(T.Scan(); offset = -1)
+        @test_throws ArgumentError T.Scan(nothing, nothing, -1, 0, true)
+        @test T.Scan(T.Scan(); limit = Int16(2)).limit == 2
         @test_throws ArgumentError T.Scan(filter = T.col(:a))         # bare column
+        @test_throws ArgumentError T.Scan(filter = !T.col(:a))
+        @test_throws ArgumentError T.Scan(filter = T.col(:a) & (T.col(:b) > 1))
         @test_throws ArgumentError T.Scan(filter = (x -> true))       # closures rejected
     end
 
@@ -62,6 +68,8 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test c == T.col(:a)
         @test c != T.col(:b)
         @test_throws ArgumentError T.coleq(T.col(:a), T.col(:b))      # col-to-col filter
+        @test_throws ArgumentError T.Cmp(T.OP_EQ, T.col(:a), T.col(:b))
+        @test_throws ArgumentError T.In(T.col(:a), T.col(:b))
         e = (c > 1) & (c < 5) & T.in_(T.col(:b), ("x", "w"))
         @test e isa T.AndExpr && length(e.args) == 3                  # flattened
         o = (c > 1) | (c < 0) | T.isnull(c)
@@ -128,6 +136,7 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
               [false, false, false]
         @test T.filtermask(T.Cmp(T.OP_NE, T.col(:a), 1), missingvals) ==
               [false, false, true]
+        @test_throws ArgumentError T.filtermask(!T.col(:a), missingvals)
         @test T.filtermask(T.AndExpr(T.ScanExpr[]), missingvals) == [true, true, true]
         @test T.filtermask(T.OrExpr(T.ScanExpr[]), missingvals) == [false, false, false]
         # the final function barrier keeps only exact `true` (SQL WHERE)
@@ -162,6 +171,13 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         @test_throws InexactError T.scan((a = [1.5],), T.Scan(select = (:a => Int,)))
         indexonly = IndexOnlyTable(IndexOnlyColumn([10, 20, 30, 40]))
         @test T.scan(indexonly, T.Scan(select = :a, offset = 1, limit = 2)).a == [20, 30]
+        @test T.filtermask(T.col(:a) > 20, indexonly) == [false, false, true, true]
+        @test T.filtermask(T.in_(T.col(:a), (10, 40)), indexonly) ==
+              [true, false, false, true]
+        indexmissing = IndexOnlyTable(IndexOnlyColumn(Union{Int, Missing}[10, missing, 30]))
+        @test T.filtermask(T.isnull(T.col(:a)), indexmissing) == [false, true, false]
+        indexstrings = IndexOnlyTable(IndexOnlyColumn(["ab", "bc", "ax"]))
+        @test T.filtermask(startswith(T.col(:a), "a"), indexstrings) == [true, false, true]
         # empty residual = identity
         @test T.scan(nt, T.Scan()) === nt
     end
@@ -215,7 +231,7 @@ Tables.getcolumn(t::IndexOnlyTable, ::Symbol) = getfield(t, :a)
         two = (l = [[1, 2], [5, 6]], n = [1, 2])
         out = T.scan(two, T.Scan(filter = T.coleq(T.col(:l), [5, 6])))
         @test out.n == [2]
-        # missing rows keep SQL semantics through the Ref-wrapped comparison
+        # missing rows keep SQL semantics through whole-value comparison
         lm = (l = Union{Missing, Vector{Int}}[[1], missing, [2]], n = [1, 2, 3])
         out = T.scan(lm, T.Scan(filter = T.coleq(T.col(:l), [2])))
         @test out.n == [3]
