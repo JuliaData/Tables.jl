@@ -975,10 +975,10 @@ end
     @test Set(Tables.columnnames(Dict("a"=>1, SubString("b")=>2))) == Set([:a, :b])
     @test Set(Tables.columnnames(Dict(SubString("a")=>1, SubString("b")=>2))) == Set([:a, :b])
 
-    @test Tables.getcolumn(Dict(:a=>1, :b=>2), 1) == 1
-    @test Tables.getcolumn(Dict("a"=>1, "b"=>2), 1 + (Int === Int64)) == 1
-    @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), 1 + (Int === Int64)) == 1
-    @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), 1 + (Int === Int64)) == 1
+    @test Tables.getcolumn(Dict(:a=>1, :b=>2), :a) == 1
+    @test Tables.getcolumn(Dict("a"=>1, "b"=>2), :a) == 1
+    @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), :a) == 1
+    @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), :a) == 1
     @test Tables.getcolumn(Dict(:a=>1, :b=>2), :a) == 1
     @test Tables.getcolumn(Dict("a"=>1, "b"=>2), :a) == 1
     @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), :a) == 1
