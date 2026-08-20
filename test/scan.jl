@@ -38,7 +38,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test s.select[5] == T.SelectItem(4, nothing, nothing)
         @test s.select[6].ref isa Regex
         @test T.Scan(select = :a).select == [T.SelectItem(:a, nothing, nothing)]
+        @test T.Scan().select == [T.SelectItem(T.All(), nothing, nothing)]
+        @test isempty(T.Scan(select = ()).select)
+        @test_throws ArgumentError T.Scan(select = nothing)
         @test T._isidentity(T.Scan())
+        @test T._isidentity(T.Scan(select = T.All()))
         @test !T._isidentity(T.Scan(limit = 5))
         @test !T._isidentity(T.Scan(offset = 1))
         @test_throws ArgumentError T.Scan(select = (:a => 1.5,))
@@ -48,7 +52,7 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test_throws ArgumentError T.Scan(offset = -1)
         @test_throws ArgumentError T.Scan(T.Scan(); limit = -1)
         @test_throws ArgumentError T.Scan(T.Scan(); offset = -1)
-        @test_throws ArgumentError T.Scan(nothing, nothing, -1, 0, true)
+        @test_throws ArgumentError T.Scan(T.Scan().select, nothing, -1, 0, true)
         @test T.Scan(T.Scan(); limit = Int16(2)).limit == 2
         @test_throws ArgumentError T.Scan(filter = T.col(:a))         # bare column
         @test_throws ArgumentError T.Scan(filter = !T.col(:a))
@@ -266,11 +270,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test out.b == ["yy"] && out.a == [2]
         @test T.filtermask(s, nt) == [false, true, true, true, false]
         # a source that pushed select/limit down hands the filter to Tables.scan
-        residual = T.Scan(s; select = nothing, limit = nothing, offset = 0)
-        @test residual.select === nothing && residual.limit === nothing && residual.filter === s.filter
+        residual = T.Scan(s; select = T.All(), limit = nothing, offset = 0)
+        @test T._isallselection(residual.select) && residual.limit === nothing && residual.filter === s.filter
         pushed = (b = nt.b, a = nt.a)                # what the source materialized (projection done)
         @test isequal(T.scan(pushed, residual).a, [2, 3, 4])   # filter applied generically
-        @test T._isidentity(T.Scan(s; select = nothing, filter = nothing, limit = nothing))
+        @test T._isidentity(T.Scan(s; select = T.All(), filter = nothing, limit = nothing))
         @test T.Scan(s; select = (:c,)).select == T.Scan(select = (:c,)).select
     end
 
@@ -310,6 +314,8 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test occursin("isnull", sprint(show, T.Scan(filter = T.isnull(T.col(:x)))))
         @test occursin("filter = true", sprint(show, T.Scan(filter = T.AndExpr(T.ScanExpr[]))))
         @test occursin("filter = false", sprint(show, T.Scan(filter = T.OrExpr(T.ScanExpr[]))))
+        @test sprint(show, T.Scan()) == "Tables.Scan()"
+        @test sprint(show, T.Scan(select = ())) == "Tables.Scan(select = ())"
         io = IOBuffer()
         T.describe(io, s, T.Scan())
         @test occursin("fully pushed down", String(take!(io)))

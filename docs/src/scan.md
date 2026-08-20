@@ -44,10 +44,8 @@ the filter.
 
 ### Selection
 
-`select=nothing` keeps every column and also means that the projection axis was
-not requested. This distinction matters when a source builds a residual
-request. An explicit `Tables.All()` is a selection item that expands to every
-source column.
+`select=Tables.All()` is the default and keeps every column. `select=()` selects
+zero columns while preserving the result's row count.
 
 A selection accepts names, indices, regular expressions, `Tables.All()`, and
 `Tables.Not(...)`. Pair forms add a type override or output name:
@@ -129,12 +127,15 @@ example, a source that performs projection but leaves filtering and row bounds
 for the generic executor can use:
 
 ```julia
-residual = Tables.Scan(request; select=nothing)
+residual = Tables.Scan(request; select=Tables.All())
 result = Tables.scan(materialized_columns, residual)
 ```
 
-Only remove work that was performed exactly. A statistics check that only
-prunes impossible partitions does not consume the filter.
+`Tables.All()` is the projection identity, so the residual does not repeat
+projection work. Only remove work that the source performed exactly.
+
+A statistics check that only prunes impossible partitions does not consume the
+filter.
 
 `Tables.OpNode(name, args)` is the extension point for source-specific,
 plain-data operations. A source can recognize and consume a named operation

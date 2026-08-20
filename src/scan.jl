@@ -9,7 +9,7 @@
 # scan=Tables.Scan(...))`, `Arrow.Table(path; scan=...)` — and apply what they
 # can WHILE materializing (skipping columns never parsed, rows never decoded).
 # What a source cannot push down it either rejects with an ArgumentError, or
-# hands to `Tables.scan` as a residual (`Tables.Scan(scan; select=nothing)`
+# hands to `Tables.scan` as a residual (`Tables.Scan(scan; select=All())`
 # strips the axes it already handled). Sources are free to support only a
 # subset — the value is the shared vocabulary and the pushdown, not a
 # capability-negotiation protocol.
@@ -268,7 +268,7 @@ _checkpredicate(x) =
 # --- the Scan value --------------------------------------------------------------
 
 """
-    Tables.Scan(; select=nothing, filter=nothing, limit=nothing, offset=nothing, validate=true)
+    Tables.Scan(; select=Tables.All(), filter=nothing, limit=nothing, offset=nothing, validate=true)
 
 A scan request: what to keep, what to call it, how to type it, which rows
 qualify, and how many. Plain data all the way down — see `Tables.scan` for
@@ -277,7 +277,8 @@ the generic executor and the module comment for how sources push it down.
   * `select`: a column reference or tuple/vector of select items
     (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`;
     refs are `Symbol`/`String`/`Int`/`Regex`/`Tables.Not`/`Tables.All`).
-    `nothing` keeps every column. Selection order = output order.
+    `Tables.All()` keeps every column; `()` selects zero columns. Selection
+    order = output order.
   * `filter`: an expression built from `Tables.col`; a row is kept iff the
     predicate evaluates to exactly `true` (`missing` excludes, SQL-style).
     Filters see source column names, before renames.
@@ -289,31 +290,31 @@ the generic executor and the module comment for how sources push it down.
     against it exclude, SQL-style).
 """
 struct Scan
-    select::Union{Nothing, Vector{SelectItem}}
+    select::Vector{SelectItem}
     filter::Union{Nothing, ScanExpr}
     limit::Union{Nothing, Int}
     offset::Int
     validate::Bool
-    function Scan(select::Union{Nothing, Vector{SelectItem}},
+    function Scan(select::Vector{SelectItem},
                   filter, limit::Union{Nothing, Int},
                   offset::Int, validate::Bool)
         limit === nothing || limit >= 0 ||
             throw(ArgumentError("limit must be ≥ 0 (got $limit)"))
         offset >= 0 || throw(ArgumentError("offset must be ≥ 0 (got $offset)"))
-        if select !== nothing
-            nots = count(it -> it.ref isa Not, select)
-            0 < nots < length(select) &&
-                throw(ArgumentError("Not(...) selections cannot be mixed with positive selections"))
-        end
+        nots = count(it -> it.ref isa Not, select)
+        0 < nots < length(select) &&
+            throw(ArgumentError("Not(...) selections cannot be mixed with positive selections"))
         return new(select, _checkpredicate(filter), limit, offset, validate)
     end
 end
 
-function Scan(; select=nothing, filter=nothing, limit::Union{Nothing, Integer}=nothing,
+_selectitems(select::Vector{SelectItem}) = select
+_selectitems(select::Union{Tuple, AbstractVector}) = SelectItem[_selectitem(x) for x in select]
+_selectitems(select) = SelectItem[_selectitem(select)]
+
+function Scan(; select=All(), filter=nothing, limit::Union{Nothing, Integer}=nothing,
                 offset::Union{Nothing, Integer}=nothing, validate::Bool=true)
-    items = select === nothing ? nothing :
-            select isa Union{Tuple, AbstractVector} ? SelectItem[_selectitem(x) for x in select] :
-            SelectItem[_selectitem(select)]
+    items = _selectitems(select)
     lim = limit === nothing ? nothing : Int(limit)
     off = offset === nothing ? 0 : Int(offset)
     return Scan(items, filter, lim, off, validate)
@@ -326,19 +327,25 @@ end
 Copy a scan with some axes replaced — how a source builds the RESIDUAL it
 hands to `Tables.scan` after pushing the rest down: a reader that handled
 projection, types and limits itself but cannot filter does
-`Tables.scan(table, Tables.Scan(scan; select=nothing, limit=nothing, offset=0))`.
+`Tables.scan(table, Tables.Scan(scan; select=All(), limit=nothing, offset=0))`.
 """
 function Scan(s::Scan; select=s.select, filter=s.filter,
               limit::Union{Nothing, Integer}=s.limit,
               offset::Union{Nothing, Integer}=s.offset, validate::Bool=s.validate)
-    items = select isa Union{Nothing, Vector{SelectItem}} ? select : Scan(; select).select
+    items = _selectitems(select)
     lim = limit === nothing ? nothing : Int(limit)
     off = offset === nothing ? 0 : Int(offset)
     return Scan(items, filter, lim, off, validate)
 end
 
+function _isallselection(select::Vector{SelectItem})
+    length(select) == 1 || return false
+    item = only(select)
+    return item.ref isa All && item.type === nothing && item.rename === nothing
+end
+
 _isidentity(s::Scan) =
-    s.select === nothing && s.filter === nothing && s.limit === nothing && s.offset == 0
+    _isallselection(s.select) && s.filter === nothing && s.limit === nothing && s.offset == 0
 
 
 # --- schema resolution -----------------------------------------------------------
@@ -447,7 +454,7 @@ containing only its referenced columns.
 function resolve(scan::Scan, names)
     nms = collect(Symbol, names)
     cols = BoundColumn[]
-    if scan.select === nothing
+    if _isallselection(scan.select)
         append!(cols, BoundColumn(i, nm, nothing) for (i, nm) in enumerate(nms))
     elseif !isempty(scan.select) && scan.select[1].ref isa Not
         excluded = Set{Int}()
@@ -693,7 +700,7 @@ end
 function Base.show(io::IO, s::Scan)
     print(io, "Tables.Scan(")
     parts = String[]
-    if s.select !== nothing
+    if !_isallselection(s.select)
         sel = join((begin
             r = it.ref isa Not ? "Not($(_refstr(it.ref.ref)))" :
                 it.ref isa All ? "All()" : _refstr(it.ref)
