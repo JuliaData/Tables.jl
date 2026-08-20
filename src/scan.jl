@@ -22,22 +22,15 @@
 #     prunes by a predicate but cannot guarantee exactness keeps the filter in
 #     the residual).
 #   * Missing follows SQL WHERE: a predicate evaluating to `missing` excludes
-#     the row. `isnull`/`!isnull` are first-class nodes; `coleq` never
-#     matches missing.
+#     the row. `isnull`/`!isnull` are first-class nodes; comparisons never
+#     match missing.
 #   * Filters reference SOURCE column names (pre-rename); the pipeline order
-#     is fixed: bind → filter → offset/limit → project/rename/type.
+#     is fixed: resolve → filter → offset/limit → project/rename/type.
 #   * Selection order defines output order.
 
 # --- column references & selection items --------------------------------------
 
-"""
-    Tables.All()
-
-Selection item matching every column (in file order). Useful combined with
-renames. `select = (:id, Tables.All())` is an error because it produces the
-output name `id` twice; renaming the explicit selection avoids that conflict.
-"""
-struct All end
+import DataAPI: All
 
 """
     Tables.Not(ref)
@@ -89,54 +82,64 @@ _selectitem(x) = throw(ArgumentError("unsupported select item $(repr(x)); expect
 
 abstract type ScanExpr end
 
+struct Col <: ScanExpr
+    ref::Union{Symbol, String, Int}
+end
 """
     Tables.col(ref)
 
 A column reference inside a `Scan` filter: `col(:price) > 100`. Comparisons
-against literals, `in_`, `isnull`, `startswith`/`endswith`/`contains`, and
+against literals, `colin`, `isnull`, `startswith`/`endswith`/`contains`, and
 `&`/`|`/`!` build plain expression values.
 """
-struct Col <: ScanExpr
-    ref::Union{Symbol, String, Int}
-end
 col(r::Union{Symbol, AbstractString, Int}) = Col(r isa AbstractString ? String(r) : r)
 
-const OP_EQ, OP_NE, OP_LT, OP_LE, OP_GT, OP_GE = 0x01, 0x02, 0x03, 0x04, 0x05, 0x06
+@enum ComparisonOperator::UInt8 begin
+    OP_EQ = 0x01
+    OP_NE = 0x02
+    OP_LT = 0x03
+    OP_LE = 0x04
+    OP_GT = 0x05
+    OP_GE = 0x06
+end
 const _OPNAMES = ("==", "!=", "<", "<=", ">", ">=")
 _colcolerr() = throw(ArgumentError("column-to-column comparisons are not supported; " *
                                    "compare a column against a literal value"))
 
 struct Cmp{T} <: ScanExpr
-    op::UInt8
+    op::ComparisonOperator
     lhs::Col
     rhs::T
-    function Cmp(op::Integer, lhs::Col, rhs::T) where {T}
-        OP_EQ <= op <= OP_GE ||
-            throw(ArgumentError("unknown comparison operator code $op"))
+    function Cmp(op::ComparisonOperator, lhs::Col, rhs::T) where {T}
         rhs isa Col && _colcolerr()
-        return new{T}(UInt8(op), lhs, rhs)
+        return new{T}(op, lhs, rhs)
     end
 end
+function Cmp(op::Integer, lhs::Col, rhs)
+    0x01 <= op <= 0x06 || throw(ArgumentError("unknown comparison operator code $op"))
+    return Cmp(ComparisonOperator(op), lhs, rhs)
+end
 
+_comparisonoperator(::typeof(==)) = OP_EQ
+_comparisonoperator(::typeof(!=)) = OP_NE
+_comparisonoperator(::typeof(<)) = OP_LT
+_comparisonoperator(::typeof(<=)) = OP_LE
+_comparisonoperator(::typeof(>)) = OP_GT
+_comparisonoperator(::typeof(>=)) = OP_GE
+_comparisonoperator(op) = throw(ArgumentError(
+    "unsupported comparison function $(repr(op)); expected ==, !=, <, <=, >, or >=",
+))
 """
-    Tables.coleq(col, value)
-    Tables.colne(col, value)
-    Tables.collt(col, value)
-    Tables.colle(col, value)
-    Tables.colgt(col, value)
-    Tables.colge(col, value)
+    Tables.colcmp(op, col, value)
 
-Build a comparison predicate for a column and a literal value. These named
-constructors accept any literal type. `<`, `<=`, `>`, and `>=` provide shorthand
-for numeric, string, and character values. Equality uses `coleq` and `colne` so
-`Base.isequal` keeps its Boolean contract.
+Build a comparison predicate for a column and a literal value. `op` must be
+`==`, `!=`, `<`, `<=`, `>`, or `>=`. Ordered comparisons also support the
+shorthand `col(:x) < value` for numeric, string, and character values.
+
+Use `colcmp` for equality so `==` and `isequal` on expression objects keep
+their normal Boolean contracts.
 """
-coleq(c::Col, value) = Cmp(OP_EQ, c, value)
-colne(c::Col, value) = Cmp(OP_NE, c, value)
-collt(c::Col, value) = Cmp(OP_LT, c, value)
-colle(c::Col, value) = Cmp(OP_LE, c, value)
-colgt(c::Col, value) = Cmp(OP_GT, c, value)
-colge(c::Col, value) = Cmp(OP_GE, c, value)
+colcmp(op, c::Col, value) = Cmp(_comparisonoperator(op), c, value)
 
 struct In{T} <: ScanExpr
     lhs::Col
@@ -148,11 +151,12 @@ struct In{T} <: ScanExpr
 end
 
 """
-    Tables.in_(col, values)
+    Tables.colin(col, values)
 
-Membership predicate: `in_(col(:status), ("active", "trial"))`.
+Build a membership predicate: `colin(col(:status), ("active", "trial"))`.
+If the column value is `missing`, the predicate result is also `missing`.
 """
-in_(c::Col, values) = In(c, values)
+colin(c::Col, values) = In(c, values)
 
 struct IsNull <: ScanExpr
     lhs::Col
@@ -167,23 +171,29 @@ Use `!Tables.isnull(col)` to match values that are not `missing`.
 
 The `isnull` name is deliberate. Defining `Base.ismissing(::Col)` would
 specialize Base's broad fallback and invalidate unrelated precompiled code
-when Tables loads. Use `isnull` rather than `coleq(col(:x), missing)`, which
-follows SQL semantics and matches no row.
+when Tables loads. Use `isnull` rather than `colcmp(==, col(:x), missing)`,
+which follows SQL semantics and matches no row.
 """
 function isnull end
 isnull(c::Col) = IsNull(c, false)
 
-const STR_STARTSWITH, STR_ENDSWITH, STR_CONTAINS = 0x01, 0x02, 0x03
+@enum StringPredicate::UInt8 begin
+    STR_STARTSWITH = 0x01
+    STR_ENDSWITH = 0x02
+    STR_CONTAINS = 0x03
+end
 
 struct StrPred <: ScanExpr
-    kind::UInt8
+    kind::StringPredicate
     lhs::Col
     s::String
-    function StrPred(kind::Integer, lhs::Col, s::AbstractString)
-        STR_STARTSWITH <= kind <= STR_CONTAINS ||
-            throw(ArgumentError("unknown string predicate code $kind"))
-        return new(UInt8(kind), lhs, String(s))
+    function StrPred(kind::StringPredicate, lhs::Col, s::AbstractString)
+        return new(kind, lhs, String(s))
     end
+end
+function StrPred(kind::Integer, lhs::Col, s::AbstractString)
+    0x01 <= kind <= 0x03 || throw(ArgumentError("unknown string predicate code $kind"))
+    return StrPred(StringPredicate(kind), lhs, s)
 end
 
 struct AndExpr <: ScanExpr
@@ -201,29 +211,27 @@ struct AlwaysFalse <: ScanExpr end
 """
     Tables.OpNode(name, args)
 
-The expression algebra's growth channel: a named node with child values.
-Sources that recognize `name` may push it down; the generic executor rejects
-unknown names, so new operations deploy source-first without new node types.
+The expression algebra's growth channel. Every node has a symbolic `name` and
+plain-data arguments. A source can recognize and consume that name before
+generic resolution. An unconsumed `OpNode` is rejected by `Tables.resolve` and
+the generic executor.
 """
 struct OpNode <: ScanExpr
     name::Symbol
     args::Vector{Any}
 end
 
-for f in (:coleq, :colne, :collt, :colle, :colgt, :colge)
-    @eval $f(::Col, ::Col) = _colcolerr()
-end
 for T in (Number, AbstractString, AbstractChar)
     @eval begin
-        Base.:<(c::Col, v::$T) = collt(c, v)
-        Base.:<(v::$T, c::Col) = colgt(c, v)
-        Base.:<=(c::Col, v::$T) = colle(c, v)
-        Base.:<=(v::$T, c::Col) = colge(c, v)
+        Base.:<(c::Col, v::$T) = colcmp(<, c, v)
+        Base.:<(v::$T, c::Col) = colcmp(>, c, v)
+        Base.:<=(c::Col, v::$T) = colcmp(<=, c, v)
+        Base.:<=(v::$T, c::Col) = colcmp(>=, c, v)
     end
 end
 Base.:(==)(a::Col, b::Col) = a.ref == b.ref
 Base.isequal(a::Col, b::Col) = isequal(a.ref, b.ref)
-Base.hash(c::Col, h::UInt) = hash(c.ref, hash(:TablesCol, h))
+Base.hash(c::Col, h::UInt) = hash(c.ref, h + 0x6f38a7d1)
 Base.:<(::Col, ::Col) = _colcolerr()
 Base.:<=(::Col, ::Col) = _colcolerr()
 
@@ -255,7 +263,7 @@ _checkpredicate(e::ScanExpr) = e
 _checkpredicate(e::Col) =
     throw(ArgumentError("a bare column reference is not a predicate; compare it against a value"))
 _checkpredicate(x) =
-    throw(ArgumentError("filter must be a Tables.Scan expression (built from Tables.col), got $(typeof(x))"))
+    throw(ArgumentError("filter must be a Tables.ScanExpr built from Tables.col(...), got $(typeof(x))"))
 
 # --- the Scan value --------------------------------------------------------------
 
@@ -329,22 +337,16 @@ function Scan(s::Scan; select=s.select, filter=s.filter,
     return Scan(items, filter, lim, off, validate)
 end
 
-"""
-    isempty(scan::Tables.Scan)
-
-`true` when the scan requests nothing: no selection, no filter, no limit or
-offset. `Tables.scan` returns the table unchanged for an empty scan.
-"""
-Base.isempty(s::Scan) =
+_isidentity(s::Scan) =
     s.select === nothing && s.filter === nothing && s.limit === nothing && s.offset == 0
 
 
-# --- binding ---------------------------------------------------------------------
+# --- schema resolution -----------------------------------------------------------
 
 """
     Tables.BoundColumn
 
-One output column after `Tables.bind`: the source column index, the output
+One output column after `Tables.resolve`: the source column index, the output
 name (post-rename, uniqueness enforced), and the optional type override.
 """
 struct BoundColumn
@@ -357,8 +359,9 @@ end
     Tables.BoundScan
 
 A `Scan` resolved against a concrete schema: output columns in order, the
-(validated) filter with the source column indices it references, and the
-row bounds. Sources can use this after binding a raw `Scan`.
+filter with positional references normalized to source names, the source
+column indices it references, and the row bounds. Sources can use this after
+resolving a raw `Scan`.
 """
 struct BoundScan
     columns::Vector{BoundColumn}
@@ -366,37 +369,36 @@ struct BoundScan
     filtercols::Vector{Int}
     limit::Union{Nothing, Int}
     offset::Int
+    validate::Bool
 end
 
 _findcol(names, r::Symbol) = findfirst(==(r), names)
 _findcol(names, r::String) = findfirst(==(Symbol(r)), names)
 _findcol(names, r::Int) = 1 <= r <= length(names) ? r : nothing
+function _findcols(names, r::Regex)
+    return findall(nm -> occursin(r, String(nm)), names)
+end
+function _findcols(names, r)
+    i = _findcol(names, r)
+    return i === nothing ? Int[] : Int[i]
+end
 _refstr(r) = r isa Regex ? "r$(repr(r.pattern))" : repr(r)
 
 function _expand!(out::Vector{BoundColumn}, names, it::SelectItem, validate::Bool)
     r = it.ref
     if r isa All
         append!(out, BoundColumn(i, nm, it.type) for (i, nm) in enumerate(names))
-    elseif r isa Regex
-        found = false
-        for (i, nm) in enumerate(names)
-            if occursin(r, String(nm))
-                push!(out, BoundColumn(i, it.rename === nothing ? nm : it.rename, it.type))
-                found = true
-            end
-        end
-        validate && !found &&
-            throw(ArgumentError("select pattern $(_refstr(r)) matches no column"))
-        found && it.rename !== nothing && count(c -> c.name == it.rename, out) > 1 &&
-            throw(ArgumentError("pattern rename $(repr(it.rename)) applies to multiple columns"))
     else
-        i = _findcol(names, r)
-        if i === nothing
+        found = _findcols(names, r)
+        if isempty(found)
             validate && throw(ArgumentError("select reference $(_refstr(r)) matches no column " *
                                             "(pass validate=false to skip unmatched references)"))
             return
         end
-        push!(out, BoundColumn(i, it.rename === nothing ? names[i] : it.rename, it.type))
+        r isa Regex && it.rename !== nothing && length(found) > 1 &&
+            throw(ArgumentError("pattern rename $(repr(it.rename)) applies to multiple columns"))
+        append!(out, BoundColumn(i, it.rename === nothing ? names[i] : it.rename, it.type)
+                     for i in found)
     end
     return
 end
@@ -404,32 +406,45 @@ end
 _notrefs(x::Union{Tuple, AbstractVector}) = collect(Any, x)
 _notrefs(x) = Any[x]
 
-function _filterrefs!(refs::Vector{Int}, e::ScanExpr, names, validate::Bool)
-    if e isa Union{Cmp, In, IsNull, StrPred}
-        i = _findcol(names, e.lhs.ref)
+function _resolvefilter(e::ScanExpr, names, refs::Vector{Int}, validate::Bool)
+    if e isa Col
+        i = _findcol(names, e.ref)
         i === nothing && validate &&
-            throw(ArgumentError("filter references unknown column $(_refstr(e.lhs.ref))"))
-        i === nothing || (i in refs || push!(refs, i))
+            throw(ArgumentError("filter references unknown column $(_refstr(e.ref))"))
+        i === nothing && return e
+        i in refs || push!(refs, i)
+        return Col(names[i])
+    elseif e isa Cmp
+        return Cmp(e.op, _resolvefilter(e.lhs, names, refs, validate), e.rhs)
+    elseif e isa In
+        return In(_resolvefilter(e.lhs, names, refs, validate), e.values)
+    elseif e isa IsNull
+        return IsNull(_resolvefilter(e.lhs, names, refs, validate), e.negated)
+    elseif e isa StrPred
+        return StrPred(e.kind, _resolvefilter(e.lhs, names, refs, validate), e.s)
     elseif e isa AndExpr || e isa OrExpr
-        foreach(a -> _filterrefs!(refs, a, names, validate), e.args)
+        args = ScanExpr[_resolvefilter(a, names, refs, validate) for a in e.args]
+        return e isa AndExpr ? AndExpr(args) : OrExpr(args)
     elseif e isa NotExpr
-        _filterrefs!(refs, e.arg, names, validate)
+        return NotExpr(_resolvefilter(e.arg, names, refs, validate))
     elseif e isa OpNode
-        throw(ArgumentError("cannot bind extension node $(repr(e.name)): no generic evaluation; " *
-                            "only sources that recognize it may consume it"))
+        throw(ArgumentError("cannot resolve extension node $(repr(e.name)); " *
+                            "a source must consume it before calling Tables.resolve"))
     end
-    return refs
+    return e
 end
 
 """
-    Tables.bind(scan::Scan, names) -> BoundScan
+    Tables.resolve(scan::Scan, names) -> BoundScan
 
 Resolve a `Scan` against a source's column names (any iterable of `Symbol`s).
 Errors on unmatched references (under `validate`), mixed `Not`/positive
 selections, and duplicate output names. Regex references expand in file
-order; selection order defines output order.
+order; selection order defines output order. Positional filter references are
+replaced with source names so the resolved filter remains valid over a subset
+containing only its referenced columns.
 """
-function bind(scan::Scan, names)
+function resolve(scan::Scan, names)
     nms = collect(Symbol, names)
     cols = BoundColumn[]
     if scan.select === nothing
@@ -437,22 +452,11 @@ function bind(scan::Scan, names)
     elseif !isempty(scan.select) && scan.select[1].ref isa Not
         excluded = Set{Int}()
         for it in scan.select, r in _notrefs((it.ref::Not).ref)
-            if r isa Regex
-                found = false
-                for (i, nm) in enumerate(nms)
-                    if occursin(r, String(nm))
-                        push!(excluded, i)
-                        found = true
-                    end
-                end
-                scan.validate && !found &&
-                    throw(ArgumentError("Not pattern $(_refstr(r)) matches no column"))
-            else
-                i = _findcol(nms, r)
-                i === nothing && scan.validate &&
-                    throw(ArgumentError("Not reference $(_refstr(r)) matches no column"))
-                i === nothing || push!(excluded, i)
-            end
+            found = _findcols(nms, r)
+            scan.validate && isempty(found) && throw(ArgumentError(
+                "Not(...) $(r isa Regex ? "pattern" : "reference") $(_refstr(r)) matches no column",
+            ))
+            union!(excluded, found)
         end
         append!(cols, BoundColumn(i, nm, nothing) for (i, nm) in enumerate(nms) if !(i in excluded))
     else
@@ -465,8 +469,9 @@ function bind(scan::Scan, names)
         push!(seen, c.name)
     end
     refs = Int[]
-    scan.filter === nothing || _filterrefs!(refs, scan.filter, nms, scan.validate)
-    return BoundScan(cols, scan.filter, refs, scan.limit, scan.offset)
+    filter = scan.filter === nothing ? nothing :
+             _resolvefilter(scan.filter, nms, refs, scan.validate)
+    return BoundScan(cols, filter, refs, scan.limit, scan.offset, scan.validate)
 end
 
 # --- generic evaluation ------------------------------------------------------------
@@ -475,11 +480,9 @@ _getcol(cols, ref::Symbol) = getcolumn(cols, ref)
 _getcol(cols, ref::String) = getcolumn(cols, Symbol(ref))
 _getcol(cols, ref::Int) = getcolumn(cols, ref)
 
-# Resolve a filter leaf's column. Under `strict` an unknown reference is an
-# error; otherwise it resolves to `nothing` and the leaf evaluates as an
-# ALL-MISSING column — the schema-evolution semantics: a column this table
-# does not have reads as missing everywhere (`isnull` keeps every row, every
-# comparison excludes, and three-valued `&`/`|` compose from there).
+# Under `strict`, an unknown filter reference is an error. Otherwise, it
+# resolves to an all-missing column. `isnull` then keeps every row, comparisons
+# exclude every row, and Boolean expressions use three-valued logic.
 function _resolvecol(cols, ref, strict::Bool)
     i = _findcol(columnnames(cols), ref)
     i === nothing || return getcolumn(cols, i)
@@ -511,13 +514,13 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
     elseif e isa In
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
-        return _columnmap(x -> in(x, e.values), a, rowcount(cols))
+        return _columnmap(x -> ismissing(x) ? missing : in(x, e.values), a, rowcount(cols))
     elseif e isa IsNull
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing &&
             return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
-        return e.negated ? _columnmap(x -> !Base.ismissing(x), a, rowcount(cols)) :
-                           _columnmap(Base.ismissing, a, rowcount(cols))
+        return e.negated ? _columnmap(x -> !ismissing(x), a, rowcount(cols)) :
+                           _columnmap(ismissing, a, rowcount(cols))
     elseif e isa StrPred
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return fill(missing, rowcount(cols))
@@ -525,7 +528,7 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
             e.kind == STR_ENDSWITH ? endswith :
             e.kind == STR_CONTAINS ? contains :
             throw(ArgumentError("unknown string predicate code $(e.kind)"))
-        return _columnmap(x -> Base.ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
+        return _columnmap(x -> ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
     elseif e isa AndExpr
         isempty(e.args) && return trues(rowcount(cols))
         return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .& y, e.args)
@@ -542,16 +545,6 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
     throw(ArgumentError("cannot generically evaluate $(typeof(e))"))
 end
 
-"""
-    Tables.filtermask(scan_or_expr, table) -> AbstractVector{Bool}
-
-Evaluate a scan's filter over a table's columns: `mask[i]` is `true` iff row
-`i` qualifies (a `missing` predicate result excludes the row). Sources use
-this for their own pushdown implementations. The bare-expression form is
-strict about unknown column references; the `Scan` form follows the scan's
-`validate` — under `validate=false` an unmatched reference evaluates as an
-all-missing column.
-"""
 # The Bool-mask comprehension runs behind a FUNCTION BARRIER: `_evalexpr`
 # returns an abstractly-typed vector (its result type depends on the
 # expression tree), and `Bool[x === true for x in v]` over an abstract `v`
@@ -560,48 +553,119 @@ all-missing column.
 # barrier costs ONE dynamic dispatch per mask instead. The column kernels
 # inside `_evalexpr` specialize on the concrete container at their own call
 # boundary.
-_boolmask(v::AbstractVector) = Bool[x === true for x in v]
+@noinline _boolmask(v::AbstractVector) = Bool[x === true for x in v]
+"""
+    Tables.filtermask(scan_or_expr, table) -> AbstractVector{Bool}
+
+Evaluate a scan's filter over a table's columns: `mask[i]` is `true` iff row
+`i` qualifies (a `missing` predicate result excludes the row). Sources use
+this for their own pushdown implementations. The bare-expression form is
+strict about unknown column references. The `Scan` form follows the scan's
+`validate` setting. The `BoundScan` form uses its resolved filter and is safe
+to evaluate over a table containing only `filtercols`.
+"""
 filtermask(e::ScanExpr, table) = _boolmask(_evalexpr(_checkpredicate(e), columns(table)))
 filtermask(s::Scan, table) = s.filter === nothing ?
+    trues(rowcount(columns(table))) :
+    _boolmask(_evalexpr(s.filter, columns(table), s.validate))
+filtermask(s::BoundScan, table) = s.filter === nothing ?
     trues(rowcount(columns(table))) :
     _boolmask(_evalexpr(s.filter, columns(table), s.validate))
 
 _converted(::Nothing, c::AbstractVector) = c
 function _converted(::Type{T}, c::AbstractVector) where {T}
     eltype(c) <: Union{T, Missing} && return c
-    anymissing = any(Base.ismissing, c)
+    anymissing = any(ismissing, c)
     E = anymissing ? Union{T, Missing} : T
-    return E[Base.ismissing(x) ? missing : convert(T, x) for x in c]
+    out = allocatecolumn(E, length(c))
+    @inbounds for i in eachindex(c)
+        x = c[i]
+        out[i] = ismissing(x) ? missing : convert(T, x)
+    end
+    return out
 end
 
 _takecolumn(c::AbstractVector, idx) = c[idx]
 _takecolumn(c, idx) = [c[i] for i in idx]
 
+struct _ScanTable{T <: NamedTuple} <: AbstractColumns
+    columns::T
+    nrows::Int
+end
+columnnames(t::_ScanTable) = propertynames(getfield(t, :columns))
+getcolumn(t::_ScanTable, i::Int) = getfield(getfield(t, :columns), i)
+getcolumn(t::_ScanTable, name::Symbol) = getproperty(getfield(t, :columns), name)
+rowcount(t::_ScanTable) = getfield(t, :nrows)
+
+function _zerocolumnpredicate(e)
+    e === nothing && return true
+    e isa AlwaysTrue && return true
+    e isa AlwaysFalse && return false
+    e isa IsNull && return !e.negated
+    if e isa AndExpr
+        sawmissing = false
+        for arg in e.args
+            result = _zerocolumnpredicate(arg)
+            result === false && return false
+            result === missing && (sawmissing = true)
+        end
+        return sawmissing ? missing : true
+    elseif e isa OrExpr
+        sawmissing = false
+        for arg in e.args
+            result = _zerocolumnpredicate(arg)
+            result === true && return true
+            result === missing && (sawmissing = true)
+        end
+        return sawmissing ? missing : false
+    elseif e isa NotExpr
+        result = _zerocolumnpredicate(e.arg)
+        return result === missing ? missing : !result
+    elseif e isa OpNode
+        throw(ArgumentError("cannot generically evaluate extension node $(repr(e.name))"))
+    end
+    return missing
+end
+
+function _windowcount(n::Int, filterresult, offset::Int, limit::Union{Nothing, Int})
+    filterresult === true || return 0
+    skipped = min(offset, n)
+    available = n - skipped
+    return limit === nothing ? available : min(limit, available)
+end
+
 """
     Tables.scan(table, scan::Scan) -> table′
 
-Apply a `Scan` generically over ANY Tables.jl table: filter (SQL missing
-semantics: a predicate evaluating to `missing` excludes the row), then
-offset/limit, then projection, renames, and type overrides (elementwise
-`convert`). Returns the table unchanged when the scan is empty; otherwise a
-`NamedTuple` of columns. This is the reference semantics every pushdown
-must agree with, and the executor sources hand their residual to.
+Apply a `Scan` generically over any Tables.jl table: filter, then offset/limit,
+then projection, renames, and type overrides. A filter keeps only exact `true`;
+`missing` excludes the row. The input table is returned unchanged for an
+identity request. Other results are column tables. A zero-column result keeps
+its row count.
+
+This is the reference behavior every pushdown must preserve. A source can hand
+its unconsumed residual request to this function.
 """
 function scan(table, scan::Scan)
-    isempty(scan) && return table
+    _isidentity(scan) && return table
     cols = columns(table)
-    b = bind(scan, columnnames(cols))
-    if scan.filter !== nothing
-        keep = _boolmask(_evalexpr(scan.filter, cols, scan.validate))
+    b = resolve(scan, columnnames(cols))
+    nrows = rowcount(cols)
+    if isempty(columnnames(cols))
+        taken = _windowcount(nrows, _zerocolumnpredicate(b.filter), b.offset, b.limit)
+        return _ScanTable(NamedTuple(), taken)
+    elseif b.filter !== nothing
+        keep = filtermask(b, cols)
         idx = findall(keep)
     else
-        idx = 1:rowcount(cols)
+        idx = 1:nrows
     end
-    skipped = min(scan.offset, length(idx))
+    skipped = min(b.offset, length(idx))
     available = length(idx) - skipped
-    taken = scan.limit === nothing ? available : min(scan.limit, available)
+    taken = b.limit === nothing ? available : min(b.limit, available)
     idx = idx[(skipped + 1):(skipped + taken)]
     outnames = Tuple(c.name for c in b.columns)
+    isempty(outnames) && return _ScanTable(NamedTuple(), taken)
     outcols = Tuple(_converted(c.type, _takecolumn(getcolumn(cols, c.index), idx)) for c in b.columns)
     return NamedTuple{outnames}(outcols)
 end
@@ -609,8 +673,8 @@ end
 # --- display -----------------------------------------------------------------------
 
 function _exprstr(e::ScanExpr)
-    e isa Cmp && return "col($(repr(e.lhs.ref))) $(_OPNAMES[e.op]) $(repr(e.rhs))"
-    e isa In && return "in_(col($(repr(e.lhs.ref))), $(repr(e.values)))"
+    e isa Cmp && return "colcmp($(_OPNAMES[Int(e.op)]), col($(repr(e.lhs.ref))), $(repr(e.rhs)))"
+    e isa In && return "colin(col($(repr(e.lhs.ref))), $(repr(e.values)))"
     e isa IsNull && return (e.negated ? "!isnull(" : "isnull(") * "col($(repr(e.lhs.ref))))"
     e isa StrPred && return (e.kind == STR_STARTSWITH ? "startswith" :
                              e.kind == STR_ENDSWITH ? "endswith" : "contains") *
@@ -654,6 +718,6 @@ EXPLAIN affordance for pushdown debugging.
 """
 function describe(io::IO, scan::Scan, residual::Scan)
     println(io, "scan:     ", scan)
-    println(io, "residual: ", isempty(residual) ? "(empty — fully pushed down)" : residual)
+    println(io, "residual: ", _isidentity(residual) ? "(empty — fully pushed down)" : residual)
 end
 describe(scan::Scan, residual::Scan) = describe(stdout, scan, residual)

@@ -10,6 +10,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Using the Interface" => "using-the-interface.md",
+        "Scan Requests" => "scan.md",
         "Implementing the Interface" => "implementing-the-interface.md",
         "API Reference" => "api.md",
     ],
