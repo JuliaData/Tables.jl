@@ -65,7 +65,15 @@ function _selectitem(x::Not)
         throw(ArgumentError("Not references must be Symbol/String/Int/Regex values"))
     return SelectItem(x, nothing, nothing)
 end
-_selectitem(x::Union{Symbol, String, Int, Regex, Not, All}) = SelectItem(x, nothing, nothing)
+function _selectitem(x::All)
+    # DataAPI.All(cols...) with arguments is deprecated DataFrames syntax;
+    # silently selecting every column would be a data-loss trap
+    isempty(x.cols) ||
+        throw(ArgumentError("Tables.All() takes no arguments in a scan selection; " *
+                            "list the columns directly instead of All(cols...)"))
+    return SelectItem(x, nothing, nothing)
+end
+_selectitem(x::Union{Symbol, String, Int, Regex, Not}) = SelectItem(x, nothing, nothing)
 _selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, Symbol}) = SelectItem(p.first, nothing, p.second)
 _selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, String}) = SelectItem(p.first, nothing, Symbol(p.second))
 _selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, <:Type}) = SelectItem(p.first, p.second, nothing)
@@ -581,7 +589,11 @@ filtermask(s::BoundScan, table) = s.filter === nothing ?
 
 _converted(::Nothing, c::AbstractVector) = c
 function _converted(::Type{T}, c::AbstractVector) where {T}
-    eltype(c) <: Union{T, Missing} && return c
+    # eltype Union{} (necessarily empty) is vacuously <: everything, but the
+    # requested output schema still owes the override type
+    if eltype(c) !== Union{} && eltype(c) <: Union{T, Missing}
+        return c
+    end
     anymissing = any(ismissing, c)
     E = anymissing ? Union{T, Missing} : T
     out = allocatecolumn(E, length(c))

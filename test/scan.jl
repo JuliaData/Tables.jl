@@ -321,4 +321,32 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test occursin("fully pushed down", String(take!(io)))
     end
 
+    @testset "All arguments, Union{} override, residual composition" begin
+        # DataAPI.All(cols...) with arguments must not silently select everything
+        @test_throws ArgumentError T.Scan(select = T.All(:a))
+        @test_throws ArgumentError T.Scan(select = (T.All(:a, :b),))
+
+        # a Union{} column still honors the requested override type
+        empty = T.scan((u = Union{}[],), T.Scan(select = (:u => Float64,)))
+        @test T.columntable(empty).u isa Vector{Float64}
+
+        # residual composition: stripping a consumed axis reproduces the
+        # reference result, in execution order (filter, then row bounds,
+        # then projection)
+        source = (a = collect(1:6), b = collect(10.0:10.0:60.0))
+        request = T.Scan(select = (:b => :value,), filter = T.col(:a) > 2,
+                         limit = 2, offset = 1)
+        reference = T.columntable(T.scan(source, request))
+        @test reference == (value = [40.0, 50.0],)
+        # source consumed the filter
+        mask = T.filtermask(request, source)
+        filtered = (a = source.a[mask], b = source.b[mask])
+        residual = T.Scan(request; filter = nothing)
+        @test T.columntable(T.scan(filtered, residual)) == reference
+        # source consumed the filter and the row bounds
+        bounded = (a = filtered.a[2:3], b = filtered.b[2:3])
+        residual2 = T.Scan(request; filter = nothing, limit = nothing, offset = 0)
+        @test T.columntable(T.scan(bounded, residual2)) == reference
+    end
+
 end
