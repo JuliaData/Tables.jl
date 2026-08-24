@@ -706,6 +706,8 @@ include("matrix.jl")
 # dict tables
 include("dicts.jl")
 
+include("scan.jl")
+
 """
     Tables.columnindex(table, name::Symbol)
 
