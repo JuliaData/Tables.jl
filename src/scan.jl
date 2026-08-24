@@ -9,8 +9,9 @@
 # scan=Tables.Scan(...))`, `Arrow.Table(path; scan=...)` — and apply what they
 # can WHILE materializing (skipping columns never parsed, rows never decoded).
 # What a source cannot push down it either rejects with an ArgumentError, or
-# hands to `Tables.scan` as a residual (`Tables.Scan(scan; select=All())`
-# strips the axes it already handled). Sources are free to support only a
+# hands to `Tables.scan` as a residual (e.g. `Tables.Scan(scan; filter=nothing)`
+# after evaluating the filter itself; axes strip in execution order — filter,
+# then row bounds, then projection). Sources are free to support only a
 # subset — the value is the shared vocabulary and the pushdown, not a
 # capability-negotiation protocol.
 #
@@ -283,10 +284,10 @@ qualify, and how many. Plain data all the way down — see `Tables.scan` for
 the generic executor and the module comment for how sources push it down.
 
   * `select`: a column reference or tuple/vector of select items
-    (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`;
-    refs are `Symbol`/`String`/`Int`/`Regex`/`Tables.Not`/`Tables.All`).
-    `Tables.All()` keeps every column; `()` selects zero columns. Selection
-    order = output order.
+    (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`; refs in the
+    pair forms are `Symbol`/`String`/`Int`/`Regex`, while bare `Tables.Not`
+    and `Tables.All()` items stand alone). `Tables.All()` keeps every column;
+    `()` selects zero columns. Selection order = output order.
   * `filter`: an expression built from `Tables.col`; a row is kept iff the
     predicate evaluates to exactly `true` (`missing` excludes, SQL-style).
     Filters see source column names, before renames.
@@ -333,9 +334,16 @@ end
                 limit=scan.limit, offset=scan.offset, validate=scan.validate)
 
 Copy a scan with some axes replaced — how a source builds the RESIDUAL it
-hands to `Tables.scan` after pushing the rest down: a reader that handled
-projection, types and limits itself but cannot filter does
-`Tables.scan(table, Tables.Scan(scan; select=All(), limit=nothing, offset=0))`.
+hands to `Tables.scan` after pushing the rest down. The axes compose in a
+fixed order — filter, then row bounds, then projection — so a source may only
+strip an axis it performed exactly, together with every axis that comes
+before it: a reader that evaluated the filter itself hands over
+`Tables.Scan(scan; filter=nothing)`; one that also applied the row bounds
+hands over `Tables.Scan(scan; filter=nothing, limit=nothing, offset=0)`.
+Projection (`select=All()`) can only be stripped in addition when no residual
+filter references a column the projection dropped or renamed. A reader that
+cannot consume the filter must leave `limit`/`offset` in the residual too —
+they count qualifying rows, not raw rows.
 """
 function Scan(s::Scan; select=s.select, filter=s.filter,
               limit::Union{Nothing, Integer}=s.limit,

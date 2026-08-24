@@ -55,7 +55,7 @@ Tables.Scan(select = (
     :id,
     r"^metric_",
     :price => Float64,
-    :timestamp => DateTime => :created_at,
+    :qty => Int => :quantity,
 ))
 ```
 
@@ -122,17 +122,29 @@ bound = Tables.resolve(request, source_names)
 mask = Tables.filtermask(bound, predicate_columns)
 ```
 
-If a source consumes an axis, it removes that axis from the residual. For
-example, a source that performs projection but leaves filtering and row bounds
-for the generic executor can use:
+If a source consumes an axis, it removes that axis from the residual. The
+axes compose in a fixed order — filter, then row bounds, then projection —
+so an axis can only be removed together with every axis that executes before
+it. A source that evaluated the filter itself (for example with
+`Tables.filtermask`) hands the rest to the generic executor:
 
 ```julia
-residual = Tables.Scan(request; select=Tables.All())
-result = Tables.scan(materialized_columns, residual)
+residual = Tables.Scan(request; filter=nothing)
+result = Tables.scan(filtered_columns, residual)
 ```
 
-`Tables.All()` is the projection identity, so the residual does not repeat
-projection work. Only remove work that the source performed exactly.
+A source that also applied `limit`/`offset` to the qualifying rows strips
+those too (`Tables.Scan(request; filter=nothing, limit=nothing, offset=0)`,
+leaving only projection). Two constraints follow from the ordering:
+
+- `limit`/`offset` count qualifying rows, after the filter. A source that
+  cannot consume the filter must leave the row bounds in the residual as
+  well.
+- Projection may be stripped (`select=Tables.All()`, the projection identity)
+  only when no residual filter references a column the projection dropped or
+  renamed — the residual filter still uses source column names.
+
+Only remove work that the source performed exactly.
 
 A statistics check that only prunes impossible partitions does not consume the
 filter.
