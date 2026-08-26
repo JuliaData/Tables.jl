@@ -47,9 +47,9 @@ const ColRef = Union{Symbol, String, Int, Regex}
 """
     Tables.SelectItem
 
-One resolved element of `Scan.select`: a column reference plus optional type
-override and output name. Users never construct these directly — the `Scan`
-constructor lowers `ref`, `ref => name`, `ref => Type`, and
+One resolved element of a [`Scan`](@ref)'s `select` field: a column reference
+plus optional type override and output name. Users never construct these
+directly. The `Scan` constructor lowers `ref`, `ref => name`, `ref => Type`, and
 `ref => Type => name` forms.
 """
 struct SelectItem
@@ -179,8 +179,9 @@ end
 """
     Tables.isnull(col)
 
-Build a predicate that is true when the column value is Julia's `missing`.
-Use `!Tables.isnull(col)` to match values that are not `missing`.
+Build a predicate for a [`Scan`](@ref) filter that is true when the column value
+is Julia's `missing`. Use `!Tables.isnull(col)` to match values that are not
+`missing`.
 
 The `isnull` name is deliberate. Defining `Base.ismissing(::Col)` would
 specialize Base's broad fallback and invalidate unrelated precompiled code
