@@ -31,8 +31,6 @@
 
 # --- column references & selection items --------------------------------------
 
-import DataAPI: All
-
 """
     Tables.Not(ref)
 
@@ -94,12 +92,14 @@ abstract type ScanExpr end
 struct Col <: ScanExpr
     ref::Union{Symbol, String, Int}
 end
+
 """
     Tables.col(ref)
 
-A column reference inside a `Scan` filter: `col(:price) > 100`. Comparisons
-against literals, `colin`, `isnull`, `startswith`/`endswith`/`contains`, and
-`&`/`|`/`!` build plain expression values.
+A column reference inside a [`Scan`](@ref) filter: for example,
+`col(:price) > 100`. Comparisons against literals, [`colin`](@ref),
+[`isnull`](@ref), `startswith`/`endswith`/`contains`, and `&`/`|`/`!` build
+plain expression values.
 """
 col(r::Union{Symbol, AbstractString, Int}) = Col(r isa AbstractString ? String(r) : r)
 
@@ -124,6 +124,7 @@ struct Cmp{T} <: ScanExpr
         return new{T}(op, lhs, rhs)
     end
 end
+# Accept validated integer codes when reconstructing plain-data expressions.
 function Cmp(op::Integer, lhs::Col, rhs)
     0x01 <= op <= 0x06 || throw(ArgumentError("unknown comparison operator code $op"))
     return Cmp(ComparisonOperator(op), lhs, rhs)
@@ -138,15 +139,16 @@ _comparisonoperator(::typeof(>=)) = OP_GE
 _comparisonoperator(op) = throw(ArgumentError(
     "unsupported comparison function $(repr(op)); expected ==, !=, <, <=, >, or >=",
 ))
+
 """
     Tables.colcmp(op, col, value)
 
-Build a comparison predicate for a column and a literal value. `op` must be
-`==`, `!=`, `<`, `<=`, `>`, or `>=`. Ordered comparisons also support the
-shorthand `col(:x) < value` for numeric, string, and character values.
+Build a comparison predicate for a column and a literal value to be used inside
+a [`Scan`](@ref) filter. `op` must be `==`, `!=`, `<`, `<=`, `>`, or `>=`.
 
-Use `colcmp` for equality so `==` and `isequal` on expression objects keep
-their normal Boolean contracts.
+Ordered comparisons can also use operators directly, such as
+`col(:x) < value`, for numeric, string, and character values. Equality must use
+`colcmp` because `==` and `isequal` on expression objects return a `Bool`.
 """
 colcmp(op, c::Col, value) = Cmp(_comparisonoperator(op), c, value)
 
@@ -162,8 +164,10 @@ end
 """
     Tables.colin(col, values)
 
-Build a membership predicate: `colin(col(:status), ("active", "trial"))`.
-If the column value is `missing`, the predicate result is also `missing`.
+Build a membership predicate to be used inside a [`Scan`](@ref) filter: for
+example, `colin(col(:status), ("active", "trial"))`. If the column value is
+`missing`, the predicate result is also `missing`, even when the values
+container could otherwise match `missing`.
 """
 colin(c::Col, values) = In(c, values)
 
@@ -200,6 +204,7 @@ struct StrPred <: ScanExpr
         return new(kind, lhs, String(s))
     end
 end
+# Accept validated integer codes when reconstructing plain-data expressions.
 function StrPred(kind::Integer, lhs::Col, s::AbstractString)
     0x01 <= kind <= 0x03 || throw(ArgumentError("unknown string predicate code $kind"))
     return StrPred(StringPredicate(kind), lhs, s)
@@ -220,10 +225,10 @@ struct AlwaysFalse <: ScanExpr end
 """
     Tables.OpNode(name, args)
 
-The expression algebra's growth channel. Every node has a symbolic `name` and
-plain-data arguments. A source can recognize and consume that name before
-generic resolution. An unconsumed `OpNode` is rejected by `Tables.resolve` and
-the generic executor.
+A source-specific, plain-data filter operation. A source can recognize `name`,
+interpret `args`, and remove the operation before calling [`resolve`](@ref).
+The generic executor cannot interpret source-specific operations and rejects an
+unconsumed `OpNode`.
 """
 struct OpNode <: ScanExpr
     name::Symbol
@@ -369,8 +374,8 @@ _isidentity(s::Scan) =
 """
     Tables.BoundColumn
 
-One output column after `Tables.resolve`: the source column index, the output
-name (post-rename, uniqueness enforced), and the optional type override.
+One output column after [`resolve`](@ref): the source column index, the output
+name after renaming, and the optional type override. Output names are unique.
 """
 struct BoundColumn
     index::Int
@@ -381,7 +386,7 @@ end
 """
     Tables.BoundScan
 
-A `Scan` resolved against a concrete schema: output columns in order, the
+A [`Scan`](@ref) resolved against a concrete schema: output columns in order, the
 filter with positional references normalized to source names, the source
 column indices it references, and the row bounds. Sources can use this after
 resolving a raw `Scan`.
@@ -460,7 +465,8 @@ end
 """
     Tables.resolve(scan::Scan, names) -> BoundScan
 
-Resolve a `Scan` against a source's column names (any iterable of `Symbol`s).
+Resolve a [`Scan`](@ref) against a source's column names (any iterable of
+`Symbol`s).
 Errors on unmatched references (under `validate`), mixed `Not`/positive
 selections, and duplicate output names. Regex references expand in file
 order; selection order defines output order. Positional filter references are
@@ -580,12 +586,13 @@ end
 """
     Tables.filtermask(scan_or_expr, table) -> AbstractVector{Bool}
 
-Evaluate a scan's filter over a table's columns: `mask[i]` is `true` iff row
-`i` qualifies (a `missing` predicate result excludes the row). Sources use
-this for their own pushdown implementations. The bare-expression form is
-strict about unknown column references. The `Scan` form follows the scan's
-`validate` setting. The `BoundScan` form uses its resolved filter and is safe
-to evaluate over a table containing only `filtercols`.
+Evaluate a [`Scan`](@ref)'s filter over a table's columns. `mask[i]` is `true`
+if and only if row `i` qualifies. A `missing` predicate result excludes the
+row. Sources use this for their own pushdown implementations. The
+bare-expression form is strict about unknown column references. The `Scan`
+form follows the scan's `validate` setting. The `BoundScan` form uses its
+resolved filter and is safe to evaluate over a table containing only
+`filtercols`.
 """
 filtermask(e::ScanExpr, table) = _boolmask(_evalexpr(_checkpredicate(e), columns(table)))
 filtermask(s::Scan, table) = s.filter === nothing ?
@@ -605,10 +612,7 @@ function _converted(::Type{T}, c::AbstractVector) where {T}
     anymissing = any(ismissing, c)
     E = anymissing ? Union{T, Missing} : T
     out = allocatecolumn(E, length(c))
-    @inbounds for i in eachindex(c)
-        x = c[i]
-        out[i] = ismissing(x) ? missing : convert(T, x)
-    end
+    copyto!(out, c)
     return out
 end
 
