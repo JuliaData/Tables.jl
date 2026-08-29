@@ -213,7 +213,7 @@ end
             WT = wrappedtype(eltype(rowitr))
             if WT <: Tuple
                 return allocatecolumns(Schema((Symbol("Column$i") for i = 1:fieldcount(WT)), _fieldtypes(WT)), 0)
-            elseif isconcretetype(WT) && fieldcount(WT) > 0
+            elseif !(WT <: AbstractArray) && isconcretetype(WT) && fieldcount(WT) > 0
                 return allocatecolumns(Schema(fieldnames(WT), _fieldtypes(WT)), 0)
             end
         end

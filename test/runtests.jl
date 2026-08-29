@@ -488,6 +488,11 @@ Base.propertynames(g::GenericTable) = (:a, :b, :c)
     t = Tables.columns(rows)
     @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int64, Float64, String))
 
+    # Array fields are implementation details, not table columns (#353).
+    @test Tables.columntable(Vector{Any}[]) === NamedTuple()
+    @test Tables.columntable(typeof(view(Any[], :))[]) === NamedTuple()
+    @test Tables.columntable(Matrix{Any}[]) === NamedTuple()
+
     # 311
     gt = GenericTable()
     @test Tables.schema(gt) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
