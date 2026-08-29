@@ -4,6 +4,20 @@ end
 Base.length(c::IndexOnlyColumn) = length(c.data)
 Base.getindex(c::IndexOnlyColumn, i::Int) = c.data[i]
 
+struct CopyAwareColumn <: AbstractVector{Int}
+    data::Vector{Int}
+    copied::Base.RefValue{Bool}
+end
+Base.size(c::CopyAwareColumn) = size(c.data)
+Base.getindex(c::CopyAwareColumn, i::Int) = c.data[i]
+function Base.copyto!(dest::Vector{Float64}, src::CopyAwareColumn)
+    src.copied[] = true
+    @inbounds for i in eachindex(src)
+        dest[i] = src[i]
+    end
+    return dest
+end
+
 struct IndexOnlyTable{T} <: Tables.AbstractColumns
     a::IndexOnlyColumn{T}
 end
@@ -147,6 +161,15 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test out.b == ["yy", "zzz"]
         missingvals = (a = Union{Int, Missing}[1, missing, 3],
                        b = Union{String, Missing}["x", missing, "z"])
+        missingcols = T.columns(missingvals)
+        @test isequal(
+            T._evalexpr(T.colcmp(==, T.col(:a), 1), missingcols),
+            Union{Bool, Missing}[true, missing, false],
+        )
+        @test isequal(
+            T._evalexpr(T.colin(T.col(:a), (1, 2)), missingcols),
+            Union{Bool, Missing}[true, missing, false],
+        )
         @test T.filtermask(T.colin(T.col(:a), (1, missing)), missingvals) ==
               [true, false, false]
         @test T.filtermask(T.colin(T.col(:a), (2, missing)), missingvals) ==
@@ -191,6 +214,10 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test eltype(out.a) == Union{Float64, Missing}
         converted = Union{Float64, Missing}[1.0, missing]
         @test T._converted(Float64, converted) === converted
+        copied = Ref(false)
+        copyaware = CopyAwareColumn([1, 2, 3], copied)
+        @test T._converted(Float64, copyaware) == [1.0, 2.0, 3.0]
+        @test copied[]
         @test_throws InexactError T.scan((a = [1.5],), T.Scan(select = (:a => Int,)))
         indexonly = IndexOnlyTable(IndexOnlyColumn([10, 20, 30, 40]))
         @test T.scan(indexonly, T.Scan(select = :a, offset = 1, limit = 2)).a == [20, 30]

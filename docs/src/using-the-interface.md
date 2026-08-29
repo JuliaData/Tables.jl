@@ -2,6 +2,9 @@
 
 We start by discussing _usage_ of the Tables.jl interface functions, since that can help contextualize _implementing_ them for custom table types.
 
+To select columns, filter rows, or apply row limits through a shared request,
+see the consumer section of [Scan Requests](scan.md#Consumer-API).
+
 At a high level, Tables.jl provides two powerful APIs for predictably accessing data from any table-like source:
 ```julia
 # access data of input table `x` row-by-row

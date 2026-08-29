@@ -1,8 +1,10 @@
 # Scan Requests
 
-`Tables.Scan` is a logical request for projection, filtering, row bounds, and
-output conversion. It does not require a physical full-table scan. A source can
-use an index, statistics, partition pruning, or any other exact optimization.
+`Tables.Scan` describes which columns and rows a table source should return. It
+can select and rename columns, set output column types, filter rows, and apply
+an `offset` or `limit`. It does not require a physical full-table scan. A source
+can use an index, statistics, partition pruning, or any other exact
+optimization.
 
 The API has two roles:
 
@@ -12,6 +14,14 @@ The API has two roles:
   request while they read data.
 
 ## Consumer API
+
+The main constructor keywords are:
+
+- `select`: select, rename, or set the output type of columns.
+- `filter`: keep rows that match a plain-data expression.
+- `offset`: skip matching rows before producing output.
+- `limit`: set the maximum number of output rows.
+- `validate`: control how references to absent columns are handled.
 
 ```@example scan
 using Tables
@@ -72,9 +82,14 @@ Selection order defines output order. Duplicate output names are an error.
 - `startswith`, `endswith`, and `contains` for strings.
 - `&`, `|`, and `!` for Boolean composition.
 
-Expression nodes contain plain data. They do not store callbacks. This makes a
-request inspectable and suitable for serialization, pushdown, and static
-compilation.
+Built-in expression nodes represent operations as data instead of storing
+predicate callbacks. Literal values and source-specific `OpNode` arguments are
+caller-defined; keep them plain and serializable when requests must cross a
+process or persistence boundary.
+
+Only ordered comparisons have direct operator shorthand. Equality uses
+`Tables.colcmp(==, column, value)` because `==` on expression objects retains
+its normal Boolean meaning.
 
 ### Missing values
 
@@ -86,8 +101,10 @@ Filter evaluation uses SQL-like three-valued logic:
 - `&`, `|`, and `!` propagate `missing` with three-valued Boolean rules.
 - The top-level filter keeps a row only when its result is exactly `true`.
 
-These lifting rules are deliberate. Julia functions other than comparison
-operators do not generally lift `missing` on their own.
+Comparison operators follow Julia's `missing` propagation. Scan also guarantees
+that membership and string predicates return `missing` for missing column
+values. This can differ from Julia's `in` for containers that match `missing`
+directly.
 
 The name `Tables.isnull` also avoids defining `Base.ismissing(::Tables.Col)`.
 Such a method would specialize a broad Base fallback and can invalidate
@@ -122,13 +139,14 @@ bound = Tables.resolve(request, source_names)
 mask = Tables.filtermask(bound, predicate_columns)
 ```
 
-If a source consumes an axis, it removes that axis from the residual. The
-axes compose in a fixed order — filter, then row bounds, then projection —
-so an axis can only be removed together with every axis that executes before
-it. A source that evaluated the filter itself (for example with
-`Tables.filtermask`) hands the rest to the generic executor:
+If a source performs an operation, it removes that operation from the residual.
+The operations run in a fixed order: filter, then `offset`/`limit`, then column
+selection and conversion. An operation can only be removed together with every
+operation that runs before it. A source that evaluated the filter itself, for
+example with `Tables.filtermask`, hands the rest to the generic executor:
 
 ```julia
+filtered_columns = ... # columns containing only rows selected by the filter
 residual = Tables.Scan(request; filter=nothing)
 result = Tables.scan(filtered_columns, residual)
 ```
@@ -140,19 +158,21 @@ leaving only projection). Two constraints follow from the ordering:
 - `limit`/`offset` count qualifying rows, after the filter. A source that
   cannot consume the filter must leave the row bounds in the residual as
   well.
-- Projection may be stripped (`select=Tables.All()`, the projection identity)
-  only when no residual filter references a column the projection dropped or
-  renamed — the residual filter still uses source column names.
+- Column selection may be removed from the residual (`select=Tables.All()`)
+  only when no residual filter references a column that the source dropped or
+  renamed, or whose type or comparison behavior the source changed. A residual
+  filter must still observe the original source names and values.
 
 Only remove work that the source performed exactly.
 
 A statistics check that only prunes impossible partitions does not consume the
 filter.
 
-`Tables.OpNode(name, args)` is the extension point for source-specific,
-plain-data operations. A source can recognize and consume a named operation
-before it calls `Tables.resolve`. Resolution and the generic executor reject an
-unconsumed `OpNode`.
+`Tables.OpNode(name, args)` represents a source-specific filter operation using
+plain data. For example, a geospatial source can define a named bounding-box
+operation and translate it to its native query. The source must consume that
+node before it calls `Tables.resolve`. Resolution and the generic executor
+reject an unconsumed `OpNode` because they do not know its meaning.
 
 Zero-column results retain their row count. Sources should preserve the same
 property when they return a fully pushed result.

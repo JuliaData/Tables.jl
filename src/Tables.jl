@@ -9,6 +9,7 @@ if !hasmethod(getproperty, Tuple{Tuple, Int})
 end
 
 import Base: ==
+import DataAPI: All
 
 """
     Tables.AbstractColumns

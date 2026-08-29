@@ -26,6 +26,9 @@ or `Tables.AbstractColumns` object satisfies the respective interface.
 
 As an additional source of documentation, see [this discourse post](https://discourse.julialang.org/t/struggling-to-implement-tables-jl-interface-for-vector-mystruct/42318/7?u=quinnj) outlining in detail a walk-through of making a row-oriented table.
 
+Sources that can push down column selection, filtering, or row limits can also
+support `Tables.Scan`. See [Scan Source Implementations](scan.md#Source-Implementations).
+
 ## `Tables.AbstractRow`
 
 ```@docs; canonical = false
