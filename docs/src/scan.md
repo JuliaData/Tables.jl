@@ -82,9 +82,10 @@ Selection order defines output order. Duplicate output names are an error.
 - `startswith`, `endswith`, and `contains` for strings.
 - `&`, `|`, and `!` for Boolean composition.
 
-Expression nodes contain plain data. They do not store callbacks. This makes a
-request inspectable and suitable for serialization, pushdown, and static
-compilation.
+Built-in expression nodes represent operations as data instead of storing
+predicate callbacks. Literal values and source-specific `OpNode` arguments are
+caller-defined; keep them plain and serializable when requests must cross a
+process or persistence boundary.
 
 Only ordered comparisons have direct operator shorthand. Equality uses
 `Tables.colcmp(==, column, value)` because `==` on expression objects retains
@@ -159,7 +160,8 @@ leaving only projection). Two constraints follow from the ordering:
   well.
 - Column selection may be removed from the residual (`select=Tables.All()`)
   only when no residual filter references a column that the source dropped or
-  renamed. A residual filter still uses source column names.
+  renamed, or whose type or comparison behavior the source changed. A residual
+  filter must still observe the original source names and values.
 
 Only remove work that the source performed exactly.
 

@@ -226,10 +226,11 @@ struct AlwaysFalse <: ScanExpr end
 """
     Tables.OpNode(name, args)
 
-A source-specific, plain-data filter operation. A source can recognize `name`,
-interpret `args`, and remove the operation before calling [`resolve`](@ref).
-The generic executor cannot interpret source-specific operations and rejects an
-unconsumed `OpNode`.
+A source-specific filter operation. A source can recognize `name`, interpret
+the source-defined `args`, and remove the operation before calling
+[`resolve`](@ref). Keep arguments plain and serializable when requests must
+cross a process or persistence boundary. The generic executor cannot interpret
+source-specific operations and rejects an unconsumed `OpNode`.
 """
 struct OpNode <: ScanExpr
     name::Symbol
