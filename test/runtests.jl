@@ -184,6 +184,7 @@ end
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
     @test Tables.istable(typeof(rt))
     @test Tables.rowaccess(typeof(rt))
+    @test Tables.columnnames(rt) == (:a, :b, :c)
     tt = Tables.buildcolumns(nothing, rt)
     @test isequal(tt, (a = [1.0, 2.0, 3.0], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
     @test tt.a[1] === 1.0
@@ -818,6 +819,7 @@ end
 
     drt = Tables.dictrowtable(rt)
     @test Tables.isrowtable(drt)
+    @test Tables.columnnames(drt) == [:a, :b, :c]
     @test Tables.schema(drt) == Tables.Schema((:a, :b, :c), (Int, Float64, String))
     row = first(drt)
     @test (row.a, row.b, row.c) == (1, 4.0, "7")

@@ -104,6 +104,7 @@ end
 
 isrowtable(::Type{DictRowTable}) = true
 schema(x::DictRowTable) = Schema(getfield(x, :names), [getfield(x, :types)[nm] for nm in getfield(x, :names)])
+columnnames(x::DictRowTable) = getfield(x, :names)
 
 struct DictRow <: AbstractRow
     names::Vector{Symbol}

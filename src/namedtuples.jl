@@ -4,6 +4,11 @@ const RowTable{T} = AbstractVector{T} where {T <: NamedTuple}
 # interface implementation
 isrowtable(::Type{<:RowTable}) = true
 schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
+function columnnames(x::RowTable)
+    sch = schema(x)
+    sch !== nothing && return sch.names
+    return isempty(x) ? () : columnnames(first(x))
+end
 materializer(x::RowTable) = rowtable
 
 # struct to transform `Row`s into NamedTuples
