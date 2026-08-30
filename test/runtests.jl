@@ -768,6 +768,24 @@ Tables.isrowtable(::Type{IsRowTable}) = true
 
 end
 
+@testset "Tables.astable" begin
+    source = ((a=i, b=2i) for i = 1:3)
+    @test !Tables.istable(typeof(source))
+
+    table = Tables.astable(source)
+    @test Tables.istable(table)
+    @test Tables.astable(table) === table
+    @test Tables.rows(table) isa Tables.IteratorWrapper
+    @test Tables.rowtable(table) == [(a=1, b=2), (a=2, b=4), (a=3, b=6)]
+
+    columns = (a=[1, 2], b=[3, 4])
+    table = Tables.astable(columns)
+    @test Tables.columnaccess(table)
+    @test Tables.columns(table) === columns
+    @test DataAPI.nrow(table) == 2
+    @test DataAPI.ncol(table) == 2
+end
+
 @testset "Tables.partitions" begin
 
     ct = (a=[1, 2], b=[missing, 3.14], c=["hey", "ho"])

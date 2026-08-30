@@ -698,6 +698,9 @@ include("utils.jl")
 # generic fallback definitions
 include("fallbacks.jl")
 
+# explicit wrapper for runtime-compatible tables
+include("generic.jl")
+
 # allow any valid iterator to be a table
 include("tofromdatavalues.jl")
 
