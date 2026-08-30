@@ -435,6 +435,7 @@ function rows end
 # Schema implementation
 """
     Tables.Schema(names, types)
+    Tables.Schema(@NamedTuple{name1::Type1, name2::Type2})
 
 Create a `Tables.Schema` object that holds the column names and types for an `AbstractRow` iterator
 returned from `Tables.rows` or an `AbstractColumns` object returned from `Tables.columns`.
@@ -446,6 +447,14 @@ but also note that a table may return `nothing`, indicating that its column name
 are unknown (usually not inferable). This is similar to the `Base.EltypeUnknown()` trait for iterators
 when `Base.IteratorEltype` is called. Users should account for the `Tables.schema(tbl) => nothing` case
 by using the properties of the results of `Tables.rows(x)` and `Tables.columns(x)` directly.
+
+For a compact schema literal, pass a `NamedTuple` type:
+```jldoctest
+julia> Tables.Schema(@NamedTuple{a::Int, b::Float64})
+Tables.Schema:
+ :a  Int64
+ :b  Float64
+```
 
 To access the names, one can simply call `sch.names` to return a collection of Symbols (`Tuple` or `Vector`).
 To access column element types, one can similarly call `sch.types`, which will return a collection of types (like `(Int64, Float64, String)`).
