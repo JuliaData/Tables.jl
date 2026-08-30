@@ -1,9 +1,9 @@
-Base.@pure function nondatavaluenamedtuple(::Type{NT}) where {names, NT <: NamedTuple{names}}
+Base.@assume_effects :foldable function nondatavaluenamedtuple(::Type{NT}) where {names, NT <: NamedTuple{names}}
     TT = Tuple{Any[ DataValueInterfaces.nondatavaluetype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
     return NamedTuple{names, TT}
 end
 
-Base.@pure function datavaluenamedtuple(::Tables.Schema{names, types}) where {names, types}
+Base.@assume_effects :foldable function datavaluenamedtuple(::Tables.Schema{names, types}) where {names, types}
     TT = Tuple{Any[ DataValueInterfaces.datavaluetype(fieldtype(types, i)) for i = 1:fieldcount(types) ]...}
     return NamedTuple{names, TT}
 end

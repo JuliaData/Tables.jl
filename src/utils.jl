@@ -1,5 +1,5 @@
 "helper function to calculate a run-length encoding of a tuple type"
-Base.@pure function runlength(::Type{T}) where {T <: Tuple}
+function runlength(::Type{T}) where {T <: Tuple}
     rle = Tuple{Type, Int}[]
     fieldcount(T) == 0 && return rle
     curT = fieldtype(T, 1)

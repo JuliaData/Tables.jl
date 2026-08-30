@@ -129,7 +129,7 @@ columnaccess(::Type{<:ColumnTable}) = true
 columns(x::ColumnTable) = x
 
 _eltype(::Type{A}) where {T, A <: AbstractVector{T}} = T
-Base.@pure function _eltypes(::Type{NT}) where {NT <: ColumnTable}
+Base.@assume_effects :foldable function _eltypes(::Type{NT}) where {NT <: ColumnTable}
     return Tuple{Any[ _eltype(fieldtype(NT, i)) for i = 1:fieldcount(NT) ]...}
 end
 

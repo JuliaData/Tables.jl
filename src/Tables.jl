@@ -723,10 +723,10 @@ Return the column element type of a column by `name` in a table with a known sch
 """
 columntype(table, colname::Symbol) = columntype(schema(table), colname)
 
-Base.@pure columnindex(::Schema{names, types}, name::Symbol) where {names, types} = columnindex(names, name)
+Base.@assume_effects :foldable columnindex(::Schema{names, types}, name::Symbol) where {names, types} = columnindex(names, name)
 
 "given names and a Symbol `name`, compute the index (1-based) of the name in names"
-Base.@pure function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
+Base.@assume_effects :foldable function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
     i = 1
     for nm in names
         nm === name && return i
@@ -735,10 +735,10 @@ Base.@pure function columnindex(names::Tuple{Vararg{Symbol}}, name::Symbol)
     return 0
 end
 
-Base.@pure columntype(::Schema{names, types}, name::Symbol) where {names, types} = columntype(names, types, name)
+Base.@assume_effects :foldable columntype(::Schema{names, types}, name::Symbol) where {names, types} = columntype(names, types, name)
 
 "given tuple type and a Symbol `name`, compute the type of the name in the tuples types"
-Base.@pure function columntype(names::Tuple{Vararg{Symbol}}, ::Type{types}, name::Symbol) where {types <: Tuple}
+Base.@assume_effects :foldable function columntype(names::Tuple{Vararg{Symbol}}, ::Type{types}, name::Symbol) where {types <: Tuple}
     i = 1
     for nm in names
         nm === name && return fieldtype(types, i)
