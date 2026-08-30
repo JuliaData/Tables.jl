@@ -283,6 +283,10 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test mat2[:, 1] == nt.a
     @test !Tables.istable(mat2)
     @test !Tables.istable(typeof(mat2))
+    namedtuple_matrix = [(a=i, b=j) for i = 1:2, j = 1:2]
+    @test !Tables.istable(namedtuple_matrix)
+    @test_throws ArgumentError Tables.rows(namedtuple_matrix)
+    @test_throws ArgumentError Tables.columns(namedtuple_matrix)
     mat3 = Tables.matrix(nt; transpose=true)
     @test size(mat3) == (2, 3)
     @test mat3[1, :] == nt.a
@@ -363,6 +367,7 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
 
     tbl = TestMatrixTable()
+    @test Tables.istable(tbl)
     ctbl = columntable(tbl)
     @test ctbl.a == [1, 2, 3]
     @test ctbl.b == [1, 2, 3]

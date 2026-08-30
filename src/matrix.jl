@@ -1,4 +1,5 @@
 istable(::Type{<:AbstractMatrix}) = false
+istable(m::T) where {T <: AbstractMatrix} = istable(T)
 
 # for AbstractMatrix types, we don't want to automatically treat them as tables
 # *unless* someone has defined their own w/ appropriate Tables definitions
