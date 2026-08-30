@@ -153,6 +153,7 @@ columnnames(x::AbstractDict{<:AbstractString}) = collect(Symbol(k) for k in keys
 # AbstractVector of Dicts for Tables.rows
 const DictRows = AbstractVector{T} where {T <: Union{AbstractDict{<:AbstractString}, AbstractDict{Symbol}}}
 isrowtable(::Type{<:DictRows}) = true
+columns(x::DictRows) = dictcolumntable(x)
 # DictRows doesn't naturally lend itself to the `Tables.schema` requirement
 # we can't just look at the first row, because the types might change,
 # row-to-row (e.g. `missing`, then `1.1`, etc.). Therefore, the safest option

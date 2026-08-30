@@ -595,6 +595,11 @@ end
     @test isequal(Tables.rowtable(drt), rt)
     @test isequal(Tables.columntable(drt), ct)
 
+    # #367: union dictionary keys instead of fixing the schema from row one
+    drt = [OrderedDict(:id => 1), OrderedDict(:id => 2, :name => "Fiat")]
+    @test isequal(Tables.columntable(drt), (id=[1, 2], name=[missing, "Fiat"]))
+    @test isequal(Tables.columntable(reverse(drt)), (id=[2, 1], name=Union{Missing, String}["Fiat", missing]))
+
     @test Tables.istable(dct)
     @test Tables.columnaccess(dct)
     @test Tables.columns(dct) === dct
@@ -618,6 +623,10 @@ end
     @test Tables.schema(drt) === nothing
     @test isequal(Tables.rowtable(drt), rt)
     @test isequal(Tables.columntable(drt), ct)
+
+    drt = [OrderedDict("id" => 1), OrderedDict("id" => 2, "name" => "Fiat")]
+    @test isequal(Tables.columntable(drt), (id=[1, 2], name=[missing, "Fiat"]))
+    @test isequal(Tables.columntable(reverse(drt)), (id=[2, 1], name=Union{Missing, String}["Fiat", missing]))
 
     @test Tables.istable(dct)
     @test Tables.columnaccess(dct)
