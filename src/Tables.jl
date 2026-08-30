@@ -33,6 +33,7 @@ Interface definition:
 | `Tables.columnnames(table)`                              | `propertynames(table)`        | Return column names for a table as a 1-based indexable collection                                                                                                   |
 | **Optional methods**                                     |                               |                                                                                                                                                              |
 | `Tables.getcolumn(table, ::Type{T}, i::Int, nm::Symbol)` | `Tables.getcolumn(table, nm)` | Given a column eltype `T`, index `i`, and column name `nm`, retrieve the column. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+| `Tables.getcolumn(table, nm::AbstractString)`             | `Tables.getcolumn(table, Symbol(nm))` | Retrieve a column by a string name without interning it when the table provides a custom method. |
 
 Note that subtypes of `Tables.AbstractColumns` **must** overload all required methods listed
 above instead of relying on these methods' default definitions.
@@ -66,6 +67,7 @@ Interface definition:
 | `Tables.columnnames(row)`                              | `propertynames(row)`        | Return column names for a row as a 1-based indexable collection                                                                                                         |
 | **Optional methods**                                   |                             |                                                                                                                                                                  |
 | `Tables.getcolumn(row, ::Type{T}, i::Int, nm::Symbol)` | `Tables.getcolumn(row, nm)` | Given a column element type `T`, index `i`, and column name `nm`, retrieve the column value. Provides a type-stable or even constant-prop-able mechanism for efficiency. |
+| `Tables.getcolumn(row, nm::AbstractString)`             | `Tables.getcolumn(row, Symbol(nm))` | Retrieve a value by a string name without interning it when the row provides a custom method. |
 
 Note that subtypes of `Tables.AbstractRow` **must** overload all required methods listed above
 instead of relying on these methods' default definitions.
@@ -82,10 +84,12 @@ abstract type AbstractRow end
 
 """
     Tables.getcolumn(::AbstractColumns, nm::Symbol) => Indexable collection with known length
+    Tables.getcolumn(::AbstractColumns, nm::AbstractString) => Indexable collection with known length
     Tables.getcolumn(::AbstractColumns, i::Int) => Indexable collection with known length
     Tables.getcolumn(::AbstractColumns, T, i::Int, nm::Symbol) => Indexable collection with known length
 
     Tables.getcolumn(::AbstractRow, nm::Symbol) => Column value
+    Tables.getcolumn(::AbstractRow, nm::AbstractString) => Column value
     Tables.getcolumn(::AbstractRow, i::Int) => Column value
     Tables.getcolumn(::AbstractRow, T, i::Int, nm::Symbol) => Column value
 
@@ -93,7 +97,8 @@ Retrieve an entire column (from `AbstractColumns`) or single row column value (f
 or if desired, by column element type (`T`), index (`i`), and name (`nm`). When called on a `AbstractColumns` interface object,
 the returned object should be a 1-based indexable collection with known length. When called on a `AbstractRow` interface
 object, it returns the single column value. The methods taking a single `Symbol` or `Int` are both required
-for the `AbstractColumns` and `AbstractRow` interfaces; the third method is optional if type stability is possible.
+for the `AbstractColumns` and `AbstractRow` interfaces. String access and the method that accepts the column
+type, index, and name are optional.
 The default definition of `Tables.getcolumn(x, i::Int)` is `getfield(x, i)`. The default definition of
 `Tables.getcolumn(x, nm::Symbol)` is `getproperty(x, nm)`.
 """
@@ -101,6 +106,7 @@ function getcolumn end
 
 getcolumn(x, i::Int) = getfield(x, i)
 getcolumn(x, nm::Symbol) = getproperty(x, nm)
+getcolumn(x, nm::AbstractString) = getcolumn(x, Symbol(nm))
 getcolumn(x, ::Type{T}, i::Int, nm::Symbol) where {T} = getcolumn(x, nm)
 getcolumn(x::NamedTuple{names, types}, ::Type{T}, i::Int, nm::Symbol) where {names, types, T} = Core.getfield(x, i)
 

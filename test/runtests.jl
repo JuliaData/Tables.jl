@@ -258,6 +258,10 @@ Tables.getcolumn(x::MockTable, ::Symbol) = (1, 2, 3)
 Tables.getcolumn(x::MockTable, ::Int) = (1, 2, 3)
 Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
+struct StringNamedTable end
+Tables.getcolumn(::StringNamedTable, ::Symbol) = error("Symbol fallback used")
+Tables.getcolumn(::StringNamedTable, name::AbstractString) = name == "a" ? [1, 2] : throw(KeyError(name))
+
 struct TestMatrixTable <: AbstractMatrix{Int}
 end
 Tables.istable(::Type{TestMatrixTable}) = true
@@ -361,6 +365,8 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     # For the case that `Tables.getcolumn` doesn't return an `AbstractVector`
     # e.g Tuple, see #263
     @test Tables.matrix(MockTable()) == repeat([1, 2, 3], 1, 3)
+    @test Tables.getcolumn((a=[1, 2],), "a") == [1, 2]
+    @test Tables.getcolumn(StringNamedTable(), "a") == [1, 2]
 
     tbl = TestMatrixTable()
     ctbl = columntable(tbl)
