@@ -1084,5 +1084,22 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
 
     expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
     @test sprint(show, tbl, context=:compact => true) == expected_compact
+
+    expected_plain = """
+        MockRow:
+         :a  1
+         :b  2
+         :c  3"""
+    @test sprint(show, MIME("text/plain"), first(tbl)) == expected_plain
+
+    empty = Tables.Row(NamedTuple())
+    @test sprint(show, MIME("text/plain"), empty) == "Row:\n"
+
+    wide = Tables.Row(NamedTuple{Tuple(Symbol("column_$i") for i in 1:50)}(ntuple(identity, 50)))
+    output = sprint(show, MIME("text/plain"), wide;
+        context=(:limit => true, :displaysize => (12, 30)))
+    @test startswith(output, "Row:\n")
+    @test occursin('⋮', output)
+    @test !occursin("NamedTuple", output)
 end
 include("scan.jl")

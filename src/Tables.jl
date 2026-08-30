@@ -201,6 +201,13 @@ function Base.NamedTuple(r::RorC)
     return NamedTuple{Tuple(map(Symbol, names))}(Tuple(getcolumn(r, nm) for nm in names))
 end
 
+function _showrow(io::IO, x::T) where {T <: AbstractRow}
+    println(io, "$(nameof(T)):")
+    names = collect(columnnames(x))
+    values = [getcolumn(x, nm) for nm in names]
+    Base.print_matrix(io, hcat(names, values))
+end
+
 function Base.show(io::IO, x::T) where {T <: AbstractRow}
     if get(io, :compact, false) || get(io, :limit, false)
         get(io, :typeinfo, nothing) === nothing && print(io, "$T: ")
@@ -208,13 +215,11 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
     else
         # Assume we are called from within a container show method when typeinfo is set.
         get(io, :typeinfo, nothing) !== nothing && println(io)
-
-        println(io, "$T:")
-        names = collect(columnnames(x))
-        values = [getcolumn(x, nm) for nm in names]
-        Base.print_matrix(io, hcat(names, values))
+        _showrow(io, x)
     end
 end
+
+Base.show(io::IO, ::MIME"text/plain", x::AbstractRow) = _showrow(io, x)
 
 function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
     ncols = length(columnnames(table))
