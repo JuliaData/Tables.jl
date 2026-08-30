@@ -304,9 +304,10 @@ It is recommended that for users implementing `MyType`, they define only
 `istable(::Type{MyType})`. `istable(::MyType)` will then automatically delegate to this
 method.
 
-`istable` calls `TableTraits.isiterabletable` as a fallback. This can have a considerable
-runtime overhead in some contexts. To avoid these and use `istable` as a compile-time trait,
-it can be called on a type as `istable(typeof(obj))`.
+`istable` calls `TableTraits.isiterabletable` as a fallback. This can have runtime overhead
+in some contexts. When only explicitly declared Tables.jl traits should count, call
+`istable(typeof(obj))` to avoid the fallback. This type-level check intentionally returns
+`false` for tables that can only be identified by inspecting an instance at runtime.
 """
 function istable end
 
