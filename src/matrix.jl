@@ -53,6 +53,13 @@ getcolumn(m::MatrixTable, ::Type, col::Int, nm::Symbol) = getcolumn(m, col)
 getcolumn(m::MatrixTable, nm::Symbol) = getcolumn(m, getfield(m, :lookup)[nm])
 columnnames(m::MatrixTable) = names(m)
 
+materializer(::Type{<:MatrixTable}) = _matrixmaterializer
+_matrixmaterializer(x::MatrixTable) = x
+function _matrixmaterializer(x)
+    cols = columns(x)
+    return table(matrix(cols); header=columnnames(cols))
+end
+
 """
     Tables.table(m::AbstractVecOrMat; [header])
 

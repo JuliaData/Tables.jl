@@ -303,6 +303,11 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     @test Tables.rowaccess(typeof(mattbl))
     @test Tables.columnaccess(typeof(mattbl))
     @test Tables.columns(mattbl) === mattbl
+    @test Tables.materializer(mattbl)(mattbl) === mattbl
+    materialized = Tables.materializer(mattbl)([(Column1=1, Column2=2), (Column1=3, Column2=4)])
+    @test materialized isa Tables.MatrixTable
+    @test Tables.matrix(materialized) == [1 2; 3 4]
+    @test Tables.columnnames(materialized) == [:Column1, :Column2]
     @test mattbl.Column1 == [1,2,3]
     @test Tables.getcolumn(mattbl, :Column1) == [1,2,3]
     @test Tables.getcolumn(mattbl, 1) == [1,2,3]
