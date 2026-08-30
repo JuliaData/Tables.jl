@@ -5,6 +5,17 @@ on:
     branches: [main]
     tags: ["*"]
 jobs:
+  compile-min:
+    name: Non-generated fallbacks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: 'min-patch'
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+      - run: julia --project=. --compile=min test/compilemin.jl
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
