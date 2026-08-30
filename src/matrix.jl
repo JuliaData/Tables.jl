@@ -39,7 +39,7 @@ getcolumn(m::MatrixRow, nm::Symbol) =
     getfield(getfield(m, :source), :matrix)[getfield(m, :row), getfield(getfield(m, :source), :lookup)[nm]]
 columnnames(m::MatrixRow) = names(getfield(m, :source))
 
-schema(m::MatrixTables{T}) where {T} = Schema(Tuple(names(m)), NTuple{size(getfield(m, :matrix), 2), eltype(T)})
+schema(m::MatrixTables{T}) where {T} = Schema(names(m), fill(eltype(T), size(getfield(m, :matrix), 2)))
 Base.eltype(::Type{M}) where {T,M<:MatrixRowTable{T}} = MatrixRow{T}
 Base.length(m::MatrixRowTable) = size(getfield(m, :matrix), 1)
 

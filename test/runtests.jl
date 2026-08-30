@@ -300,6 +300,7 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
     mattbl = Tables.table(mat)
     @test Tables.istable(typeof(mattbl))
+    @test !Tables.stored(Tables.schema(mattbl))
     @test Tables.rowaccess(typeof(mattbl))
     @test Tables.columnaccess(typeof(mattbl))
     @test Tables.columns(mattbl) === mattbl
@@ -323,6 +324,15 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
     mattbl = Tables.table(mat, header=1:3)
     @test Tables.columnnames(mattbl) == Symbol.(1:3)
     @test_throws ArgumentError Tables.table(mat, header=[:A, :B, :C, :D])
+
+    ncols = Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1
+    wide = Tables.table(Matrix{Float64}(undef, 0, ncols))
+    sch = Tables.schema(wide)
+    @test Tables.stored(sch)
+    @test length(sch.names) == length(sch.types) == ncols
+    @test first(sch.names) == :Column1
+    @test last(sch.names) == Symbol("Column", ncols)
+    @test all(==(Float64), sch.types)
 
     X = [1 2; 3 4; 5 6]
     tbl = Tables.table(X)
