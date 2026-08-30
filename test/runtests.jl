@@ -225,6 +225,14 @@ end
     end
 end
 
+struct CustomMaterializerRows <: AbstractVector{NamedTuple{(:a,), Tuple{Int}}}
+    values::Vector{NamedTuple{(:a,), Tuple{Int}}}
+end
+Base.size(x::CustomMaterializerRows) = size(x.values)
+Base.getindex(x::CustomMaterializerRows, i::Int) = x.values[i]
+custommaterializer(x) = x
+Tables.materializer(::Type{CustomMaterializerRows}) = custommaterializer
+
 @testset "Materializer" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
@@ -246,6 +254,8 @@ end
     @test select(rt, :a) == [(a=1,), (a=2,), (a=3,)]
 
     @test Tables.materializer(1) === Tables.columntable
+    rows = CustomMaterializerRows([(a=1,)])
+    @test Tables.materializer(rows) === custommaterializer
 end
 
 # Table with tuple columns.

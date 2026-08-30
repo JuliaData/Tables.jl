@@ -4,7 +4,7 @@ const RowTable{T} = AbstractVector{T} where {T <: NamedTuple}
 # interface implementation
 isrowtable(::Type{<:RowTable}) = true
 schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
-materializer(x::RowTable) = rowtable
+materializer(::Type{<:RowTable}) = rowtable
 
 # struct to transform `Row`s into NamedTuples
 struct NamedTupleIterator{schema, T}
@@ -137,7 +137,7 @@ names(::Type{NT}) where {nms, T, NT<:NamedTuple{nms, T}} = nms
 types(::Type{NT}) where {nms, T, NT<:NamedTuple{nms, T}} = T
 
 schema(x::T) where {T <: ColumnTable} = Schema(names(T), _eltypes(T))
-materializer(x::ColumnTable) = columntable
+materializer(::Type{<:ColumnTable}) = columntable
 
 getarray(x::AbstractArray) = x
 getarray(x) = collect(x)
