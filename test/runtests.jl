@@ -1085,4 +1085,50 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
     @test sprint(show, tbl, context=:compact => true) == expected_compact
 end
+
+struct RuntimeRow
+    columns::Dict{Symbol, AbstractVector}
+    index::Int
+end
+
+Tables.getcolumn(row::RuntimeRow, name::Symbol) = row.columns[name][row.index]
+Tables.getcolumn(row::RuntimeRow, index::Int) =
+    Tables.getcolumn(row, Tables.columnnames(row)[index])
+Tables.columnnames(row::RuntimeRow) = collect(keys(row.columns))
+
+struct RuntimeTable
+    columns::Dict{Symbol, AbstractVector}
+end
+
+Tables.istable(::Type{RuntimeTable}) = true
+Tables.rowaccess(::Type{RuntimeTable}) = true
+Tables.columnaccess(::Type{RuntimeTable}) = true
+Tables.columns(table::RuntimeTable) = table.columns
+Tables.rows(table::RuntimeTable) =
+    (RuntimeRow(table.columns, i) for i in eachindex(first(values(table.columns))))
+
+@testset "Issue #137" begin
+    columns = Dict{Symbol, AbstractVector}(
+        :a => [1, 2, 3],
+        :b => [10.0, 20.0, 30.0],
+        :dynamic => Any["x", "y", "z"],
+    )
+    table = RuntimeTable(columns)
+    rows = Tables.typedrows(table, :a, :b)
+    row = first(rows)
+
+    @test row.a === 1
+    @test row.b === 10.0
+    @test row.dynamic == "x"
+    @test Tables.columnnames(row) == Tables.columnnames(first(Tables.rows(table)))
+    @test collect(Tables.getcolumn(row, name) for name in Tables.columnnames(row)) ==
+        collect(Tables.getcolumn(first(Tables.rows(table)), name) for name in Tables.columnnames(row))
+    @test collect(r.a for r in rows) == [1, 2, 3]
+    @test Core.Compiler.return_type(r -> r.a, Tuple{typeof(row)}) === Int
+    @test Core.Compiler.return_type(r -> r.b, Tuple{typeof(row)}) === Float64
+    @test Core.Compiler.return_type(r -> r.dynamic, Tuple{typeof(row)}) === Any
+    @test_throws ArgumentError Tables.typedrows(table, :missing)
+    @test_throws ArgumentError Tables.typedrows(table, :a, :a)
+    @test_throws ArgumentError Tables.typedrows((a = [1],), :a)
+end
 include("scan.jl")

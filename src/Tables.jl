@@ -432,6 +432,79 @@ See also [`rowtable`](@ref) and [`namedtupleiterator`](@ref).
 """
 function rows end
 
+"""
+    Tables.typedrows(table, names::Symbol...)
+
+Return a row iterator that specializes access to `names` without specializing on
+the other columns. The input must provide native row and column access. Selected
+columns are read directly from `Tables.columns(table)`, while other values are
+read from the corresponding row returned by `Tables.rows(table)`.
+
+This is useful for wide tables when a small, known set of columns controls a hot
+path, but later work may need arbitrary columns from selected rows.
+"""
+function typedrows(table, names::Symbol...)
+    rowaccess(table) || throw(ArgumentError("Tables.typedrows requires native row access"))
+    columnaccess(table) || throw(ArgumentError("Tables.typedrows requires native column access"))
+    allunique(names) || throw(ArgumentError("Tables.typedrows requires unique column names"))
+    columns = Tables.columns(table)
+    available = columnnames(columns)
+    for name in names
+        name in available || throw(ArgumentError("column $(repr(name)) not found"))
+    end
+    selected = NamedTuple{names}(ntuple(i -> getcolumn(columns, names[i]), length(names)))
+    return TypedRows(selected, Tables.rows(table))
+end
+
+struct TypedRows{names, C <: NamedTuple{names}, R}
+    columns::C
+    rows::R
+end
+
+struct TypedRow{names, V <: Tuple, R} <: AbstractRow
+    values::V
+    row::R
+end
+
+istable(::Type{<:TypedRows}) = true
+rowaccess(::Type{<:TypedRows}) = true
+rows(x::TypedRows) = x
+schema(x::TypedRows) = schema(getfield(x, :rows))
+materializer(::Type{<:TypedRows{names, C, R}}) where {names, C, R} = materializer(R)
+
+Base.IteratorEltype(::Type{<:TypedRows}) = Base.EltypeUnknown()
+Base.IteratorSize(::Type{<:TypedRows{names, C, R}}) where {names, C, R} = Base.IteratorSize(R)
+Base.length(x::TypedRows) = length(getfield(x, :rows))
+Base.size(x::TypedRows) = size(getfield(x, :rows))
+
+function Base.iterate(x::TypedRows)
+    next = iterate(getfield(x, :rows))
+    return _typediterate(x, next, 1)
+end
+
+function Base.iterate(x::TypedRows, state)
+    i, rowstate = state
+    next = iterate(getfield(x, :rows), rowstate)
+    return _typediterate(x, next, i)
+end
+
+function _typediterate(x::TypedRows{names}, next, i) where {names}
+    next === nothing && return nothing
+    row, state = next
+    values = map(column -> column[i], Tuple(getfield(x, :columns)))
+    return TypedRow{names, typeof(values), typeof(row)}(values, row), (i + 1, state)
+end
+
+@inline function getcolumn(x::TypedRow{names}, name::Symbol) where {names}
+    index = findfirst(==(name), names)
+    index === nothing && return getcolumn(getfield(x, :row), name)
+    return getfield(getfield(x, :values), index)
+end
+
+getcolumn(x::TypedRow, i::Int) = getcolumn(getfield(x, :row), i)
+getcolumn(x::TypedRow, ::Type{T}, i::Int, name::Symbol) where {T} = getcolumn(x, name)
+columnnames(x::TypedRow) = columnnames(getfield(x, :row))
+
 # Schema implementation
 """
     Tables.Schema(names, types)
