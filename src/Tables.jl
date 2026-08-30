@@ -96,6 +96,10 @@ object, it returns the single column value. The methods taking a single `Symbol`
 for the `AbstractColumns` and `AbstractRow` interfaces; the third method is optional if type stability is possible.
 The default definition of `Tables.getcolumn(x, i::Int)` is `getfield(x, i)`. The default definition of
 `Tables.getcolumn(x, nm::Symbol)` is `getproperty(x, nm)`.
+
+Every retrieved column or row value must be assigned. An unassigned reference (`#undef`) is not a
+valid table value. Sources may throw `UndefRefError` when such a reference is accessed, and consumers
+are not required to replace or otherwise handle it.
 """
 function getcolumn end
 

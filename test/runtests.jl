@@ -501,6 +501,11 @@ Base.propertynames(g::GenericTable) = (:a, :b, :c)
     @test_throws ArgumentError Tables.rows(GenericTable)
 end
 
+@testset "unassigned values" begin
+    column = Vector{String}(undef, 1)
+    @test_throws UndefRefError Tables.rowtable((a=column,))
+end
+
 @testset "isless" begin
     t = (x = [1, 1, 0, 2], y = [-1, 1, 3, 2])
     a,b,c,d = Tables.rows(t)
