@@ -638,9 +638,21 @@ Tables.getcolumn(r::Row, nm::Symbol) = getfield(r, nm)
 Tables.getcolumn(r::Row, ::Type{T}, i::Int, nm::Symbol) where {T} = getfield(r, i)
 Tables.columnnames(r::Row) = fieldnames(Row)
 
+struct OptInRow
+    a::Int
+end
+Tables.isrow(::Type{OptInRow}) = true
+
 struct DummyRow <: Tables.AbstractRow end
 
 @testset "AbstractRow" begin
+    @test Tables.isrow(Row)
+    @test Tables.isrow(Row(1, missing, "hey"))
+    @test Tables.isrow((a=1,))
+    @test Tables.isrow(Dict(:a => 1))
+    @test Tables.isrow(Dict("a" => 1))
+    @test Tables.isrow(OptInRow(1))
+    @test !Tables.isrow(1)
 
     row = Row(1, missing, "hey")
     row2 = Row(2, 3.14, "ho")

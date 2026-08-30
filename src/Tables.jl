@@ -81,6 +81,25 @@ This allows the custom row type to behave as close as possible to a builtin `Nam
 abstract type AbstractRow end
 
 """
+    Tables.isrow(x) => Bool
+
+Check whether an object has explicitly declared that it implements the Tables.jl row
+interface. Packages that define custom row types can opt in with
+`Tables.isrow(::Type{MyRow}) = true`.
+
+Like [`Tables.istable`](@ref), this trait is intentionally conservative. A `false` result
+does not prove that the object cannot be used as a row at runtime.
+"""
+function isrow end
+
+isrow(x::T) where {T} = isrow(T)
+isrow(::Type) = false
+isrow(::Type{<:AbstractRow}) = true
+isrow(::Type{<:NamedTuple}) = true
+isrow(::Type{<:AbstractDict{Symbol}}) = true
+isrow(::Type{<:AbstractDict{<:AbstractString}}) = true
+
+"""
     Tables.getcolumn(::AbstractColumns, nm::Symbol) => Indexable collection with known length
     Tables.getcolumn(::AbstractColumns, i::Int) => Indexable collection with known length
     Tables.getcolumn(::AbstractColumns, T, i::Int, nm::Symbol) => Indexable collection with known length
