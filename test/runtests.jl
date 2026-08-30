@@ -184,6 +184,15 @@ end
     rt = [(a=1, b=4.0, c="7"), (a=2.0, b=missing, c="8"), (a=3, b=6.0, c="9")]
     @test Tables.istable(typeof(rt))
     @test Tables.rowaccess(typeof(rt))
+
+    # #150: a positive trait requires statically known row names
+    @test !Tables.istable(Vector{NamedTuple})
+    @test Tables.istable(Vector{NamedTuple{(:a,)}})
+    unknown_names = NamedTuple[(a=1,), (b=2,)]
+    @test !Tables.istable(unknown_names)
+    reordered_names = [(a=1, b=2), (b=3, a=4)]
+    @test !Tables.istable(reordered_names)
+    @test Tables.columntable(reordered_names) == (a=[1, 4], b=[2, 3])
     tt = Tables.buildcolumns(nothing, rt)
     @test isequal(tt, (a = [1.0, 2.0, 3.0], b = Union{Missing, Float64}[4.0, missing, 6.0], c = ["7", "8", "9"]))
     @test tt.a[1] === 1.0

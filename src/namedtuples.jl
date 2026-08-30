@@ -2,7 +2,13 @@
 const RowTable{T} = AbstractVector{T} where {T <: NamedTuple}
 
 # interface implementation
-isrowtable(::Type{<:RowTable}) = true
+Base.@assume_effects :foldable function isrowtable(::Type{T}) where {T <: RowTable}
+    names = Base.unwrap_unionall(eltype(T)).parameters[1]
+    return names isa Tuple
+end
+istable(x::T) where {T <: RowTable} = istable(T)
+rowaccess(::Type{<:RowTable}) = true
+rows(x::RowTable) = x
 schema(x::AbstractVector{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
 materializer(x::RowTable) = rowtable
 
