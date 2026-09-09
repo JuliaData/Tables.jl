@@ -93,10 +93,6 @@ using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators,
 
     @test propertynames(Tables.Schema((:a, :b), nothing)) == (:names, :types)
 
-    v = Tables.EmptyVector(1)
-    @test_throws UndefRefError v[1]
-    @test Base.IndexStyle(typeof(v)) == Base.IndexLinear()
-
     @test Tables.istable(Tables.CopiedColumns)
     @test Tables.columnaccess(Tables.CopiedColumns)
     c = Tables.CopiedColumns(nt)
@@ -1086,3 +1082,5 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     @test sprint(show, tbl, context=:compact => true) == expected_compact
 end
 include("scan.jl")
+
+include("buffering.jl")

@@ -12,13 +12,20 @@ can be thought of as a `OrderedDict` mapping column names as `Symbol`s to `Abstr
 The order of the input table columns is preserved via the `Tables.schema(::DictColumnTable)`.
 
 For "schema-less" input tables, `dictcolumntable` employs a "column unioning" behavior,
-as opposed to inferring the schema from the first row like `Tables.columns`. This
+as opposed to taking the column names from the first row like `Tables.columns`. This
 means that as rows are iterated, each value from the row is joined into an aggregate
 final set of columns. This is especially useful when input table rows may not include
 columns if the value is missing, instead of including an actual value `missing`, which
 is common in json, for example. This results in a performance cost tracking all seen
 values and inferring the final unioned schemas, so it's recommended to use only when
 needed.
+
+For unknown schemas, the source is read once and the original cell values are buffered
+while column types are inferred with `promote_type`. Final columns are then allocated
+and each value is converted directly to its final column type. Absent cells become
+`missing`. Peak memory includes both the buffered values and output columns, plus
+buffering overhead. Mutable cell contents are not copied. Final numeric promotion can
+still round values. Rows with a known schema do not need this intermediate buffer.
 """
 function dictcolumntable(x)
     if columnaccess(x)
@@ -39,48 +46,10 @@ function dictcolumntable(x)
             end
             out = OrderedDict(names[k] => v for (k, v) in out)
         else
-            names = Symbol[]
-            seen = Set{Symbol}()
-            out = OrderedDict{Symbol, AbstractVector}()
-            for (i, row) in enumerate(r)
-                for nm in columnnames(row)
-                    push!(seen, nm)
-                    val = getcolumn(row, nm)
-                    if haskey(out, nm)
-                        col = out[nm]
-                        if typeof(val) <: eltype(col)
-                            add!(val, 0, nm, col, L, i)
-                        else # widen column type
-                            new = allocatecolumn(promote_type(eltype(col), typeof(val)), length(col))
-                            i > 1 && copyto!(new, 1, col, 1, i - 1)
-                            add!(new, val, L, i)
-                            out[nm] = new
-                        end
-                    else
-                        push!(names, nm)
-                        if i == 1
-                            new = allocatecolumn(typeof(val), len)
-                            add!(new, val, L, i)
-                            out[nm] = new
-                        else
-                            new = allocatecolumn(Union{Missing, typeof(val)}, len)
-                            add!(new, val, L, i)
-                            out[nm] = new
-                        end
-                    end
-                end
-                for nm in names
-                    if !(nm in seen)
-                        col = out[nm]
-                        if !(eltype(col) >: Missing)
-                            new = allocatecolumn(Union{Missing, eltype(col)}, len)
-                            i > 1 && copyto!(new, 1, col, 1, i - 1)
-                            out[nm] = new
-                        end
-                    end
-                end
-                empty!(seen)
-            end
+            state = iterate(r)
+            names, cols = state === nothing ? (Symbol[], AbstractVector[]) :
+                buffercolumns(r, state; unioncols=true)
+            out = OrderedDict{Symbol, AbstractVector}(nm => col for (nm, col) in zip(names, cols))
             sch = Schema(collect(keys(out)), eltype.(values(out)))
         end
     end

@@ -149,53 +149,62 @@ end
     return nt
 end
 
-@inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
-@inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
-
-@inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, L) where {T}
-    if val isa T || promote_type(typeof(val), T) <: T
-        add!(dest, val, L, row)
-        return
-    else
-        new = allocatecolumn(promote_type(T, typeof(val)), length(dest))
-        row > 1 && copyto!(new, 1, dest, 1, row - 1)
-        add!(new, val, L, row)
-        updated[] = ntuple(i->i == col ? new : updated[][i], length(updated[]))
-        return
-    end
-end
-
-function __buildcolumns(rowitr, st, sch, columns, rownbr, updated)
-    while true
-        state = iterate(rowitr, st)
-        state === nothing && break
+# Keep original cell values until the final column types are known. Storing them
+# by column avoids per-row bookkeeping and supports sources that reuse row objects.
+function buffercolumns(rowitr, state; unioncols=false)
+    firstnames = collect(columnnames(state[1]))
+    len = Base.haslength(rowitr) ? length(rowitr) : 0
+    names = Symbol[]
+    indices = Dict{Symbol, Int}()
+    types = Type[]
+    buffered = Vector{Any}[]
+    rownum = 0
+    while state !== nothing
         row, st = state
-        rownbr += 1
-        eachcolumns(add_or_widen!, sch, row, columns, rownbr, updated, Base.IteratorSize(rowitr))
-        # little explanation here: we just called add_or_widen! for each column value of our row
-        # note that when a column's type is widened, `updated` is set w/ the new set of columns
-        # we then check if our current `columns` isn't the same object as our `updated` ref
-        # if it isn't, we're going to call __buildcolumns again, passing our new updated ref as
-        # columns, which allows __buildcolumns to specialize (i.e. recompile) based on the new types
-        # of updated. So a new __buildcolumns will be compiled for each widening event.
-        columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated)
+        rownum += 1
+        for (i, nm) in enumerate(unioncols ? columnnames(row) : firstnames)
+            if unioncols || rownum == 1
+                name = Symbol(nm)
+                i = get!(indices, name) do
+                    push!(names, name)
+                    push!(types, Union{})
+                    push!(buffered, sizehint!(Any[], len))
+                    length(names)
+                end
+            end
+            values = buffered[i]
+            T = types[i]
+            if length(values) < rownum - 1
+                padmissing!(values, rownum - 1)
+                T = Union{Missing, T}
+            end
+            val = getcolumn(row, nm)
+            push!(values, val)
+            types[i] = val isa T ? T : promote_type(T, typeof(val))
+        end
+        state = iterate(rowitr, st)
     end
-    return updated
+    columns = AbstractVector[]
+    for (i, values) in enumerate(buffered)
+        T = types[i]
+        if length(values) < rownum
+            padmissing!(values, rownum)
+            T = Union{Missing, T}
+        end
+        column = allocatecolumn(T, rownum)
+        copyto!(column, values)
+        push!(columns, column)
+    end
+    return names, columns
 end
 
-# for the schema-less case, we do one extra step of initializing each column as an `EmptyVector`
-# and doing an initial widening for each column in _buildcolumns, before passing the widened
-# set of columns on to __buildcolumns
-struct EmptyVector <: AbstractVector{Union{}}
-    len::Int
-end
-Base.IndexStyle(::Type{EmptyVector}) = Base.IndexLinear()
-Base.size(x::EmptyVector) = (x.len,)
-Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
-
-function _buildcolumns(rowitr, row, st, sch, columns, updated)
-    eachcolumns(add_or_widen!, sch, row, columns, 1, updated, Base.IteratorSize(rowitr))
-    return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
+function padmissing!(values, len)
+    start = length(values) + 1
+    resize!(values, len)
+    for i in start:len
+        values[i] = missing
+    end
+    return values
 end
 
 if isdefined(Base, :fieldtypes)
@@ -219,12 +228,8 @@ end
         end
         return NamedTuple()
     end
-    row, st = state
-    names = Tuple(columnnames(row))
-    len = Base.haslength(T) ? length(rowitr) : 0
-    sch = Schema(names, nothing)
-    columns = Tuple(EmptyVector(len) for _ = 1:length(names))
-    return NamedTuple{map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
+    names, columns = buffercolumns(rowitr, state)
+    return NamedTuple{Tuple(names)}(Tuple(columns))
 end
 
 """
