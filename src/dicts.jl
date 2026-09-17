@@ -49,11 +49,12 @@ function dictcolumntable(x)
             for row in r
                 n += 1
                 for nm in columnnames(row)
-                    i = get!(index, nm) do
+                    i = get(index, nm, 0)
+                    if i == 0 # no closure here: captured locals would be boxed and slow the loop
                         push!(names, nm)
                         push!(types, Union{})
                         push!(buffers, sizehint!(Any[], len))
-                        return length(names)
+                        i = index[nm] = length(names)
                     end
                     vals = buffers[i]
                     T = types[i]
