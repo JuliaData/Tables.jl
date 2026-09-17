@@ -39,59 +39,45 @@ function dictcolumntable(x)
             end
             out = OrderedDict(names[k] => v for (k, v) in out)
         else
+            # Column names and types are only known once every row is seen, so buffer the
+            # original values and convert each one once into its final column type.
             names = Symbol[]
             index = Dict{Symbol, Int}()
             types = Type[]
-            cols = AbstractVector[]
-            filled = Int[] # rows written per column; a gap means the column was absent
+            buffers = Vector{Any}[]
             n = 0
             for row in r
                 n += 1
                 for nm in columnnames(row)
-                    val = getcolumn(row, nm)
-                    i = get(index, nm, 0)
-                    if i == 0
+                    i = get!(index, nm) do
                         push!(names, nm)
-                        i = index[nm] = length(names)
-                        T = n == 1 ? typeof(val) : Union{Missing, typeof(val)}
-                        push!(types, T)
-                        push!(cols, allocatecolumn(T, len))
-                        push!(filled, 0)
+                        push!(types, Union{})
+                        push!(buffers, sizehint!(Any[], len))
+                        return length(names)
                     end
-                    col = fillgaps!(cols, types, filled, i, n - 1, L)
-                    if !(val isa eltype(col))
-                        col, types[i] = widen(col, types[i], val, n - 1)
-                        cols[i] = col
+                    vals = buffers[i]
+                    T = types[i]
+                    if length(vals) < n - 1 # absent from earlier rows
+                        append!(vals, Iterators.repeated(missing, n - 1 - length(vals)))
+                        T = Union{Missing, T}
                     end
-                    add!(col, val, L, n)
-                    filled[i] = n
+                    val = getcolumn(row, nm)
+                    push!(vals, val)
+                    types[i] = val isa T ? T : promote_type(T, typeof(val))
                 end
             end
-            for i in eachindex(cols)
-                cols[i] = finishcolumn(fillgaps!(cols, types, filled, i, n, L), types[i])
+            cols = map(buffers, types) do vals, T
+                if length(vals) < n # absent from the last rows
+                    append!(vals, Iterators.repeated(missing, n - length(vals)))
+                    T = Union{Missing, T}
+                end
+                return finishcolumn(vals, T)
             end
             out = OrderedDict{Symbol, AbstractVector}(zip(names, cols))
             sch = Schema(collect(keys(out)), eltype.(values(out)))
         end
     end
     return DictColumnTable(sch, out)
-end
-
-# Make column `i` hold `missing` for rows `filled[i]+1:upto` (rows where it was absent).
-function fillgaps!(cols, types, filled, i, upto, L)
-    col = cols[i]
-    filled[i] < upto || return col
-    if !(Missing <: eltype(col))
-        col, types[i] = widen(col, types[i], missing, filled[i])
-        cols[i] = col
-    end
-    if !(L isa Union{Base.HasLength, Base.HasShape}) # `allocatecolumn` prefilled `missing` otherwise
-        for j = filled[i]+1:upto
-            push!(col, missing)
-        end
-    end
-    filled[i] = upto
-    return col
 end
 
 istable(::Type{DictColumnTable}) = true
