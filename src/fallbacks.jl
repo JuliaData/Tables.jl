@@ -160,7 +160,7 @@ end
 function widen(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
     V = typeof(val)
     P2 = promote_type(P, V)
-    S = T <: P2 && V <: P2 ? P2 : Union{T, V}
+    S = T <: P2 && V <: P2 ? P2 : Any
     new = allocatecolumn(S, length(dest))
     nfilled > 0 && copyto!(new, 1, dest, 1, nfilled)
     return new, P2
