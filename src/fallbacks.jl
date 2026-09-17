@@ -171,6 +171,8 @@ finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} = T === P ? col : c
 
 @inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
     if val isa T
+        # `Any` storage no longer tells us which types were folded into `P`, so keep folding.
+        T === Any && !(val isa types[col]) && (types[col] = promote_type(types[col], typeof(val)))
         add!(dest, val, L, row)
         return
     else

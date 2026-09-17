@@ -62,6 +62,8 @@ function dictcolumntable(x)
                     if !(val isa eltype(col))
                         col, types[i] = widen(col, types[i], val, n - 1)
                         cols[i] = col
+                    elseif eltype(col) === Any && !(val isa types[i])
+                        types[i] = promote_type(types[i], typeof(val))
                     end
                     add!(col, val, L, n)
                     filled[i] = n
