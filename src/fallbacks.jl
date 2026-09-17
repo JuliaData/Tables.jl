@@ -169,7 +169,7 @@ end
 # Convert a column once into its promoted type if storage was widened losslessly instead.
 finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} = T === P ? col : copyto!(allocatecolumn(P, length(col)), col)
 
-@inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
+@inline function add_or_widen!(@nospecialize(val), col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
     if val isa T
         add!(dest, val, L, row)
         return
