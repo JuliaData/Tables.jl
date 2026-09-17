@@ -245,6 +245,21 @@ end
     return NamedTuple{map(Symbol, names)}(Tuple(finishcolumn(cols[i], types[i]) for i = 1:length(names)))
 end
 
+# Restartable sources: infer the promoted column types in a first pass, then build typed
+# columns directly through the known-schema path. No intermediate storage or copies.
+function buildcolumns(::Nothing, rowitr::AbstractVector)
+    isempty(rowitr) && return invoke(buildcolumns, Tuple{Nothing, Any}, nothing, rowitr)
+    names = Tuple(columnnames(first(rowitr)))
+    types = Type[Union{} for _ = 1:length(names)]
+    for row in rowitr
+        for (i, nm) in enumerate(names)
+            val = getcolumn(row, nm)
+            val isa types[i] || (types[i] = promote_type(types[i], typeof(val)))
+        end
+    end
+    return buildcolumns(Schema(names, Tuple(types)), rowitr)
+end
+
 """
     Tables.CopiedColumns
 
