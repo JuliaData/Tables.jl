@@ -1086,3 +1086,5 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     @test sprint(show, tbl, context=:compact => true) == expected_compact
 end
 include("scan.jl")
+
+include("buffering.jl")

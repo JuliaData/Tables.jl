@@ -176,6 +176,54 @@ Note in both the rows and columns usages, we didn't need to worry about the natu
 of the input data; we just called [`Tables.rows`](@ref) or [`Tables.columns`](@ref) as was most natural for
 the table-specific use-case, knowing that it will Just Work™️.
 
+## Memory use when constructing columns
+
+The generic [`Tables.columns`](@ref) fallback and [`Tables.columntable`](@ref)
+construct in-memory columns from row sources. When the schema is unknown, they start
+each column with its first value's type and widen storage without converting values.
+When promotion would require conversion, a union preserves the original values until
+the final promoted type is known. Homogeneous columns keep their typed storage.
+[`Tables.dictcolumntable`](@ref) instead buffers cells in `Any` vectors and tracks
+columns that appear or disappear across rows. Both paths convert values directly to
+their final column types, so intermediate numeric promotion cannot lose information.
+Final numeric promotion can still round values, such as a large integer converted to
+`Float64`. Mutable cell contents are not copied.
+The source is traversed once, even when it reports a length: knowing the length
+does not guarantee that an iterator can be restarted safely.
+
+For ordinary columns, widening and final conversion can temporarily require both old
+and new storage. Dictionary construction can retain `Any` buffers alongside the output
+columns, plus bookkeeping. Known-schema row sources are written directly to typed
+columns without inference or intermediate buffers. Sources that already provide column
+access use their own implementation.
+
+For larger workloads, choose an approach that matches the source and the work:
+
+- If the column types are known, provide a [`Tables.Schema`](@ref) from the row
+  source or construct typed column vectors directly. This avoids schema inference
+  and intermediate storage while still producing an in-memory table.
+- [DataFrames.jl](https://dataframes.juliadata.org/stable/lib/types/) is an in-memory
+  analysis package. `DataFrame(rows)` uses the Tables.jl column fallback, so changing
+  the sink alone does not avoid inference and widening. With existing column vectors,
+  `DataFrame(columns; copycols=false)` can avoid copying them; the DataFrame and
+  its source then share those vectors.
+- For data already stored in Arrow format,
+  [Arrow.jl](https://arrow.apache.org/julia/stable/manual/) supports memory-mapped
+  file access and `Arrow.Stream` iterates over record batches. Process batches
+  separately to avoid constructing one table containing every row. Writing an
+  arbitrary row source to Arrow first is not itself a guarantee of lower memory use.
+- For data that fits a SQL schema,
+  [SQLite.jl](https://juliadatabases.org/SQLite.jl/stable/) provides file-backed
+  databases, and [DuckDB](https://duckdb.org/docs/stable/connect/overview) supports
+  disk-backed data and query execution that can spill to disk. Filter or aggregate
+  in the database before collecting results into Julia columns. Database types and
+  conversion rules differ from Julia's; select a schema that preserves the values
+  you need.
+
+These options change how data is stored or processed. They are not interchangeable
+with constructing columns from arbitrary Julia values, and collecting an entire
+result into a Julia table still requires memory for those columns.
+
 ## Tables.jl Utilities
 
 Before moving on to _implementing_ the Tables.jl interfaces, we take a quick
