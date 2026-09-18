@@ -53,6 +53,17 @@ end
         @test isequal(col, [1.0, 2.0, missing])
         @test col[1] === 1.0
 
+        # Repeated types in lossless storage still convert to the final promoted type.
+        for values in (Any[1, 2.0, 3, 4.0], Any[1.0, 2, 3.0, 4],
+                       Any[1, missing, 2, missing], Any[1, 2.0, missing, 3])
+            T = foldl(promote_type, typeof.(values))
+            for size in (Base.HasLength(), Base.SizeUnknown())
+                col = constructor(BufferedTestRows([(a=x,) for x in values], size)).a
+                @test eltype(col) === T
+                @test isequal(col, T[values...])
+            end
+        end
+
         # Cell contents retain the usual shallow-reference semantics.
         cell = [1, 2]
         @test constructor(BufferedTestRows([(a=cell,)])).a[1] === cell
@@ -82,4 +93,12 @@ end
     ct = Tables.dictcolumntable(BufferedTestRows([NamedTuple(); rows]))
     @test ismissing(ct.a[1])
     @test ct.a[2] === typemax(Int64)
+
+    # Fill leading, internal, and trailing gaps, including consecutive empty rows.
+    sparse = [NamedTuple(), (a=1,), NamedTuple(), NamedTuple(), (a=2.0,), NamedTuple()]
+    for size in (Base.HasLength(), Base.SizeUnknown())
+        ct = Tables.dictcolumntable(BufferedTestRows(sparse, size))
+        @test eltype(ct.a) === Union{Missing, Float64}
+        @test isequal(ct.a, [missing, 1.0, missing, missing, 2.0, missing])
+    end
 end

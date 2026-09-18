@@ -179,26 +179,32 @@ the table-specific use-case, knowing that it will Just Work™️.
 ## Memory use when constructing columns
 
 The generic [`Tables.columns`](@ref) fallback and [`Tables.columntable`](@ref)
-construct in-memory columns from row sources. When the schema is unknown, they
-buffer the original cell values while inferring the final promoted column types,
-then convert each value directly to its final type. [`Tables.dictcolumntable`](@ref)
-uses the same buffer and also tracks columns that appear or disappear across rows.
+construct in-memory columns from row sources. When the schema is unknown, they start
+each column with its first value's type and widen storage without converting values.
+When promotion would require conversion, a union preserves the original values until
+the final promoted type is known. Homogeneous columns keep their typed storage.
+[`Tables.dictcolumntable`](@ref) instead buffers cells in `Any` vectors and tracks
+columns that appear or disappear across rows. Both paths convert values directly to
+their final column types, so intermediate numeric promotion cannot lose information.
+Final numeric promotion can still round values, such as a large integer converted to
+`Float64`. Mutable cell contents are not copied.
 The source is traversed once, even when it reports a length: knowing the length
 does not guarantee that an iterator can be restarted safely.
 
-Peak memory includes the buffer, its bookkeeping, and the output columns. Buffering
-can also increase construction time. Known-schema row sources are written directly
-to typed columns without this intermediate buffer. Sources that already provide
-column access use their own implementation.
+For ordinary columns, widening and final conversion can temporarily require both old
+and new storage. Dictionary construction can retain `Any` buffers alongside the output
+columns, plus bookkeeping. Known-schema row sources are written directly to typed
+columns without inference or intermediate buffers. Sources that already provide column
+access use their own implementation.
 
 For larger workloads, choose an approach that matches the source and the work:
 
 - If the column types are known, provide a [`Tables.Schema`](@ref) from the row
   source or construct typed column vectors directly. This avoids schema inference
-  and row buffering while still producing an in-memory table.
+  and intermediate storage while still producing an in-memory table.
 - [DataFrames.jl](https://dataframes.juliadata.org/stable/lib/types/) is an in-memory
   analysis package. `DataFrame(rows)` uses the Tables.jl column fallback, so changing
-  the sink alone does not avoid this buffer. With existing column vectors,
+  the sink alone does not avoid inference and widening. With existing column vectors,
   `DataFrame(columns; copycols=false)` can avoid copying them; the DataFrame and
   its source then share those vectors.
 - For data already stored in Arrow format,

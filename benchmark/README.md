@@ -4,7 +4,7 @@ From the repository root, create a benchmark environment using this checkout:
 
 ```sh
 julia --project=benchmark -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-julia --project=benchmark benchmark/buffering.jl 100000
+julia --startup-file=no --threads=1 --project=benchmark benchmark/buffering.jl 100000
 ```
 
 For before/after comparisons, run the same script in separate Julia processes and
@@ -19,8 +19,10 @@ count, sample count, and a precision check for the late-widening case. Allocated
 bytes measure allocation traffic, not peak memory or retained output size.
 
 Cases cover known schemas, deliberately hidden schemas on the same dense rows,
-unknown-length iteration, late widening to `Any`, 32-column rows, and sparse rows
-with changing column names. The hidden-schema cases measure the cost of generic
+unknown-length iteration, late widening to `Any`, 32-column rows, abstract row element
+types, alternating numeric types, `missing`, and sparse rows with changing column names.
+To run a subset, append `cases unknown_dense,mixed_numeric` after the row count.
+The hidden-schema cases measure the cost of generic
 inference; providing the known schema avoids that path. The late-widening input
 contains a large integer that the old implementation rounded before the column
 reached its final `Any` type.
@@ -28,7 +30,7 @@ reached its final `Any` type.
 For a separate whole-process peak-RSS measurement on macOS:
 
 ```sh
-/usr/bin/time -l julia --project=benchmark benchmark/buffering.jl 1000000 rss unknown_dense columntable
+/usr/bin/time -l julia --startup-file=no --threads=1 --project=benchmark benchmark/buffering.jl 1000000 rss unknown_dense columntable
 ```
 
 On Linux, use `/usr/bin/time -v`. RSS mode warms up on 1,000 rows, runs a full GC,

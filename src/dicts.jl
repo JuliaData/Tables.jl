@@ -21,11 +21,11 @@ values and inferring the final unioned schemas, so it's recommended to use only 
 needed.
 
 For unknown schemas, the source is read once and the original cell values are buffered
-while column types are inferred with `promote_type`. Final columns are then allocated
-and each value is converted directly to its final column type. Absent cells become
-`missing`. Peak memory includes both the buffered values and output columns, plus
-buffering overhead. Mutable cell contents are not copied. Final numeric promotion can
-still round values. Rows with a known schema do not need this intermediate buffer.
+in `Any` vectors while column types are inferred with `promote_type`. Values are then
+converted directly to their final column types. Absent cells become `missing`. Peak
+memory can include both the buffered values and output columns, plus buffering overhead.
+Mutable cell contents are not copied. Final numeric promotion can still round values.
+Rows with a known schema do not need this intermediate buffer.
 """
 function dictcolumntable(x)
     if columnaccess(x)
@@ -46,14 +46,53 @@ function dictcolumntable(x)
             end
             out = OrderedDict(names[k] => v for (k, v) in out)
         else
-            state = iterate(r)
-            names, cols = state === nothing ? (Symbol[], AbstractVector[]) :
-                buffercolumns(r, state; unioncols=true)
-            out = OrderedDict{Symbol, AbstractVector}(nm => col for (nm, col) in zip(names, cols))
+            names, cols = buffercolumns(r, len)
+            out = OrderedDict{Symbol, AbstractVector}(zip(names, cols))
             sch = Schema(collect(keys(out)), eltype.(values(out)))
         end
     end
     return DictColumnTable(sch, out)
+end
+
+# Column names and types are only known once every row is seen, so buffer the original
+# values and convert each one once into its final column type. Kept in its own function
+# so the hot loop's locals stay type-stable.
+function buffercolumns(r, len)
+    names = Symbol[]
+    index = Dict{Symbol, Int}()
+    types = Type[]
+    buffers = Vector{Any}[]
+    n = 0
+    for row in r
+        n += 1
+        for nm in columnnames(row)
+            i = get(index, nm, 0)
+            if i == 0
+                push!(names, nm)
+                push!(types, Union{})
+                push!(buffers, sizehint!(Any[], len))
+                i = index[nm] = length(names)
+            end
+            vals = buffers[i]
+            T = types[i]
+            if length(vals) < n - 1 # absent from earlier rows
+                append!(vals, Iterators.repeated(missing, n - 1 - length(vals)))
+                T = Union{Missing, T}
+            end
+            val = getcolumn(row, nm)
+            push!(vals, val)
+            types[i] = val isa T ? T : promote_type(T, typeof(val))
+        end
+    end
+    cols = AbstractVector[]
+    for (vals, T) in zip(buffers, types)
+        if length(vals) < n # absent from the last rows
+            append!(vals, Iterators.repeated(missing, n - length(vals)))
+            T = Union{Missing, T}
+        end
+        push!(cols, finishcolumn(vals, T))
+    end
+    return names, cols
 end
 
 istable(::Type{DictColumnTable}) = true

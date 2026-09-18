@@ -149,62 +149,62 @@ end
     return nt
 end
 
-# Keep original cell values until the final column types are known. Storing them
-# by column avoids per-row bookkeeping and supports sources that reuse row objects.
-function buffercolumns(rowitr, state; unioncols=false)
-    firstnames = collect(columnnames(state[1]))
-    len = Base.haslength(rowitr) ? length(rowitr) : 0
-    names = Symbol[]
-    indices = Dict{Symbol, Int}()
-    types = Type[]
-    buffered = Vector{Any}[]
-    rownum = 0
-    while state !== nothing
-        row, st = state
-        rownum += 1
-        for (i, nm) in enumerate(unioncols ? columnnames(row) : firstnames)
-            if unioncols || rownum == 1
-                name = Symbol(nm)
-                i = get!(indices, name) do
-                    push!(names, name)
-                    push!(types, Union{})
-                    push!(buffered, sizehint!(Any[], len))
-                    length(names)
-                end
-            end
-            values = buffered[i]
-            T = types[i]
-            if length(values) < rownum - 1
-                padmissing!(values, rownum - 1)
-                T = Union{Missing, T}
-            end
-            val = getcolumn(row, nm)
-            push!(values, val)
-            types[i] = val isa T ? T : promote_type(T, typeof(val))
-        end
-        state = iterate(rowitr, st)
-    end
-    columns = AbstractVector[]
-    for (i, values) in enumerate(buffered)
-        T = types[i]
-        if length(values) < rownum
-            padmissing!(values, rownum)
-            T = Union{Missing, T}
-        end
-        column = allocatecolumn(T, rownum)
-        copyto!(column, values)
-        push!(columns, column)
-    end
-    return names, columns
+@inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
+@inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
+
+# Copy the filled values into storage that also holds `val` without conversion.
+# `P` tracks the promoted output type. If promotion is not a supertype of both storage
+# and the new value, use their union and defer conversion until the final type is known.
+function widen(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
+    V = typeof(val)
+    P2 = promote_type(P, V)
+    S = T <: P2 && V <: P2 ? P2 : Union{T, V}
+    new = allocatecolumn(S, length(dest))
+    nfilled > 0 && copyto!(new, 1, dest, 1, nfilled)
+    return new, P2
 end
 
-function padmissing!(values, len)
-    start = length(values) + 1
-    resize!(values, len)
-    for i in start:len
-        values[i] = missing
+# Convert a column once into its promoted type if storage was widened losslessly instead.
+finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} = T === P ? col : copyto!(allocatecolumn(P, length(col)), col)
+
+@inline function add_or_widen!(@nospecialize(val), col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
+    if val isa T
+        add!(dest, val, L, row)
+        return
+    else
+        new, types[col] = widen(dest, types[col], val, row - 1)
+        add!(new, val, L, row)
+        updated[] = ntuple(i->i == col ? new : updated[][i], length(updated[]))
+        return
     end
-    return values
+end
+
+function __buildcolumns(rowitr, st, sch, columns, rownbr, updated, types)
+    while true
+        state = iterate(rowitr, st)
+        state === nothing && break
+        row, st = state
+        rownbr += 1
+        eachcolumns(add_or_widen!, sch, row, columns, rownbr, updated, types, Base.IteratorSize(rowitr))
+        # Restart with the widened columns so this loop specializes on their new types.
+        columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated, types)
+    end
+    return updated
+end
+
+# for the schema-less case, we do one extra step of initializing each column as an `EmptyVector`
+# and doing an initial widening for each column in _buildcolumns, before passing the widened
+# set of columns on to __buildcolumns
+struct EmptyVector <: AbstractVector{Union{}}
+    len::Int
+end
+Base.IndexStyle(::Type{EmptyVector}) = Base.IndexLinear()
+Base.size(x::EmptyVector) = (x.len,)
+Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
+
+function _buildcolumns(rowitr, row, st, sch, columns, updated, types)
+    eachcolumns(add_or_widen!, sch, row, columns, 1, updated, types, Base.IteratorSize(rowitr))
+    return __buildcolumns(rowitr, st, sch, updated[], 1, updated, types)
 end
 
 if isdefined(Base, :fieldtypes)
@@ -228,8 +228,14 @@ end
         end
         return NamedTuple()
     end
-    names, columns = buffercolumns(rowitr, state)
-    return NamedTuple{Tuple(names)}(Tuple(columns))
+    row, st = state
+    names = Tuple(columnnames(row))
+    len = Base.haslength(T) ? length(rowitr) : 0
+    sch = Schema(names, nothing)
+    columns = Tuple(EmptyVector(len) for _ = 1:length(names))
+    types = Type[Union{} for _ = 1:length(names)]
+    cols = _buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns), types)[]
+    return NamedTuple{map(Symbol, names)}(Tuple(finishcolumn(cols[i], types[i]) for i = 1:length(names)))
 end
 
 """

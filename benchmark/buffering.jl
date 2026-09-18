@@ -31,6 +31,14 @@ function source(case, n)
     elseif case == "unknown_wide"
         names = ntuple(i -> Symbol(:c, i), 32)
         return UnknownRows([NamedTuple{names}(ntuple(_ -> i, 32)) for i in 1:n])
+    elseif case == "unknown_dense_vec" # plain Vector with non-concrete eltype: schema unknown, but restartable
+        return NamedTuple{(:a, :b, :c)}[(a=i, b=Float64(i), c="value") for i in 1:n]
+    elseif case == "mixed_numeric" # Int/Float64 alternate -> Float64 column (JSON-like numbers)
+        return NamedTuple{(:a,)}[(a=isodd(i) ? i : Float64(i),) for i in 1:n]
+    elseif case == "float_then_int" # Float64 first, then Ints -> Float64 column
+        return NamedTuple{(:a,)}[(a=i == 1 ? 1.0 : i,) for i in 1:n]
+    elseif case == "int_then_missing" # one missing in the middle -> Union{Int,Missing}
+        return NamedTuple{(:a,)}[(a=i == n ÷ 2 ? missing : i,) for i in 1:n]
     elseif case == "sparse"
         return [i % 3 == 0 ? (a=i, c="value") : (a=i, b=Float64(i)) for i in 1:n]
     end
@@ -41,6 +49,10 @@ function check(case, result, n)
     length(Tables.getcolumn(result, 1)) == n || error("wrong row count")
     if case == "late_widening"
         return Tables.getcolumn(result, :a)[1] === typemax(Int64)
+    elseif case in ("mixed_numeric", "float_then_int")
+        return eltype(Tables.getcolumn(result, :a)) === Float64
+    elseif case == "int_then_missing"
+        return eltype(Tables.getcolumn(result, :a)) === Union{Int, Missing}
     end
     return true
 end
@@ -59,7 +71,9 @@ function main(args)
         return
     end
     println("case,constructor,rows,samples,median_ns,min_ns,allocated_bytes,allocations,preserved")
-    for case in ("known_dense", "unknown_dense", "unknown_stream", "late_widening", "unknown_wide", "sparse")
+    cases = ("known_dense", "unknown_dense", "unknown_stream", "late_widening", "unknown_wide", "unknown_dense_vec", "mixed_numeric", "float_then_int", "int_then_missing", "sparse")
+    length(args) >= 3 && args[2] == "cases" && (cases = Tuple(split(args[3], ",")))
+    for case in cases
         input = source(case, n)
         for (name, f) in (("columntable", Tables.columntable), ("dictcolumntable", Tables.dictcolumntable))
             case == "sparse" && name == "columntable" && continue
