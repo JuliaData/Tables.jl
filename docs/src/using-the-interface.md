@@ -41,34 +41,6 @@ Tables.columns
 
 Given these two powerful data access methods, let's walk through real, albeit somewhat simplified versions of how packages actually use these methods.
 
-## Getting column names from any table
-
-Call `Tables.columnnames(Tables.columns(x))` to get the column names of a
-Tables.jl-compatible source. [`Tables.columnnames`](@ref) accepts a columns object
-or an individual row. A row table, such as a vector of named tuples or the result
-of [`Tables.dictrowtable`](@ref), is a container of rows. Calling `columnnames`
-directly on that container can return its properties instead of its column names.
-
-```jldoctest; setup = :(using Tables)
-julia> rows = [(a=1, b="x"), (a=2, b="y")];
-
-julia> Tuple(Tables.columnnames(Tables.columns(rows)))
-(:a, :b)
-
-julia> dictrows = Tables.dictrowtable(rows);
-
-julia> Tuple(Tables.columnnames(Tables.columns(dictrows)))
-(:a, :b)
-
-julia> Tuple(Tables.columnnames(first(Tables.rows(rows))))
-(:a, :b)
-```
-
-For a row source, `Tables.columns` may read and store all rows. If you only need
-names and the row source has a known schema, use
-`Tables.schema(Tables.rows(x)).names` instead. Check that the schema is not
-`nothing` before accessing its names.
-
 ## `Tables.rows` usage
 
 First up, let's take a look at the [SQLite.jl](https://github.com/JuliaDatabases/SQLite.jl) package and how it uses the Tables.jl interface to allow loading of generic table-like data into a sqlite relational table. Here's the code:
@@ -203,6 +175,37 @@ as an `AbstractVector`, as is required by the DataFrame constructor.
 Note in both the rows and columns usages, we didn't need to worry about the natural orientation
 of the input data; we just called [`Tables.rows`](@ref) or [`Tables.columns`](@ref) as was most natural for
 the table-specific use-case, knowing that it will Just Work™️.
+
+## Getting column names from any table
+
+Call `Tables.columnnames(Tables.columns(x))` to get the column names of a
+Tables.jl-compatible source. [`Tables.columnnames`](@ref) accepts a columns object
+or an individual row. A row table, such as a vector of named tuples or the result
+of [`Tables.dictrowtable`](@ref), is a container of rows. Calling `columnnames`
+directly on that container can return its properties instead of its column names.
+
+```jldoctest; setup = :(using Tables)
+julia> rows = [(a=1, b="x"), (a=2, b="y")];
+
+julia> Tables.columnnames(rows)
+()
+
+julia> Tables.columnnames(Tables.columns(rows))
+(:a, :b)
+
+julia> dictrows = Tables.dictrowtable(rows);
+
+julia> Tables.columnnames(Tables.columns(dictrows))
+(:a, :b)
+
+julia> Tables.columnnames(first(Tables.rows(rows)))
+(:a, :b)
+```
+
+For a row source, `Tables.columns` may read and store all rows. If you only need
+names and the row source has a known schema, use
+`Tables.schema(Tables.rows(x)).names` instead. Check that the schema is not
+`nothing` before accessing its names.
 
 ## Tables.jl Utilities
 
