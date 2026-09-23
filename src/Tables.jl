@@ -470,8 +470,14 @@ struct Schema{names, types}
 end
 
 Schema{names, types}() where {names, types} = Schema{names, types}(nothing, nothing)
-Schema(names::Tuple{Vararg{Symbol}}, ::Type{T}) where {T <: Tuple} = Schema{names, T}()
-Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema{names, types}()
+function Schema(names::Tuple{Vararg{Symbol}}, ::Type{T}) where {T <: Tuple}
+    if length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
+        return Schema(names, (fieldtype(T, i) for i in 1:fieldcount(T)))
+    else
+        return Schema{names, T}()
+    end
+end
+Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
 
 # whether names/types are stored or not
 stored(::Schema{names, types}) where {names, types} = names === nothing && types === nothing

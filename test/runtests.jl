@@ -907,6 +907,20 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
     @test sch.names == [Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
     @test sch.types == [Float64 for _ = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
     @test typeof(sch) == Tables.Schema{nothing, nothing}
+    n = Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1
+    matrix = Tables.table(Matrix{Float64}(undef, 0, n); header=sch.names)
+    tuple_names = Tuple(sch.names)
+    for wide in (Tables.schema(matrix), Tables.schema(Tables.rows(matrix)),
+                 Tables.Schema(tuple_names, NTuple{n, Float64}),
+                 Tables.Schema(NamedTuple{tuple_names, NTuple{n, Float64}}))
+        @test Tables.stored(wide)
+        @test wide.names == sch.names
+        @test wide.types == sch.types
+    end
+    @test Tables.Schema((:a, :b), Tuple{Int, String}) isa
+        Tables.Schema{(:a, :b), Tuple{Int, String}}
+    @test Tables.Schema(NamedTuple{(:a, :b), Tuple{Int, String}}) isa
+        Tables.Schema{(:a, :b), Tuple{Int, String}}
     r = Tables.rows(x)
     Tables.eachcolumn(sch, first(r)) do y, i, nm
         @test y isa Float64
