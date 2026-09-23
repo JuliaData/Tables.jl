@@ -471,9 +471,11 @@ end
 
 Schema{names, types}() where {names, types} = Schema{names, types}(nothing, nothing)
 function Schema(names::Tuple{Vararg{Symbol}}, ::Type{T}) where {T <: Tuple}
-    length(names) > SCHEMA_SPECIALIZATION_THRESHOLD &&
+    if length(names) > SCHEMA_SPECIALIZATION_THRESHOLD
         return Schema(names, (fieldtype(T, i) for i in 1:fieldcount(T)))
-    return Schema{names, T}()
+    else
+        return Schema{names, T}()
+    end
 end
 Schema(::Type{NamedTuple{names, types}}) where {names, types} = Schema(names, types)
 
