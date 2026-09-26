@@ -33,6 +33,35 @@ Tables.getcolumn(::ZeroColumnTable, i::Int) = throw(BoundsError((), i))
 Tables.getcolumn(::ZeroColumnTable, name::Symbol) = throw(ArgumentError("unknown column $name"))
 Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
 
+struct IntegerScanComparison
+    value::Int
+end
+Base.:(==)(x::IntegerScanComparison, ::Int) = x.value
+
+struct EagerScanColumn{T, M} <: AbstractVector{T}
+    values::Vector{T}
+    mask::M
+    calls::Base.RefValue{Int}
+end
+Base.size(c::EagerScanColumn) = size(c.values)
+Base.getindex(c::EagerScanColumn, i::Int) = c.values[i]
+function Base.Broadcast.broadcasted(f, c::EagerScanColumn)
+    c.calls[] += 1
+    return broadcast!(f, c.mask, c.values)
+end
+
+struct BooleanScanStyle <: Base.Broadcast.AbstractArrayStyle{1} end
+struct BooleanScanColumn{T} <: AbstractVector{T}
+    values::Vector{T}
+end
+Base.size(c::BooleanScanColumn) = size(c.values)
+Base.getindex(c::BooleanScanColumn, i::Int) = c.values[i]
+Base.BroadcastStyle(::Type{<:BooleanScanColumn}) = BooleanScanStyle()
+function Base.copy(v::Base.Broadcast.Broadcasted{BooleanScanStyle})
+    plain = Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}}(v.f, v.args, v.axes)
+    return BitVector(Base.copy(plain))
+end
+
 @testset "scan.jl" begin
 
     T = Tables
@@ -163,11 +192,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
                        b = Union{String, Missing}["x", missing, "z"])
         missingcols = T.columns(missingvals)
         @test isequal(
-            T._evalexpr(T.colcmp(==, T.col(:a), 1), missingcols),
+            Base.Broadcast.materialize(T._evalexpr(T.colcmp(==, T.col(:a), 1), missingcols)),
             Union{Bool, Missing}[true, missing, false],
         )
         @test isequal(
-            T._evalexpr(T.colin(T.col(:a), (1, 2)), missingcols),
+            Base.Broadcast.materialize(T._evalexpr(T.colin(T.col(:a), (1, 2)), missingcols)),
             Union{Bool, Missing}[true, missing, false],
         )
         @test T.filtermask(T.colin(T.col(:a), (1, missing)), missingvals) ==
@@ -230,6 +259,74 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test T.filtermask(startswith(T.col(:a), "a"), indexstrings) == [true, false, true]
         # empty residual = identity
         @test T.scan(nt, T.Scan()) === nt
+    end
+
+    @testset "scan: logical masks preserve three-valued truth and ownership" begin
+        combinations = vec(collect(Iterators.product((true, false, missing),
+            (true, false, missing), (true, false, missing))))
+        source = (a=[x[1] for x in combinations], b=[x[2] for x in combinations],
+            c=[x[3] for x in combinations])
+        a, b, c = (T.colcmp(==, T.col(name), true) for name in (:a, :b, :c))
+        for op in (&, |), negate_a in (false, true), negate_b in (false, true)
+            expr = op(negate_a ? !a : a, negate_b ? !b : b)
+            expected = [op(negate_a ? !x : x, negate_b ? !y : y) for (x, y, _) in combinations]
+            @test T.filtermask(expr, source) == [x === true for x in expected]
+            @test T.filtermask(!expr, source) == [x === false for x in expected]
+        end
+        for (expr, expected) in (
+            ((a | b) & c, [(x | y) & z for (x, y, z) in combinations]),
+            (a | (b & c), [x | (y & z) for (x, y, z) in combinations]),
+        )
+            @test T.filtermask(expr, source) == [x === true for x in expected]
+            @test T.filtermask(!expr, source) == [x === false for x in expected]
+        end
+        for expr in (T.AlwaysFalse() & (T.col(:gone) > 1),
+                     T.AlwaysTrue() | (T.col(:gone) > 1))
+            @test_throws ArgumentError T.filtermask(expr, source)
+        end
+        before = deepcopy(source)
+        mask = T.filtermask((a | b) & !c, source)
+        fill!(mask, true)
+        @test isequal(source, before)
+        @test T.filtermask((a | b) & !c, source) ==
+            [((x | y) & !z) === true for (x, y, z) in combinations]
+
+        # Custom comparison results still use elementwise &, | and exact true.
+        custom = (a=IntegerScanComparison.([0, 1, 2]), b=[true, true, false])
+        for op in (&, |)
+            expr = op(T.colcmp(==, T.col(:a), 1), T.colcmp(==, T.col(:b), true))
+            @test T.filtermask(expr, custom) ==
+                [op(x.value, y) === true for (x, y) in zip(custom.a, custom.b)]
+        end
+        @test_throws MethodError T.filtermask(!T.colcmp(==, T.col(:a), 1), custom)
+
+        # Eager custom broadcasts run once and may return shared storage.
+        calls = Ref(0)
+        eager = EagerScanColumn([0, 1, 2], falses(3), calls)
+        expr = T.colcmp(==, T.col(:a), 1)
+        mask = T.filtermask(expr, (a=eager,))
+        @test mask == [false, true, false]
+        @test calls[] == 1
+        fill!(mask, true)
+        @test eager.mask == [false, true, false]
+        @test T.filtermask(expr, (a=eager,)) == [false, true, false]
+        @test calls[] == 2
+        # Result storage can convert Bool comparisons to integer zero/one.
+        integers = EagerScanColumn([0, 1, 2], zeros(Int, 3), Ref(0))
+        @test T.filtermask(expr | T.AlwaysTrue(), (a=integers,)) == falses(3)
+        @test integers.calls[] == 1
+        # A lazy custom style can convert integer comparisons to Bool on copy.
+        styled = BooleanScanColumn(IntegerScanComparison.([0, 1, 0]))
+        @test T.filtermask(expr, (a=styled,)) == [false, true, false]
+        @test T.filtermask(!expr, (a=styled,)) == [true, false, true]
+
+        n = 65536
+        large = (a=collect(1:n), b=Union{Missing,Int}[i % 7 == 0 ? missing : i for i in 1:n])
+        expr = (T.col(:a) > n ÷ 8) & (T.col(:a) < 7n ÷ 8) &
+            (T.col(:b) >= n ÷ 4) & !T.isnull(T.col(:b))
+        T.filtermask(expr, large)
+        allocated = @allocated T.filtermask(expr, large)
+        @test allocated < 2n
     end
 
     @testset "scan: validate=false filters treat unmatched refs as all-missing" begin
