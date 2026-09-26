@@ -413,6 +413,7 @@ function _findcols(names, r)
     return i === nothing ? Int[] : Int[i]
 end
 _refstr(r) = r isa Regex ? "r$(repr(r.pattern))" : repr(r)
+_refstr(r::Symbol) = repr(String(r))
 
 function _expand!(out::Vector{BoundColumn}, names, it::SelectItem, validate::Bool)
     r = it.ref
@@ -524,23 +525,16 @@ end
 # Keep primitive predicates lazy so SQL WHERE conversion can share their loop.
 # Literals stay inside scalar kernels: collection-valued rows compare whole
 # values. Non-vector columns only require Tables.jl's scalar-indexing contract.
-function _columnmap(f, c::AbstractVector, ::Int)
+function _columnmap(f::F, c::AbstractVector, ::Int) where {F}
     v = Base.Broadcast.broadcasted(f, c)
     # Custom styles may convert predicate values during materialization.
     return v isa Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}} ?
         v : Base.Broadcast.materialize(v)
 end
-_columnmap(f, c, n::Int) = Base.Broadcast.broadcasted(i -> f(c[i]), 1:n)
-_columnvalues(f, c, n::Int) = Base.Broadcast.materialize(_columnmap(f, c, n))
+_columnmap(f::F, c, n::Int) where {F} = Base.Broadcast.broadcasted(i -> f(c[i]), 1:n)
+_columnvalues(f::F, c, n::Int) where {F} = Base.Broadcast.materialize(_columnmap(f, c, n))
 # Custom columns may broadcast eagerly; inference must not run their predicates.
-function _booleancolumn(f, c, ::Int)
-    B = Base.promote_op(_columnmap, typeof(f), typeof(c), Int)
-    if c isa Vector && B <: Base.Broadcast.Broadcasted{
-            Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(f), Tuple{typeof(c)}}
-        # Standard vector broadcasts preserve the scalar result type, even
-        # when inference cannot determine the materialized vector's eltype.
-        return Base.Broadcast.combine_eltypes(f, (c,)) <: Union{Bool, Missing}
-    end
+function _booleancolumn(f::F, c, ::Int) where {F}
     return Base.promote_op(_columnvalues, typeof(f), typeof(c), Int) <: AbstractVector{<:Union{Bool, Missing}}
 end
 
@@ -636,11 +630,18 @@ function _evalmask(e, cols, strict, negated=false)
     elseif e isa NotExpr
         return _evalmask(e.arg, cols, strict, !negated)
     end
-    return _boolmask(_evalexpr(e, cols, strict), rowcount(cols), negated)
+    n = rowcount(cols)
+    value = _evalexpr(e, cols, strict,
+        (f, c, n) -> _booleancolumn(f, c, n) ?
+            _boolmask(_columnmap(f, c, n), n, negated) :
+            _boolmask(_columnvalues(f, c, n), n, negated))
+    return value isa BitVector ? value : _boolmask(value, n, negated)
 end
 
 function _filtermask(e, cols, strict=true)
-    _booleanpredicate(e, cols, strict) && return _evalmask(e, cols, strict)
+    if !(e isa Union{AndExpr, OrExpr, NotExpr}) || _booleanpredicate(e, cols, strict)
+        return _evalmask(e, cols, strict)
+    end
     # Preserve elementwise bitwise behavior of non-Boolean custom comparisons.
     return _boolmask(_evalexpr(e, cols, strict, _columnvalues), rowcount(cols))
 end

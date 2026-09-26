@@ -62,6 +62,25 @@ function Base.copy(v::Base.Broadcast.Broadcasted{BooleanScanStyle})
     return BitVector(Base.copy(plain))
 end
 
+struct IntegerCopyScanColumn <: AbstractVector{Int}
+    values::Vector{Int}
+end
+Base.size(c::IntegerCopyScanColumn) = size(c.values)
+Base.getindex(c::IntegerCopyScanColumn, i::Int) = c.values[i]
+function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
+                   Tuple{IntegerCopyScanColumn}}) where {A, F}
+    return Int[v.f(x) for x in v.args[1].values]
+end
+
+struct BooleanCopyScanValue
+    value::Int
+end
+Base.:(==)(x::BooleanCopyScanValue, y::Int) = x.value == y
+function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
+                   Tuple{Vector{BooleanCopyScanValue}}}) where {A, F}
+    return Int[v.f(x) for x in v.args[1]]
+end
+
 @testset "scan.jl" begin
 
     T = Tables
@@ -320,13 +339,33 @@ end
         @test T.filtermask(expr, (a=styled,)) == [false, true, false]
         @test T.filtermask(!expr, (a=styled,)) == [true, false, true]
 
+        # Default-style copy methods can also convert Bool values to Int,
+        # including when the source is a Vector of user-defined values.
+        for column in (IntegerCopyScanColumn([0, 1, 2]), BooleanCopyScanValue.([0, 1, 2]))
+            table = (a=column,)
+            for request in (expr, T.Scan(filter=expr), T.resolve(T.Scan(filter=expr), (:a,)))
+                @test T.filtermask(request, table) == falses(3)
+            end
+            @test T.filtermask(expr | T.AlwaysTrue(), table) == falses(3)
+            @test_throws MethodError T.filtermask(!expr, table)
+        end
+
         n = 65536
-        large = (a=collect(1:n), b=Union{Missing,Int}[i % 7 == 0 ? missing : i for i in 1:n])
         expr = (T.col(:a) > n ÷ 8) & (T.col(:a) < 7n ÷ 8) &
             (T.col(:b) >= n ÷ 4) & !T.isnull(T.col(:b))
-        T.filtermask(expr, large)
-        allocated = @allocated T.filtermask(expr, large)
-        @test allocated < 2n
+        values = collect(1:n)
+        for b in (values, Union{Missing,Int}[i % 7 == 0 ? missing : i for i in values])
+            large = (a=values, b=b)
+            T.filtermask(expr, large)
+            allocated = @allocated T.filtermask(expr, large)
+            if eltype(b) === Int
+                @test allocated < n
+            elseif VERSION >= v"1.13"
+                # Older compilers can widen nullable broadcast output types,
+                # requiring the conservative materialization path.
+                @test allocated < 2n
+            end
+        end
     end
 
     @testset "scan: validate=false filters treat unmatched refs as all-missing" begin
@@ -334,6 +373,13 @@ end
         # strict (default): unknown filter refs error, matching resolve
         @test_throws ArgumentError T.scan(nt2, T.Scan(filter = T.col(:gone) > 1))
         @test_throws ArgumentError T.filtermask(T.col(:gone) > 1, nt2)
+        for name in (Symbol("a b"), Symbol("a\nb"), Symbol("=foo\"bar\\baz"))
+            err = try T.filtermask(T.col(name) > 0, nt2) catch caught; caught end
+            @test err isa ArgumentError
+            text = sprint(showerror, err)
+            @test occursin(repr(String(name)), text)
+            @test !occursin('\n', text)
+        end
         # lenient: comparisons/membership/strings against the absent column
         # evaluate to missing → rows excluded, SQL-style
         for f in (T.col(:gone) > 1, T.colin(T.col(:gone), (1, 2)),

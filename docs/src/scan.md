@@ -177,6 +177,26 @@ reject an unconsumed `OpNode` because they do not know its meaning.
 Zero-column results retain their row count. Sources should preserve the same
 property when they return a fully pushed result.
 
+### Compiling primitive filters
+
+The bare-expression form of `Tables.filtermask` has a compile-and-run check with
+Julia 1.13 and JuliaC's `--trim=safe`. It covers single-column `NamedTuple` tables
+with integer or string vectors that can contain `missing`: comparisons, tuple
+membership, null checks, and string predicates. The executable receives its
+comparison threshold at runtime.
+
+Run the check from the package directory:
+
+```sh
+julia --project=test/trim -e 'using Pkg; Pkg.instantiate()'
+julia --project=test/trim test/trim/runtests.jl
+```
+
+This verified subset does not include compound filters, the `Scan` or
+`BoundScan` overloads, arbitrary custom columns, or the full `Tables.scan`
+executor. Those paths can still require dynamic dispatch unavailable in a
+trimmed executable.
+
 ```@docs; canonical = false
 Tables.Scan
 Tables.scan
