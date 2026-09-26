@@ -37,6 +37,20 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+  trim:
+    name: Trim primitive filters
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.13'
+      - uses: julia-actions/cache@v3
+      - name: Install trim environment
+        run: julia --startup-file=no --project=test/trim -e 'using Pkg; Pkg.instantiate()'
+      - name: Compile and run primitive filters
+        run: julia --startup-file=no --project=test/trim test/trim/runtests.jl
   docs:
     name: Documentation
     runs-on: ubuntu-latest
