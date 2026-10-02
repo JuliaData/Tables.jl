@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
-          version: '1.13'
+          version: '1'
       - uses: julia-actions/cache@v3
       - name: Install trim environment
         run: julia --startup-file=no --project=test/trim -e 'using Pkg; Pkg.instantiate()'

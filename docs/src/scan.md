@@ -179,11 +179,11 @@ property when they return a fully pushed result.
 
 ### Compiling primitive filters
 
-The bare-expression form of `Tables.filtermask` has a compile-and-run check with
-Julia 1.13 and JuliaC's `--trim=safe`. It covers single-column `NamedTuple` tables
-with integer or string vectors that can contain `missing`: comparisons, tuple
-membership, null checks, and string predicates. The executable receives its
-comparison threshold at runtime.
+The bare-expression form of `Tables.filtermask` supports static compilation
+with Julia 1.13 and JuliaC's `--trim=safe` for single-column
+`NamedTuple` tables with `Int` or `String` vectors that can contain `missing`.
+The supported predicates are comparisons, tuple membership, null checks, and
+string predicates. Comparison thresholds can be supplied at runtime.
 
 Run the check from the package directory:
 
@@ -192,7 +192,7 @@ julia --project=test/trim -e 'using Pkg; Pkg.instantiate()'
 julia --project=test/trim test/trim/runtests.jl
 ```
 
-This verified subset does not include compound filters, the `Scan` or
+This support does not include compound filters, the `Scan` or
 `BoundScan` overloads, arbitrary custom columns, or the full `Tables.scan`
 executor. Those paths can still require dynamic dispatch unavailable in a
 trimmed executable.
