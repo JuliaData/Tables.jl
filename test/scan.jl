@@ -368,6 +368,64 @@ end
         end
     end
 
+    @testset "scan: constant and missing masks" begin
+        # These leaves bypass the column callback and must expand scalar results.
+        # Empty AND/OR keep their existing identities, including under negation.
+        for n in (0, 1, 65)
+            source = ZeroColumnTable(n)
+            for (expr, expected) in (
+                (T.AlwaysTrue(), true), (T.AlwaysFalse(), false),
+                (T.AndExpr(T.ScanExpr[]), true), (T.OrExpr(T.ScanExpr[]), false),
+            )
+                for (filter, keep) in ((expr, expected), (!expr, !expected))
+                    scan = T.Scan(filter=filter)
+                    bound = T.resolve(scan, ())
+                    for request in (filter, scan, bound)
+                        mask = T.filtermask(request, source)
+                        @test mask isa BitVector
+                        @test mask == fill(keep, n)
+                    end
+                end
+            end
+            for expr in (T.col(:gone) > 1, !(T.col(:gone) > 1),
+                         T.isnull(T.col(:gone)), !T.isnull(T.col(:gone)))
+                scan = T.Scan(filter=expr, validate=false)
+                expected = expr isa T.IsNull && !expr.negated
+                for request in (scan, T.resolve(scan, ()))
+                    @test T.filtermask(request, source) == fill(expected, n)
+                end
+            end
+        end
+        @test T._boolmask(Union{Bool, Missing}[true, missing, false], 3, true) ==
+              [false, false, true]
+        for n in (0, 1, 65), negated in (false, true)
+            values = isodd.(1:n)
+            lazy = Base.Broadcast.broadcasted(identity, values)
+            @test T._boolmask(lazy, n, negated) == (negated ? .!values : values)
+        end
+    end
+
+    @testset "scan: eager predicate inference and negated mask ownership" begin
+        for n in (0, 1, 65)
+            calls = Ref(0)
+            eager = EagerScanColumn(collect(1:n), falses(n), calls)
+            table = (a=eager,)
+            expr = T.col(:a) > 1
+            @test T._isbooleanpredicate(expr, T.columns(table), true)
+            @test calls[] == 0
+            for filter in (!expr, !(expr & T.AlwaysTrue()), !expr | T.AlwaysFalse())
+                scan = T.Scan(filter=filter)
+                for request in (filter, scan, T.resolve(scan, (:a,)))
+                    mask = T.filtermask(request, table)
+                    @test mask == [x <= 1 for x in eager.values]
+                    fill!(mask, true)
+                    @test eager.mask == [x > 1 for x in eager.values]
+                end
+            end
+            @test calls[] == 9
+        end
+    end
+
     @testset "scan: validate=false filters treat unmatched refs as all-missing" begin
         nt2 = (a = [1, 2, 3], b = ["x", "y", "z"])
         # strict (default): unknown filter refs error, matching resolve

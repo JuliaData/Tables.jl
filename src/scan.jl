@@ -527,8 +527,8 @@ end
 # values. Non-vector columns only require Tables.jl's scalar-indexing contract.
 function _columnmap(f::F, c::AbstractVector, ::Int) where {F}
     v = Base.Broadcast.broadcasted(f, c)
-    # A custom broadcast may convert Bool results to another type on copy.
-    # Preserve that conversion before testing which values are exactly true.
+    # A custom style's copy method may convert predicate values (e.g. Int to
+    # Bool). Materialize it before mask conversion so fusion preserves that step.
     return v isa Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}} ?
         v : Base.Broadcast.materialize(v)
 end
@@ -537,6 +537,7 @@ _columnvalues(f::F, c, n::Int) where {F} = Base.Broadcast.materialize(_columnmap
 # Check the materialized type without evaluating an eager custom broadcast.
 # promote_op can fold at compile time; inconclusive inference keeps the
 # materialized evaluator, preserving custom conversions.
+# The guard must fold without runtime compiler reflection in trimmed code.
 _booleancolumn(f::F, c, ::Int) where {F} =
     Base.promote_op(_columnvalues, F, typeof(c), Int) <: AbstractVector{<:Union{Bool, Missing}}
 
@@ -605,13 +606,13 @@ function _isbooleanpredicate(e::ScanExpr, cols, strict::Bool)
     end
 end
 
-# Specialize at the column boundary, keeping dynamic expression dispatch out
-# of row loops. Write owned masks to protect from a custom broadcast sharing storage.
+# _evalexpr returns different container types for different expressions.
+# Specialize on the concrete v here to keep dynamic dispatch out of row loops.
+# Write owned masks to protect storage shared by a custom broadcast.
 @noinline function _boolmask(v, n::Int=length(v), negated::Bool=false)
     if v isa Base.Broadcast.Broadcasted && Base.Broadcast.combine_eltypes(v.f, v.args) === Bool
-        result = Base.Broadcast.materialize!(BitVector(undef, n), v)
-        negated && (result .= .!result)
-        return result
+        values = negated ? Base.Broadcast.broadcasted(!, v) : v
+        return Base.Broadcast.materialize!(BitVector(undef, n), values)
     elseif negated
         # Only exact false qualifies under negation; missing still excludes a row.
         return Base.Broadcast.materialize!(BitVector(undef, n),

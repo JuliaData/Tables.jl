@@ -91,6 +91,12 @@ Only ordered comparisons have direct operator shorthand. Equality uses
 `Tables.colcmp(==, column, value)` because `==` on expression objects retains
 its normal Boolean meaning.
 
+When constructing expressions programmatically, an empty
+`Tables.AndExpr(Tables.ScanExpr[])` matches every row, while an empty
+`Tables.OrExpr(Tables.ScanExpr[])` matches no rows. These are the identities for
+conjunction and disjunction. Check for an empty predicate list before constructing
+the expression if it indicates a mistake in the caller's column selection.
+
 ### Missing values
 
 Filter evaluation uses SQL-like three-valued logic:
@@ -180,12 +186,13 @@ property when they return a fully pushed result.
 ### Compiling primitive filters
 
 The bare-expression form of `Tables.filtermask` supports static compilation
-with Julia 1.13 and JuliaC's `--trim=safe` for single-column
+with Julia 1.13 or later and JuliaC's `--trim=safe` for single-column
 `NamedTuple` tables with `Int` or `String` vectors that can contain `missing`.
 The supported predicates are comparisons, tuple membership, null checks, and
-string predicates. Comparison thresholds can be supplied at runtime.
+string predicates. Column references can be symbols, strings, or integer
+positions. Comparison thresholds can be supplied at runtime.
 
-Run the check from the package directory:
+To compile and run an example executable from the package directory:
 
 ```sh
 julia --project=test/trim -e 'using Pkg; Pkg.instantiate()'
