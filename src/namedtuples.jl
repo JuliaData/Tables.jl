@@ -150,6 +150,15 @@ also known as a "column table". A "column table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl column interface
 naturally.
 
+When constructing columns from rows with an unknown schema, this function reads the
+source once and starts each column with the first value's type. Storage widens without
+converting existing values, using a union when numeric promotion could lose information.
+Column types are inferred with `promote_type`; any required conversion is deferred until
+the final types are known. Widening and final conversion can temporarily require both
+old and new column storage. Mutable cell contents are not copied. Final numeric promotion
+can still round values, such as a large integer converted to `Float64`. Rows with a known
+schema are written directly to typed columns without this inference step.
+
 Note that if `x` is an object in which columns are stored as vectors, the check that
 these vectors use 1-based indexing is not performed (it should be ensured when `x` is constructed).
 

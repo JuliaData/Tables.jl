@@ -152,33 +152,42 @@ end
 @inline add!(dest::AbstractArray, val, ::Union{Base.HasLength, Base.HasShape}, row) = setindex!(dest, val, row)
 @inline add!(dest::AbstractArray, val, T, row) = push!(dest, val)
 
-@inline function add_or_widen!(val, col::Int, nm, dest::AbstractArray{T}, row, updated, L) where {T}
-    if val isa T || promote_type(typeof(val), T) <: T
+# Copy the filled values into storage that also holds `val` without conversion.
+# `P` tracks the promoted output type. If promotion is not a supertype of both storage
+# and the new value, use their union and defer conversion until the final type is known.
+function widen(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
+    V = typeof(val)
+    P2 = promote_type(P, V)
+    S = T <: P2 && V <: P2 ? P2 : Union{T, V}
+    new = allocatecolumn(S, length(dest))
+    nfilled > 0 && copyto!(new, 1, dest, 1, nfilled)
+    return new, P2
+end
+
+# Convert a column once into its promoted type if storage was widened losslessly instead.
+finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} = T === P ? col : copyto!(allocatecolumn(P, length(col)), col)
+
+@inline function add_or_widen!(@nospecialize(val), col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
+    if val isa T
         add!(dest, val, L, row)
         return
     else
-        new = allocatecolumn(promote_type(T, typeof(val)), length(dest))
-        row > 1 && copyto!(new, 1, dest, 1, row - 1)
+        new, types[col] = widen(dest, types[col], val, row - 1)
         add!(new, val, L, row)
         updated[] = ntuple(i->i == col ? new : updated[][i], length(updated[]))
         return
     end
 end
 
-function __buildcolumns(rowitr, st, sch, columns, rownbr, updated)
+function __buildcolumns(rowitr, st, sch, columns, rownbr, updated, types)
     while true
         state = iterate(rowitr, st)
         state === nothing && break
         row, st = state
         rownbr += 1
-        eachcolumns(add_or_widen!, sch, row, columns, rownbr, updated, Base.IteratorSize(rowitr))
-        # little explanation here: we just called add_or_widen! for each column value of our row
-        # note that when a column's type is widened, `updated` is set w/ the new set of columns
-        # we then check if our current `columns` isn't the same object as our `updated` ref
-        # if it isn't, we're going to call __buildcolumns again, passing our new updated ref as
-        # columns, which allows __buildcolumns to specialize (i.e. recompile) based on the new types
-        # of updated. So a new __buildcolumns will be compiled for each widening event.
-        columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated)
+        eachcolumns(add_or_widen!, sch, row, columns, rownbr, updated, types, Base.IteratorSize(rowitr))
+        # Restart with the widened columns so this loop specializes on their new types.
+        columns !== updated[] && return __buildcolumns(rowitr, st, sch, updated[], rownbr, updated, types)
     end
     return updated
 end
@@ -193,9 +202,9 @@ Base.IndexStyle(::Type{EmptyVector}) = Base.IndexLinear()
 Base.size(x::EmptyVector) = (x.len,)
 Base.getindex(x::EmptyVector, i::Int) = throw(UndefRefError())
 
-function _buildcolumns(rowitr, row, st, sch, columns, updated)
-    eachcolumns(add_or_widen!, sch, row, columns, 1, updated, Base.IteratorSize(rowitr))
-    return __buildcolumns(rowitr, st, sch, updated[], 1, updated)
+function _buildcolumns(rowitr, row, st, sch, columns, updated, types)
+    eachcolumns(add_or_widen!, sch, row, columns, 1, updated, types, Base.IteratorSize(rowitr))
+    return __buildcolumns(rowitr, st, sch, updated[], 1, updated, types)
 end
 
 if isdefined(Base, :fieldtypes)
@@ -224,7 +233,9 @@ end
     len = Base.haslength(T) ? length(rowitr) : 0
     sch = Schema(names, nothing)
     columns = Tuple(EmptyVector(len) for _ = 1:length(names))
-    return NamedTuple{map(Symbol, names)}(_buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns))[])
+    types = Type[Union{} for _ = 1:length(names)]
+    cols = _buildcolumns(rowitr, row, st, sch, columns, Ref{Any}(columns), types)[]
+    return NamedTuple{map(Symbol, names)}(Tuple(finishcolumn(cols[i], types[i]) for i = 1:length(names)))
 end
 
 """
