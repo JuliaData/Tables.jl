@@ -77,15 +77,25 @@ end
 Materialize any table source input as a new `Matrix` or in the case of a `MatrixTable`
 return the originally wrapped matrix. If the table column element types are not homogeneous,
 they will be promoted to a common type in the materialized `Matrix`. Note that column names are
-ignored in the conversion. By default, input table columns will be materialized as corresponding
+ignored in the conversion. If the source does not declare its column types, they are taken from
+the returned columns. By default, input table columns will be materialized as corresponding
 matrix columns; passing `transpose=true` will transpose the input with input columns as matrix rows
 or in the case of a `MatrixTable` apply `permutedims` to the originally wrapped matrix.
 """
 function matrix(table; transpose::Bool=false)
     cols = Columns(table)
-    types = schema(cols).types
-    T = reduce(promote_type, types)
-    n, p = rowcount(cols), length(types)
+    sch = schema(cols)
+    if sch === nothing || sch.types === nothing
+        # Read lazy columns once to discover their element types.
+        cols = collect(cols)
+        types = map(eltype, cols)
+        n = isempty(cols) ? 0 : length(first(cols))
+    else
+        types = sch.types
+        n = rowcount(cols)
+    end
+    T = reduce(promote_type, types; init=Union{})
+    p = length(types)
     if !transpose
         matrix = Matrix{T}(undef, n, p)
         for (i, col) in enumerate(cols)
