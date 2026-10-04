@@ -91,6 +91,18 @@ Only ordered comparisons have direct operator shorthand. Equality uses
 `Tables.colcmp(==, column, value)` because `==` on expression objects retains
 its normal Boolean meaning.
 
+The generic executor builds owned compact Boolean masks. Native `Bool`, fixed-width
+integer, IEEE floating-point, and `String` vectors, optionally containing `missing`,
+can share predicate and mask-conversion loops. Custom containers or element types
+materialize their broadcasts first, preserving custom copying behavior even when
+it returns Boolean values.
+
+When constructing expressions programmatically, an empty
+`Tables.AndExpr(Tables.ScanExpr[])` matches every row, while an empty
+`Tables.OrExpr(Tables.ScanExpr[])` matches no rows. These are the identities for
+conjunction and disjunction. Check for an empty predicate list before constructing
+the expression if it indicates a mistake in the caller's column selection.
+
 ### Missing values
 
 Filter evaluation uses SQL-like three-valued logic:
@@ -176,6 +188,27 @@ reject an unconsumed `OpNode` because they do not know its meaning.
 
 Zero-column results retain their row count. Sources should preserve the same
 property when they return a fully pushed result.
+
+### Compiling primitive filters
+
+The bare-expression form of `Tables.filtermask` supports static compilation
+with Julia 1.13 or later and JuliaC's `--trim=safe` for single-column
+`NamedTuple` tables with `Int` or `String` vectors that can contain `missing`.
+The supported predicates are comparisons, tuple membership, null checks, and
+string predicates. Column references can be symbols, strings, or integer
+positions. Comparison thresholds can be supplied at runtime.
+
+To compile and run an example executable from the package directory:
+
+```sh
+julia --project=test/trim -e 'using Pkg; Pkg.instantiate()'
+julia --project=test/trim test/trim/runtests.jl
+```
+
+This support does not include compound filters, the `Scan` or
+`BoundScan` overloads, arbitrary custom columns, or the full `Tables.scan`
+executor. Those paths can still require dynamic dispatch unavailable in a
+trimmed executable.
 
 ```@docs; canonical = false
 Tables.Scan
