@@ -81,6 +81,15 @@ function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyl
     return Int[v.f(x) for x in v.args[1]]
 end
 
+struct BooleanRemapScanValue
+    value::Int
+end
+Base.:(==)(x::BooleanRemapScanValue, y::Int) = x.value == y
+function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
+                   Tuple{Vector{BooleanRemapScanValue}}}) where {A, F}
+    return Bool[!v.f(x) for x in v.args[1]]
+end
+
 @testset "scan.jl" begin
 
     T = Tables
@@ -281,6 +290,16 @@ end
     end
 
     @testset "scan: logical masks preserve three-valued truth and ownership" begin
+        # The materializer can change Boolean values without changing their type.
+        remapped = (a=BooleanRemapScanValue.([1, 2, 3]),)
+        for threshold in (1, 2, 3)
+            expr = T.colcmp(==, T.col(:a), threshold)
+            expected = Bool[!(x.value == threshold) for x in remapped.a]
+            @test T.filtermask(expr, remapped) == expected
+            @test T.filtermask(!expr, remapped) == .!expected
+            @test T.filtermask(expr | T.AlwaysFalse(), remapped) == expected
+            @test T.filtermask(expr & T.AlwaysTrue(), remapped) == expected
+        end
         combinations = vec(collect(Iterators.product((true, false, missing),
             (true, false, missing), (true, false, missing))))
         source = (a=[x[1] for x in combinations], b=[x[2] for x in combinations],

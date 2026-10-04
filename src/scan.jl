@@ -527,9 +527,10 @@ end
 # values. Non-vector columns only require Tables.jl's scalar-indexing contract.
 function _columnmap(f::F, c::AbstractVector, ::Int) where {F}
     v = Base.Broadcast.broadcasted(f, c)
-    # A custom style's copy method may convert predicate values (e.g. Int to
-    # Bool). Materialize it before mask conversion so fusion preserves that step.
-    return v isa Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}} ?
+    # Custom containers or element types may change Boolean values in copy,
+    # even with the default style. Materialize those broadcasts before fusion.
+    native = c isa Vector{<:Union{Bool, Base.BitInteger, Base.IEEEFloat, String, Missing}}
+    return native && v isa Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}} ?
         v : Base.Broadcast.materialize(v)
 end
 _columnmap(f::F, c, n::Int) where {F} = Base.Broadcast.broadcasted(i -> f(c[i]), 1:n)

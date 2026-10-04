@@ -91,6 +91,12 @@ Only ordered comparisons have direct operator shorthand. Equality uses
 `Tables.colcmp(==, column, value)` because `==` on expression objects retains
 its normal Boolean meaning.
 
+The generic executor builds owned compact Boolean masks. Native `Bool`, fixed-width
+integer, IEEE floating-point, and `String` vectors, optionally containing `missing`,
+can share predicate and mask-conversion loops. Custom containers or element types
+materialize their broadcasts first, preserving custom copying behavior even when
+it returns Boolean values.
+
 When constructing expressions programmatically, an empty
 `Tables.AndExpr(Tables.ScanExpr[])` matches every row, while an empty
 `Tables.OrExpr(Tables.ScanExpr[])` matches no rows. These are the identities for

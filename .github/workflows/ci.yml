@@ -6,6 +6,9 @@ on:
     tags: ["*"]
 jobs:
   test:
+    permissions:
+      contents: read
+      id-token: write
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -36,7 +39,8 @@ jobs:
       - uses: codecov/codecov-action@v7
         with:
           files: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
   trim:
     name: Trim primitive filters - Julia ${{ matrix.version }}
     runs-on: ubuntu-latest
