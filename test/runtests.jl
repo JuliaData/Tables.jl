@@ -225,6 +225,14 @@ end
     end
 end
 
+struct CustomMaterializedRows{T<:NamedTuple} <: AbstractVector{T}
+    rows::Vector{T}
+end
+Base.size(x::CustomMaterializedRows) = size(x.rows)
+Base.getindex(x::CustomMaterializedRows, i::Int) = x.rows[i]
+custom_materializer(x) = CustomMaterializedRows(Tables.rowtable(x))
+Tables.materializer(::Type{<:CustomMaterializedRows}) = custom_materializer
+
 @testset "Materializer" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
@@ -233,6 +241,14 @@ end
     @test nt == Tables.materializer(nt)(Tables.columns(rt))
     @test nt == Tables.materializer(nt)(rt)
     @test rt == Tables.materializer(rt)(nt)
+    @test Tables.materializer(typeof(rt)) === Tables.rowtable
+    @test Tables.materializer(NamedTuple[]) === Tables.rowtable
+    @test Tables.materializer(Vector{NamedTuple}) === Tables.rowtable
+    @test Tables.materializer(view(rt, :)) === Tables.rowtable
+    custom = CustomMaterializedRows(rt)
+    @test Tables.materializer(typeof(custom)) === custom_materializer
+    @test Tables.materializer(custom) === custom_materializer
+    @test Tables.materializer(custom)(nt).rows == rt
 
     function select(table, cols::Symbol...)
         Tables.istable(table) || throw(ArgumentError("select requires a table input"))
