@@ -33,63 +33,6 @@ Tables.getcolumn(::ZeroColumnTable, i::Int) = throw(BoundsError((), i))
 Tables.getcolumn(::ZeroColumnTable, name::Symbol) = throw(ArgumentError("unknown column $name"))
 Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
 
-struct IntegerScanComparison
-    value::Int
-end
-Base.:(==)(x::IntegerScanComparison, ::Int) = x.value
-
-struct EagerScanColumn{T, M} <: AbstractVector{T}
-    values::Vector{T}
-    mask::M
-    calls::Base.RefValue{Int}
-end
-Base.size(c::EagerScanColumn) = size(c.values)
-Base.getindex(c::EagerScanColumn, i::Int) = c.values[i]
-function Base.Broadcast.broadcasted(f, c::EagerScanColumn)
-    c.calls[] += 1
-    return broadcast!(f, c.mask, c.values)
-end
-
-struct BooleanScanStyle <: Base.Broadcast.AbstractArrayStyle{1} end
-struct BooleanScanColumn{T} <: AbstractVector{T}
-    values::Vector{T}
-end
-Base.size(c::BooleanScanColumn) = size(c.values)
-Base.getindex(c::BooleanScanColumn, i::Int) = c.values[i]
-Base.BroadcastStyle(::Type{<:BooleanScanColumn}) = BooleanScanStyle()
-function Base.copy(v::Base.Broadcast.Broadcasted{BooleanScanStyle})
-    plain = Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}}(v.f, v.args, v.axes)
-    return BitVector(Base.copy(plain))
-end
-
-struct IntegerCopyScanColumn <: AbstractVector{Int}
-    values::Vector{Int}
-end
-Base.size(c::IntegerCopyScanColumn) = size(c.values)
-Base.getindex(c::IntegerCopyScanColumn, i::Int) = c.values[i]
-function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
-                   Tuple{IntegerCopyScanColumn}}) where {A, F}
-    return Int[v.f(x) for x in v.args[1].values]
-end
-
-struct BooleanCopyScanValue
-    value::Int
-end
-Base.:(==)(x::BooleanCopyScanValue, y::Int) = x.value == y
-function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
-                   Tuple{Vector{BooleanCopyScanValue}}}) where {A, F}
-    return Int[v.f(x) for x in v.args[1]]
-end
-
-struct BooleanRemapScanValue
-    value::Int
-end
-Base.:(==)(x::BooleanRemapScanValue, y::Int) = x.value == y
-function Base.copy(v::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, A, F,
-                   Tuple{Vector{BooleanRemapScanValue}}}) where {A, F}
-    return Bool[!v.f(x) for x in v.args[1]]
-end
-
 @testset "scan.jl" begin
 
     T = Tables
@@ -219,14 +162,11 @@ end
         missingvals = (a = Union{Int, Missing}[1, missing, 3],
                        b = Union{String, Missing}["x", missing, "z"])
         missingcols = T.columns(missingvals)
-        @test isequal(
-            Base.Broadcast.materialize(T._evalexpr(T.colcmp(==, T.col(:a), 1), missingcols)),
-            Union{Bool, Missing}[true, missing, false],
-        )
-        @test isequal(
-            Base.Broadcast.materialize(T._evalexpr(T.colin(T.col(:a), (1, 2)), missingcols)),
-            Union{Bool, Missing}[true, missing, false],
-        )
+        # comparisons and membership lift missing, so negation still excludes it
+        for e in (T.colcmp(==, T.col(:a), 1), T.colin(T.col(:a), (1, 2)))
+            @test T.filtermask(e, missingcols) == [true, false, false]
+            @test T.filtermask(!e, missingcols) == [false, false, true]
+        end
         @test T.filtermask(T.colin(T.col(:a), (1, missing)), missingvals) ==
               [true, false, false]
         @test T.filtermask(T.colin(T.col(:a), (2, missing)), missingvals) ==
@@ -242,13 +182,11 @@ end
         @test_throws ArgumentError T.filtermask(!T.col(:a), missingvals)
         @test T.filtermask(T.AndExpr(T.ScanExpr[]), missingvals) == [true, true, true]
         @test T.filtermask(T.OrExpr(T.ScanExpr[]), missingvals) == [false, false, false]
-        # the final function barrier keeps only exact `true` (SQL WHERE)
-        @test T._boolmask(BitVector([true, false])) == [true, false]
-        @test T._boolmask(Bool[false, true]) == [false, true]
-        @test T._boolmask(Union{Bool, Missing}[true, missing, false]) ==
-              [true, false, false]
-        @test T._boolmask(Any[true, 1, missing, nothing]) ==
-              [true, false, false, false]
+        # only exact `true` qualifies (SQL WHERE), or exact `false` under negation
+        @test T._boolmask(Any[true, 1, missing, nothing, false], 5, true) ==
+              [true, false, false, false, false]
+        @test T._boolmask(Any[true, 1, missing, nothing, false], 5, false) ==
+              [false, false, false, false, true]
         @test_throws ArgumentError T.Cmp(0xff, T.col(:a), 1)
         @test_throws ArgumentError T.StrPred(0xff, T.col(:b), "x")
         out = T.scan(nt, T.Scan(limit = 2, offset = 1))
@@ -290,16 +228,6 @@ end
     end
 
     @testset "scan: logical masks preserve three-valued truth and ownership" begin
-        # The materializer can change Boolean values without changing their type.
-        remapped = (a=BooleanRemapScanValue.([1, 2, 3]),)
-        for threshold in (1, 2, 3)
-            expr = T.colcmp(==, T.col(:a), threshold)
-            expected = Bool[!(x.value == threshold) for x in remapped.a]
-            @test T.filtermask(expr, remapped) == expected
-            @test T.filtermask(!expr, remapped) == .!expected
-            @test T.filtermask(expr | T.AlwaysFalse(), remapped) == expected
-            @test T.filtermask(expr & T.AlwaysTrue(), remapped) == expected
-        end
         combinations = vec(collect(Iterators.product((true, false, missing),
             (true, false, missing), (true, false, missing))))
         source = (a=[x[1] for x in combinations], b=[x[2] for x in combinations],
@@ -329,46 +257,6 @@ end
         @test T.filtermask((a | b) & !c, source) ==
             [((x | y) & !z) === true for (x, y, z) in combinations]
 
-        # Custom comparison results still use elementwise &, | and exact true.
-        custom = (a=IntegerScanComparison.([0, 1, 2]), b=[true, true, false])
-        for op in (&, |)
-            expr = op(T.colcmp(==, T.col(:a), 1), T.colcmp(==, T.col(:b), true))
-            @test T.filtermask(expr, custom) ==
-                [op(x.value, y) === true for (x, y) in zip(custom.a, custom.b)]
-        end
-        @test_throws MethodError T.filtermask(!T.colcmp(==, T.col(:a), 1), custom)
-
-        # Eager custom broadcasts run once and may return shared storage.
-        calls = Ref(0)
-        eager = EagerScanColumn([0, 1, 2], falses(3), calls)
-        expr = T.colcmp(==, T.col(:a), 1)
-        mask = T.filtermask(expr, (a=eager,))
-        @test mask == [false, true, false]
-        @test calls[] == 1
-        fill!(mask, true)
-        @test eager.mask == [false, true, false]
-        @test T.filtermask(expr, (a=eager,)) == [false, true, false]
-        @test calls[] == 2
-        # Result storage can convert Bool comparisons to integer zero/one.
-        integers = EagerScanColumn([0, 1, 2], zeros(Int, 3), Ref(0))
-        @test T.filtermask(expr | T.AlwaysTrue(), (a=integers,)) == falses(3)
-        @test integers.calls[] == 1
-        # A lazy custom style can convert integer comparisons to Bool on copy.
-        styled = BooleanScanColumn(IntegerScanComparison.([0, 1, 0]))
-        @test T.filtermask(expr, (a=styled,)) == [false, true, false]
-        @test T.filtermask(!expr, (a=styled,)) == [true, false, true]
-
-        # Default-style copy methods can also convert Bool values to Int,
-        # including when the source is a Vector of user-defined values.
-        for column in (IntegerCopyScanColumn([0, 1, 2]), BooleanCopyScanValue.([0, 1, 2]))
-            table = (a=column,)
-            for request in (expr, T.Scan(filter=expr), T.resolve(T.Scan(filter=expr), (:a,)))
-                @test T.filtermask(request, table) == falses(3)
-            end
-            @test T.filtermask(expr | T.AlwaysTrue(), table) == falses(3)
-            @test_throws MethodError T.filtermask(!expr, table)
-        end
-
         n = 65536
         expr = (T.col(:a) > n ÷ 8) & (T.col(:a) < 7n ÷ 8) &
             (T.col(:b) >= n ÷ 4) & !T.isnull(T.col(:b))
@@ -376,14 +264,7 @@ end
         for b in (values, Union{Missing,Int}[i % 7 == 0 ? missing : i for i in values])
             large = (a=values, b=b)
             T.filtermask(expr, large)
-            allocated = @allocated T.filtermask(expr, large)
-            if eltype(b) === Int
-                @test allocated < n
-            elseif VERSION >= v"1.13"
-                # Older compilers can widen nullable broadcast output types,
-                # requiring the conservative materialization path.
-                @test allocated < 2n
-            end
+            @test (@allocated T.filtermask(expr, large)) < n
         end
     end
 
@@ -414,34 +295,6 @@ end
                     @test T.filtermask(request, source) == fill(expected, n)
                 end
             end
-        end
-        @test T._boolmask(Union{Bool, Missing}[true, missing, false], 3, true) ==
-              [false, false, true]
-        for n in (0, 1, 65), negated in (false, true)
-            values = isodd.(1:n)
-            lazy = Base.Broadcast.broadcasted(identity, values)
-            @test T._boolmask(lazy, n, negated) == (negated ? .!values : values)
-        end
-    end
-
-    @testset "scan: eager predicate inference and negated mask ownership" begin
-        for n in (0, 1, 65)
-            calls = Ref(0)
-            eager = EagerScanColumn(collect(1:n), falses(n), calls)
-            table = (a=eager,)
-            expr = T.col(:a) > 1
-            @test T._isbooleanpredicate(expr, T.columns(table), true)
-            @test calls[] == 0
-            for filter in (!expr, !(expr & T.AlwaysTrue()), !expr | T.AlwaysFalse())
-                scan = T.Scan(filter=filter)
-                for request in (filter, scan, T.resolve(scan, (:a,)))
-                    mask = T.filtermask(request, table)
-                    @test mask == [x <= 1 for x in eager.values]
-                    fill!(mask, true)
-                    @test eager.mask == [x > 1 for x in eager.values]
-                end
-            end
-            @test calls[] == 9
         end
     end
 

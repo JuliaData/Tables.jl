@@ -522,46 +522,38 @@ function _resolvecol(cols, ref, strict::Bool)
     return nothing
 end
 
-# Keep primitive predicates lazy so SQL WHERE conversion can share their loop.
-# Literals stay inside scalar kernels: collection-valued rows compare whole
+# Filters evaluate to Boolean masks. A row qualifies when its three-valued result
+# is exactly true, or exactly false under negation; `missing` matches neither.
+# De Morgan's laws swap AND and OR under negation.
+# Literals stay inside scalar kernels so collection-valued rows compare whole
 # values. Non-vector columns only require Tables.jl's scalar-indexing contract.
-function _columnmap(f::F, c::AbstractVector, ::Int) where {F}
-    v = Base.Broadcast.broadcasted(f, c)
-    # Custom containers or element types may change Boolean values in copy,
-    # even with the default style. Materialize those broadcasts before fusion.
-    native = c isa Vector{<:Union{Bool, Base.BitInteger, Base.IEEEFloat, String, Missing}}
-    return native && v isa Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}} ?
-        v : Base.Broadcast.materialize(v)
-end
+_columnmap(f::F, c::AbstractVector, ::Int) where {F} = Base.Broadcast.broadcasted(f, c)
 _columnmap(f::F, c, n::Int) where {F} = Base.Broadcast.broadcasted(i -> f(c[i]), 1:n)
-_columnvalues(f::F, c, n::Int) where {F} = Base.Broadcast.materialize(_columnmap(f, c, n))
-# Check the materialized type without evaluating an eager custom broadcast.
-# promote_op can fold at compile time; inconclusive inference keeps the
-# materialized evaluator, preserving custom conversions.
-# The guard must fold without runtime compiler reflection in trimmed code.
-_booleancolumn(f::F, c, ::Int) where {F} =
-    Base.promote_op(_columnvalues, F, typeof(c), Int) <: AbstractVector{<:Union{Bool, Missing}}
 
-function _evalexpr(e::ScanExpr, cols, strict::Bool=true, columnmap=_columnmap)
+# Fuses a predicate with its mask conversion in one loop per column type.
+@noinline _boolmask(v, n::Int, want::Bool) = Base.Broadcast.materialize!(BitVector(undef, n),
+    Base.Broadcast.broadcasted(x -> x === want, v))
+
+# One kernel per comparison instead of one per operator keeps compilation cheap.
+_compare(op::ComparisonOperator, x, y) =
+    op == OP_EQ ? x == y : op == OP_NE ? x != y : op == OP_LT ? x < y :
+    op == OP_LE ? x <= y : op == OP_GT ? x > y : x >= y
+
+# Leaf predicates call `columnmap(f, column, nrows)`; constants and absent
+# columns return a `Ref` of their value instead.
+function _evalexpr(e::ScanExpr, cols, strict::Bool, columnmap)
     if e isa Cmp
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return Ref(missing)
-        n = rowcount(cols)
-        return e.op == OP_EQ ? columnmap(x -> x == e.rhs, a, n) :
-               e.op == OP_NE ? columnmap(x -> x != e.rhs, a, n) :
-               e.op == OP_LT ? columnmap(x -> x < e.rhs, a, n) :
-               e.op == OP_LE ? columnmap(x -> x <= e.rhs, a, n) :
-               e.op == OP_GT ? columnmap(x -> x > e.rhs, a, n) :
-               e.op == OP_GE ? columnmap(x -> x >= e.rhs, a, n) :
-               throw(ArgumentError("unknown comparison operator code $(e.op)"))
+        op, rhs = e.op, e.rhs
+        return columnmap(x -> _compare(op, x, rhs), a, rowcount(cols))
     elseif e isa In
         a = _resolvecol(cols, e.lhs.ref, strict)
         a === nothing && return Ref(missing)
         return columnmap(x -> ismissing(x) ? missing : in(x, e.values), a, rowcount(cols))
     elseif e isa IsNull
         a = _resolvecol(cols, e.lhs.ref, strict)
-        a === nothing &&
-            return Ref(!e.negated)
+        a === nothing && return Ref(!e.negated)
         return e.negated ? columnmap(x -> !ismissing(x), a, rowcount(cols)) :
                            columnmap(ismissing, a, rowcount(cols))
     elseif e isa StrPred
@@ -572,14 +564,6 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true, columnmap=_columnmap)
             e.kind == STR_CONTAINS ? contains :
             throw(ArgumentError("unknown string predicate code $(e.kind)"))
         return columnmap(x -> ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
-    elseif e isa AndExpr
-        isempty(e.args) && return Ref(true)
-        return mapreduce(a -> _evalexpr(a, cols, strict, columnmap), (x, y) -> x .& y, e.args)
-    elseif e isa OrExpr
-        isempty(e.args) && return Ref(false)
-        return mapreduce(a -> _evalexpr(a, cols, strict, columnmap), (x, y) -> x .| y, e.args)
-    elseif e isa NotExpr
-        return .!_evalexpr(e.arg, cols, strict, columnmap)
     elseif e isa AlwaysTrue
         return Ref(true)
     elseif e isa AlwaysFalse
@@ -588,81 +572,22 @@ function _evalexpr(e::ScanExpr, cols, strict::Bool=true, columnmap=_columnmap)
     throw(ArgumentError("cannot generically evaluate $(typeof(e))"))
 end
 
-# Combine compact masks only for Bool-or-missing predicates. Other comparison
-# results retain elementwise & and | on their original values in _evalexpr.
-function _isbooleanpredicate(e::ScanExpr, cols, strict::Bool)
-    if e isa Union{AndExpr, OrExpr}
-        result = true
-        for arg in e.args
-            result &= _isbooleanpredicate(arg, cols, strict)
-        end
-        return result
-    elseif e isa NotExpr
-        return _isbooleanpredicate(e.arg, cols, strict)
-    elseif e isa Union{AlwaysTrue, AlwaysFalse}
-        return true
-    else
-        result = _evalexpr(e, cols, strict, _booleancolumn)
-        return result isa Ref ? result[] isa Union{Bool, Missing} : result
-    end
-end
-
-# _evalexpr returns different container types for different expressions.
-# Specialize on the concrete v here to keep dynamic dispatch out of row loops.
-# Write owned masks to protect storage shared by a custom broadcast.
-@noinline function _boolmask(v, n::Int=length(v), negated::Bool=false)
-    if v isa Base.Broadcast.Broadcasted && Base.Broadcast.combine_eltypes(v.f, v.args) === Bool
-        values = negated ? Base.Broadcast.broadcasted(!, v) : v
-        return Base.Broadcast.materialize!(BitVector(undef, n), values)
-    elseif negated
-        # Only exact false qualifies under negation; missing still excludes a row.
-        return Base.Broadcast.materialize!(BitVector(undef, n),
-            Base.Broadcast.broadcasted(x -> x === false, v))
-    else
-        # Only exact true qualifies; missing and non-Boolean values do not.
-        return Base.Broadcast.materialize!(BitVector(undef, n),
-            Base.Broadcast.broadcasted(x -> x === true, v))
-    end
-end
-
-function _maskcombine!(op, x::AbstractVector{Bool}, y::AbstractVector{Bool})
-    x .= op.(x, y)
-    return x
-end
-
-# A negated WHERE asks for exact false. De Morgan's laws swap AND and OR;
-# missing matches neither exact true nor exact false, even under negation.
-function _evalmask(e::ScanExpr, cols, strict::Bool, negated::Bool=false)
+function _filtermask(e::ScanExpr, cols, strict::Bool=true, negated::Bool=false)
     if e isa Union{AndExpr, OrExpr}
         conjunction = (e isa AndExpr) != negated
-        # Empty AND/OR use their true/false identities, inverted by negation.
         isempty(e.args) && return conjunction ? trues(rowcount(cols)) : falses(rowcount(cols))
-        op = conjunction ? (&) : (|)
-        return mapreduce(a -> _evalmask(a, cols, strict, negated),
-            (x, y) -> _maskcombine!(op, x, y), e.args)
+        mask = _filtermask(e.args[1], cols, strict, negated)
+        for i in 2:length(e.args)
+            arg = _filtermask(e.args[i], cols, strict, negated)
+            conjunction ? (mask .&= arg) : (mask .|= arg)
+        end
+        return mask
     elseif e isa NotExpr
-        return _evalmask(e.arg, cols, strict, !negated)
-    else
-        n = rowcount(cols)
-        value = _evalexpr(e, cols, strict, (f, c, n) -> begin
-            # Bool-or-missing predicates can share the mask conversion loop.
-            # Otherwise, preserve custom conversions during materialization.
-            values = _booleancolumn(f, c, n) ? _columnmap(f, c, n) : _columnvalues(f, c, n)
-            return _boolmask(values, n, negated)
-        end)
-        # Constants and absent columns return a scalar Ref without calling
-        # the column callback; expand those values to one mask bit per row.
-        return value isa BitVector ? value : _boolmask(value, n, negated)
+        return _filtermask(e.arg, cols, strict, !negated)
     end
-end
-
-function _filtermask(e::ScanExpr, cols, strict::Bool=true)
-    if !(e isa Union{AndExpr, OrExpr, NotExpr}) || _isbooleanpredicate(e, cols, strict)
-        return _evalmask(e, cols, strict)
-    else
-        # Preserve elementwise bitwise behavior of non-Boolean custom comparisons.
-        return _boolmask(_evalexpr(e, cols, strict, _columnvalues), rowcount(cols))
-    end
+    n = rowcount(cols)
+    mask = _evalexpr(e, cols, strict, (f, c, n) -> _boolmask(_columnmap(f, c, n), n, !negated))
+    return mask isa BitVector ? mask : _boolmask(mask, n, !negated)
 end
 
 """
