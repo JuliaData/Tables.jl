@@ -41,6 +41,16 @@ jobs:
           files: lcov.info
           fail_ci_if_error: true
           use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-docdeploy@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
   trim:
     name: Trim primitive filters - Julia ${{ matrix.version }}
     runs-on: ubuntu-latest
@@ -59,13 +69,3 @@ jobs:
         run: julia --startup-file=no --project=test/trim -e 'using Pkg; Pkg.instantiate()'
       - name: Compile and run primitive filters
         run: julia --startup-file=no --project=test/trim test/trim/runtests.jl
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-docdeploy@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
