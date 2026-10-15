@@ -155,7 +155,7 @@ end
 # Copy the filled values into storage that also holds `val` without conversion.
 # `P` tracks the promoted output type. If promotion is not a supertype of both storage
 # and the new value, use their union and defer conversion until the final type is known.
-function widen(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
+function widencolumn(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
     V = typeof(val)
     P2 = promote_type(P, V)
     S = T <: P2 && V <: P2 ? P2 : Union{T, V}
@@ -165,14 +165,15 @@ function widen(dest::AbstractArray{T}, ::Type{P}, val, nfilled) where {T, P}
 end
 
 # Convert a column once into its promoted type if storage was widened losslessly instead.
-finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} = T === P ? col : copyto!(allocatecolumn(P, length(col)), col)
+finishcolumn(col::AbstractVector{T}, ::Type{P}) where {T, P} =
+    T === P ? col : copyto!(allocatecolumn(P, length(col)), col)
 
 @inline function add_or_widen!(@nospecialize(val), col::Int, nm, dest::AbstractArray{T}, row, updated, types, L) where {T}
     if val isa T
         add!(dest, val, L, row)
         return
     else
-        new, types[col] = widen(dest, types[col], val, row - 1)
+        new, types[col] = widencolumn(dest, types[col], val, row - 1)
         add!(new, val, L, row)
         updated[] = ntuple(i->i == col ? new : updated[][i], length(updated[]))
         return

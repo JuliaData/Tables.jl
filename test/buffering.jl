@@ -39,7 +39,7 @@ end
                 @test all(col[i] === input[i].a for i in eachindex(input))
             end
         end
-        # Intermediate conversion can throw, even when the final type is Any.
+        # Intermediate conversion can throw, even when the final type is Any (#387)
         col = constructor([(a=-1,), (a=UInt64(1),), (a="",)]).a
         @test col[1] === -1
         @test col[2] === UInt64(1)
@@ -93,6 +93,11 @@ end
     ct = Tables.dictcolumntable(BufferedTestRows([NamedTuple(); rows]))
     @test ismissing(ct.a[1])
     @test ct.a[2] === typemax(Int64)
+
+    # A gap must widen the column type even when the next value fits the old type.
+    ct = Tables.dictcolumntable(BufferedTestRows([(a=1,), NamedTuple(), (a=2,)]))
+    @test eltype(ct.a) === Union{Missing, Int}
+    @test isequal(ct.a, [1, missing, 2])
 
     # Fill leading, internal, and trailing gaps, including consecutive empty rows.
     sparse = [NamedTuple(), (a=1,), NamedTuple(), NamedTuple(), (a=2.0,), NamedTuple()]

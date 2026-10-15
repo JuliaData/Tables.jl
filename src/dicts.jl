@@ -20,12 +20,10 @@ is common in json, for example. This results in a performance cost tracking all 
 values and inferring the final unioned schemas, so it's recommended to use only when
 needed.
 
-For unknown schemas, the source is read once and the original cell values are buffered
-in `Any` vectors while column types are inferred with `promote_type`. Values are then
-converted directly to their final column types. Absent cells become `missing`. Peak
-memory can include both the buffered values and output columns, plus buffering overhead.
-Mutable cell contents are not copied. Final numeric promotion can still round values.
-Rows with a known schema do not need this intermediate buffer.
+For unknown schemas, cell values are buffered in `Any` vectors while column types are
+chosen with `promote_type`. Values are then converted once to their final column types,
+and absent cells become `missing`. Tables with a known schema do not need this
+intermediate buffer.
 """
 function dictcolumntable(x)
     if columnaccess(x)
@@ -57,7 +55,7 @@ end
 # Column names and types are only known once every row is seen, so buffer the original
 # values and convert each one once into its final column type. Kept in its own function
 # so the hot loop's locals stay type-stable.
-function buffercolumns(r, len)
+function buffercolumns(r, len::Integer)
     names = Symbol[]
     index = Dict{Symbol, Int}()
     types = Type[]
@@ -77,11 +75,11 @@ function buffercolumns(r, len)
             T = types[i]
             if length(vals) < n - 1 # absent from earlier rows
                 append!(vals, Iterators.repeated(missing, n - 1 - length(vals)))
-                T = Union{Missing, T}
+                types[i] = T = Union{Missing, T}
             end
             val = getcolumn(row, nm)
             push!(vals, val)
-            types[i] = val isa T ? T : promote_type(T, typeof(val))
+            val isa T || (types[i] = promote_type(T, typeof(val)))
         end
     end
     cols = AbstractVector[]
