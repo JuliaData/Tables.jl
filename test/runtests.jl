@@ -274,50 +274,6 @@ Tables.getcolumn(x::MockTable, ::Symbol) = (1, 2, 3)
 Tables.getcolumn(x::MockTable, ::Int) = (1, 2, 3)
 Tables.schema(x::MockTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
-struct MatrixUnknownColumns <: Tables.AbstractColumns
-    names::Vector{Symbol}
-    data::Vector{Any}
-    partial::Bool
-    calls::Vector{Int}
-end
-Tables.istable(::Type{MatrixUnknownColumns}) = true
-Tables.columnaccess(::Type{MatrixUnknownColumns}) = true
-Tables.columns(x::MatrixUnknownColumns) = x
-Tables.columnnames(x::MatrixUnknownColumns) = getfield(x, :names)
-Tables.schema(x::MatrixUnknownColumns) = getfield(x, :partial) ? Tables.Schema(getfield(x,:names), nothing) : nothing
-function Tables.getcolumn(x::MatrixUnknownColumns, i::Int)
-    getfield(x, :calls)[i] += 1
-    return getfield(x, :data)[i]
-end
-Tables.getcolumn(x::MatrixUnknownColumns, name::Symbol) = Tables.getcolumn(x, findfirst(==(name), getfield(x,:names)))
-
-
-@testset "Matrix conversion without column types" begin
-    for partial in (false, true), n in (0, 1, 3), transpose in (false, true)
-        @testset "$partial $n $transpose" begin
-            source = MatrixUnknownColumns([:a, :b, :c], Any[collect(1:n), Float64.(1:n), Tuple(1:n)], partial, zeros(Int, 3))
-            expected = hcat(collect(1:n), Float64.(1:n), collect(1:n))
-            result = Tables.matrix(source; transpose=transpose)
-            @test result == (transpose ? permutedims(expected) : expected)
-            @test eltype(result) === Float64
-            @test getfield(source, :calls) == [1, 1, 1]
-        end
-    end
-    for transpose in (false, true)
-        for source in ((;), MatrixUnknownColumns(Symbol[], Any[], false, Int[]))
-            @test size(Tables.matrix(source;transpose=transpose)) == (0,0)
-        end
-        @testset "Wide input $transpose" begin
-            n=67_001
-            source = MatrixUnknownColumns([Symbol("c",i) for i in 1:n], Any[[i] for i in 1:n], false, zeros(Int,n))
-            result = Tables.matrix(source;transpose=transpose)
-            @test size(result) == (transpose ? (n,1) : (1,n))
-            @test vec(result) == collect(1:n)
-            @test all(==(1), getfield(source, :calls))
-        end
-    end
-end
-
 struct TestMatrixTable <: AbstractMatrix{Int}
 end
 Tables.istable(::Type{TestMatrixTable}) = true
@@ -334,6 +290,7 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
     mat = Tables.matrix(rt)
     @test nt.a == mat[:, 1]
+    @test size(Tables.matrix((;))) == (0, 0)
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
     @test_throws ArgumentError Tables.rows(mat)
@@ -783,6 +740,9 @@ struct DummyCols <: Tables.AbstractColumns end
     @test Tables.columns(col) === col
     @test Tables.schema(col) === nothing
     @test isequal(Tables.columntable(col), ct)
+    # without a schema, matrix uses the element types of the columns
+    @test isequal(Tables.matrix(col), Any[1 missing "hey"; 2 3.14 "ho"])
+    @test isequal(Tables.matrix(col; transpose=true), Any[1 2; missing 3.14; "hey" "ho"])
 
     c = DummyCols()
     @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, 1)
