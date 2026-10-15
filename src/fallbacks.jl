@@ -213,7 +213,9 @@ end
             WT = wrappedtype(eltype(rowitr))
             if WT <: Tuple
                 return allocatecolumns(Schema((Symbol("Column$i") for i = 1:fieldcount(WT)), _fieldtypes(WT)), 0)
-            elseif !(WT <: AbstractArray) && isconcretetype(WT) && fieldcount(WT) > 0
+            # fields of arrays, dicts, and Tables' own row wrappers are internals, not columns
+            elseif !(WT <: Union{AbstractArray, AbstractDict, ColumnsRow, MatrixRow, IteratorRow, DictRow, Row}) &&
+                   isconcretetype(WT) && fieldcount(WT) > 0
                 return allocatecolumns(Schema(fieldnames(WT), _fieldtypes(WT)), 0)
             end
         end
