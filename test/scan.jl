@@ -162,14 +162,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         missingvals = (a = Union{Int, Missing}[1, missing, 3],
                        b = Union{String, Missing}["x", missing, "z"])
         missingcols = T.columns(missingvals)
-        @test isequal(
-            T._evalexpr(T.colcmp(==, T.col(:a), 1), missingcols),
-            Union{Bool, Missing}[true, missing, false],
-        )
-        @test isequal(
-            T._evalexpr(T.colin(T.col(:a), (1, 2)), missingcols),
-            Union{Bool, Missing}[true, missing, false],
-        )
+        # comparisons and membership lift missing, so negation still excludes it
+        for e in (T.colcmp(==, T.col(:a), 1), T.colin(T.col(:a), (1, 2)))
+            @test T.filtermask(e, missingcols) == [true, false, false]
+            @test T.filtermask(!e, missingcols) == [false, false, true]
+        end
         @test T.filtermask(T.colin(T.col(:a), (1, missing)), missingvals) ==
               [true, false, false]
         @test T.filtermask(T.colin(T.col(:a), (2, missing)), missingvals) ==
@@ -185,13 +182,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test_throws ArgumentError T.filtermask(!T.col(:a), missingvals)
         @test T.filtermask(T.AndExpr(T.ScanExpr[]), missingvals) == [true, true, true]
         @test T.filtermask(T.OrExpr(T.ScanExpr[]), missingvals) == [false, false, false]
-        # the final function barrier keeps only exact `true` (SQL WHERE)
-        @test T._boolmask(BitVector([true, false])) == [true, false]
-        @test T._boolmask(Bool[false, true]) == [false, true]
-        @test T._boolmask(Union{Bool, Missing}[true, missing, false]) ==
-              [true, false, false]
-        @test T._boolmask(Any[true, 1, missing, nothing]) ==
-              [true, false, false, false]
+        # only exact `true` qualifies (SQL WHERE), or exact `false` under negation
+        @test T._boolmask(Any[true, 1, missing, nothing, false], 5, true) ==
+              [true, false, false, false, false]
+        @test T._boolmask(Any[true, 1, missing, nothing, false], 5, false) ==
+              [false, false, false, false, true]
         @test_throws ArgumentError T.Cmp(0xff, T.col(:a), 1)
         @test_throws ArgumentError T.StrPred(0xff, T.col(:b), "x")
         out = T.scan(nt, T.Scan(limit = 2, offset = 1))
@@ -232,11 +227,89 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test T.scan(nt, T.Scan()) === nt
     end
 
+    @testset "scan: logical masks preserve three-valued truth and ownership" begin
+        combinations = vec(collect(Iterators.product((true, false, missing),
+            (true, false, missing), (true, false, missing))))
+        source = (a=[x[1] for x in combinations], b=[x[2] for x in combinations],
+            c=[x[3] for x in combinations])
+        a, b, c = (T.colcmp(==, T.col(name), true) for name in (:a, :b, :c))
+        for op in (&, |), negate_a in (false, true), negate_b in (false, true)
+            expr = op(negate_a ? !a : a, negate_b ? !b : b)
+            expected = [op(negate_a ? !x : x, negate_b ? !y : y) for (x, y, _) in combinations]
+            @test T.filtermask(expr, source) == [x === true for x in expected]
+            @test T.filtermask(!expr, source) == [x === false for x in expected]
+        end
+        for (expr, expected) in (
+            ((a | b) & c, [(x | y) & z for (x, y, z) in combinations]),
+            (a | (b & c), [x | (y & z) for (x, y, z) in combinations]),
+        )
+            @test T.filtermask(expr, source) == [x === true for x in expected]
+            @test T.filtermask(!expr, source) == [x === false for x in expected]
+        end
+        for expr in (T.AlwaysFalse() & (T.col(:gone) > 1),
+                     T.AlwaysTrue() | (T.col(:gone) > 1))
+            @test_throws ArgumentError T.filtermask(expr, source)
+        end
+        before = deepcopy(source)
+        mask = T.filtermask((a | b) & !c, source)
+        fill!(mask, true)
+        @test isequal(source, before)
+        @test T.filtermask((a | b) & !c, source) ==
+            [((x | y) & !z) === true for (x, y, z) in combinations]
+
+        n = 65536
+        expr = (T.col(:a) > n ÷ 8) & (T.col(:a) < 7n ÷ 8) &
+            (T.col(:b) >= n ÷ 4) & !T.isnull(T.col(:b))
+        values = collect(1:n)
+        for b in (values, Union{Missing,Int}[i % 7 == 0 ? missing : i for i in values])
+            large = (a=values, b=b)
+            T.filtermask(expr, large)
+            @test (@allocated T.filtermask(expr, large)) < n
+        end
+    end
+
+    @testset "scan: constant and missing masks" begin
+        # These leaves bypass the column callback and must expand scalar results.
+        # Empty AND/OR keep their existing identities, including under negation.
+        for n in (0, 1, 65)
+            source = ZeroColumnTable(n)
+            for (expr, expected) in (
+                (T.AlwaysTrue(), true), (T.AlwaysFalse(), false),
+                (T.AndExpr(T.ScanExpr[]), true), (T.OrExpr(T.ScanExpr[]), false),
+            )
+                for (filter, keep) in ((expr, expected), (!expr, !expected))
+                    scan = T.Scan(filter=filter)
+                    bound = T.resolve(scan, ())
+                    for request in (filter, scan, bound)
+                        mask = T.filtermask(request, source)
+                        @test mask isa BitVector
+                        @test mask == fill(keep, n)
+                    end
+                end
+            end
+            for expr in (T.col(:gone) > 1, !(T.col(:gone) > 1),
+                         T.isnull(T.col(:gone)), !T.isnull(T.col(:gone)))
+                scan = T.Scan(filter=expr, validate=false)
+                expected = expr isa T.IsNull && !expr.negated
+                for request in (scan, T.resolve(scan, ()))
+                    @test T.filtermask(request, source) == fill(expected, n)
+                end
+            end
+        end
+    end
+
     @testset "scan: validate=false filters treat unmatched refs as all-missing" begin
         nt2 = (a = [1, 2, 3], b = ["x", "y", "z"])
         # strict (default): unknown filter refs error, matching resolve
         @test_throws ArgumentError T.scan(nt2, T.Scan(filter = T.col(:gone) > 1))
         @test_throws ArgumentError T.filtermask(T.col(:gone) > 1, nt2)
+        for name in (Symbol("a b"), Symbol("a\nb"), Symbol("=foo\"bar\\baz"))
+            err = try T.filtermask(T.col(name) > 0, nt2) catch caught; caught end
+            @test err isa ArgumentError
+            text = sprint(showerror, err)
+            @test occursin(repr(String(name)), text)
+            @test !occursin('\n', text)
+        end
         # lenient: comparisons/membership/strings against the absent column
         # evaluate to missing → rows excluded, SQL-style
         for f in (T.col(:gone) > 1, T.colin(T.col(:gone), (1, 2)),
