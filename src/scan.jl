@@ -5,9 +5,9 @@
 #     Tables.Scan(...)             the request (a value; no Function fields)
 #     Tables.scan(table, scan)     the generic executor over any Tables.jl table
 #
-# Sources that can push a scan down accept it as a keyword — `CSV.File(path;
-# scan=Tables.Scan(...))`, `Arrow.Table(path; scan=...)` — and apply what they
-# can WHILE materializing (skipping columns never parsed, rows never decoded).
+# Sources that can push a scan down accept it as a keyword — for example
+# `CSV.File(path; scan=Tables.Scan(...))` — and apply what they can WHILE
+# materializing (skipping columns never parsed, rows never decoded).
 # What a source cannot push down it either rejects with an ArgumentError, or
 # hands to `Tables.scan` as a residual (e.g. `Tables.Scan(scan; filter=nothing)`
 # after evaluating the filter itself; axes strip in execution order — filter,
@@ -287,8 +287,8 @@ _checkpredicate(x) =
     Tables.Scan(; select=Tables.All(), filter=nothing, limit=nothing, offset=nothing, validate=true)
 
 A scan request: what to keep, what to call it, how to type it, which rows
-qualify, and how many. Plain data all the way down — see `Tables.scan` for
-the generic executor and the module comment for how sources push it down.
+qualify, and how many. It is plain data; [`Tables.scan`](@ref) executes it
+over any table, and sources can push it down while they read.
 
   * `select`: a column reference or tuple/vector of select items
     (`ref`, `ref => name`, `ref => Type`, `ref => Type => name`; refs in the
@@ -470,8 +470,8 @@ end
 Resolve a [`Scan`](@ref) against a source's column names (any iterable of
 `Symbol`s).
 Errors on unmatched references (under `validate`), mixed `Not`/positive
-selections, and duplicate output names. Regex references expand in file
-order; selection order defines output order. Positional filter references are
+selections, and duplicate output names. Regex references expand in source
+column order; selection order defines output order. Positional filter references are
 replaced with source names so the resolved filter remains valid over a subset
 containing only its referenced columns.
 """
