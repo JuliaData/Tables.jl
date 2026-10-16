@@ -290,6 +290,7 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
     mat = Tables.matrix(rt)
     @test nt.a == mat[:, 1]
+    @test size(Tables.matrix((;))) == (0, 0)
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
     @test_throws ArgumentError Tables.rows(mat)
@@ -739,6 +740,9 @@ struct DummyCols <: Tables.AbstractColumns end
     @test Tables.columns(col) === col
     @test Tables.schema(col) === nothing
     @test isequal(Tables.columntable(col), ct)
+    # without a schema, matrix uses the element types of the columns
+    @test isequal(Tables.matrix(col), Any[1 missing "hey"; 2 3.14 "ho"])
+    @test isequal(Tables.matrix(col; transpose=true), Any[1 2; missing 3.14; "hey" "ho"])
 
     c = DummyCols()
     @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, 1)
