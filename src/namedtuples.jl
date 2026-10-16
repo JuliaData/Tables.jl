@@ -150,6 +150,12 @@ also known as a "column table". A "column table" is a kind of default
 table type of sorts, since it satisfies the Tables.jl column interface
 naturally.
 
+For rows with an unknown schema, each column starts with the type of its first value and
+is widened as other value types appear. Column types are chosen with `promote_type`;
+any required conversion is deferred until the final types are known. Rows with a known
+schema, and columns whose values share one type, are written directly to typed columns
+without intermediate buffers.
+
 Note that if `x` is an object in which columns are stored as vectors, the check that
 these vectors use 1-based indexing is not performed (it should be ensured when `x` is constructed).
 

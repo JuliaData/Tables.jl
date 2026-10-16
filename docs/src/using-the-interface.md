@@ -207,6 +207,21 @@ names and the row source has a known schema, use
 `Tables.schema(Tables.rows(x)).names` instead. Check that the schema is not
 `nothing` before accessing its names.
 
+## Memory use when constructing columns
+
+When a row source has no schema, the [`Tables.columns`](@ref) fallback and
+[`Tables.columntable`](@ref) start each column with the type of its first value. A value
+that does not fit the column's element type causes the column to be copied into wider
+storage, so old and new storage briefly coexist. Values keep their original types until
+every row has been read, then are converted once to the column type chosen by
+`promote_type`; a large integer in a column promoted to `Float64` can still round.
+[`Tables.dictcolumntable`](@ref) instead buffers every cell in an `Any` vector, which
+uses more memory but lets columns appear or disappear between rows.
+
+Row sources with a known [`Tables.Schema`](@ref) skip this work: their columns are
+allocated with the final types and filled directly. For large inputs, have the row
+source report its schema, or build typed column vectors directly.
+
 ## Tables.jl Utilities
 
 Before moving on to _implementing_ the Tables.jl interfaces, we take a quick
