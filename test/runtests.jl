@@ -225,6 +225,14 @@ end
     end
 end
 
+struct CustomMaterializedRows{T<:NamedTuple} <: AbstractVector{T}
+    rows::Vector{T}
+end
+Base.size(x::CustomMaterializedRows) = size(x.rows)
+Base.getindex(x::CustomMaterializedRows, i::Int) = x.rows[i]
+custom_materializer(x) = CustomMaterializedRows(Tables.rowtable(x))
+Tables.materializer(::Type{<:CustomMaterializedRows}) = custom_materializer
+
 @testset "Materializer" begin
     rt = [(a=1, b=4.0, c="7"), (a=2, b=5.0, c="8"), (a=3, b=6.0, c="9")]
     nt = (a=[1,2,3], b=[4.0, 5.0, 6.0], c=["7", "8", "9"])
@@ -233,6 +241,14 @@ end
     @test nt == Tables.materializer(nt)(Tables.columns(rt))
     @test nt == Tables.materializer(nt)(rt)
     @test rt == Tables.materializer(rt)(nt)
+    @test Tables.materializer(typeof(rt)) === Tables.rowtable
+    @test Tables.materializer(NamedTuple[]) === Tables.rowtable
+    @test Tables.materializer(Vector{NamedTuple}) === Tables.rowtable
+    @test Tables.materializer(view(rt, :)) === Tables.rowtable
+    custom = CustomMaterializedRows(rt)
+    @test Tables.materializer(typeof(custom)) === custom_materializer
+    @test Tables.materializer(custom) === custom_materializer
+    @test Tables.materializer(custom)(nt).rows == rt
 
     function select(table, cols::Symbol...)
         Tables.istable(table) || throw(ArgumentError("select requires a table input"))
@@ -274,6 +290,7 @@ Tables.schema(x::TestMatrixTable) = Tables.Schema((:a, :b, :c), NTuple{3, Int})
 
     mat = Tables.matrix(rt)
     @test nt.a == mat[:, 1]
+    @test size(Tables.matrix((;))) == (0, 0)
     @test size(mat) == (3, 3)
     @test eltype(mat) == Any
     @test_throws ArgumentError Tables.rows(mat)
@@ -487,6 +504,11 @@ Base.propertynames(g::GenericTable) = (:a, :b, :c)
     rows = Tuple{Int64, Float64, String}[]
     t = Tables.columns(rows)
     @test Tables.schema(t) == Tables.Schema((:Column1, :Column2, :Column3), (Int64, Float64, String))
+
+    # Array fields are implementation details, not table columns (#353).
+    @test Tables.columntable(Vector{Any}[]) === NamedTuple()
+    @test Tables.columntable(typeof(view(Any[], :))[]) === NamedTuple()
+    @test Tables.columntable(Matrix{Any}[]) === NamedTuple()
 
     # 311
     gt = GenericTable()
@@ -718,6 +740,9 @@ struct DummyCols <: Tables.AbstractColumns end
     @test Tables.columns(col) === col
     @test Tables.schema(col) === nothing
     @test isequal(Tables.columntable(col), ct)
+    # without a schema, matrix uses the element types of the columns
+    @test isequal(Tables.matrix(col), Any[1 missing "hey"; 2 3.14 "ho"])
+    @test isequal(Tables.matrix(col; transpose=true), Any[1 2; missing 3.14; "hey" "ho"])
 
     c = DummyCols()
     @test_throws ErrorException("`Tables.getcolumn` must be specifically overloaded for DummyCols <: Union{AbstractRow, AbstractColumns}`") Tables.getcolumn(c, 1)
@@ -886,6 +911,20 @@ Tables.columnnames(::WideTable2) = [Symbol("x", i) for i = 1:1000]
     @test sch.names == [Symbol("x", i) for i = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
     @test sch.types == [Float64 for _ = 1:(Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1)]
     @test typeof(sch) == Tables.Schema{nothing, nothing}
+    n = Tables.SCHEMA_SPECIALIZATION_THRESHOLD + 1
+    matrix = Tables.table(Matrix{Float64}(undef, 0, n); header=sch.names)
+    tuple_names = Tuple(sch.names)
+    for wide in (Tables.schema(matrix), Tables.schema(Tables.rows(matrix)),
+                 Tables.Schema(tuple_names, NTuple{n, Float64}),
+                 Tables.Schema(NamedTuple{tuple_names, NTuple{n, Float64}}))
+        @test Tables.stored(wide)
+        @test wide.names == sch.names
+        @test wide.types == sch.types
+    end
+    @test Tables.Schema((:a, :b), Tuple{Int, String}) isa
+        Tables.Schema{(:a, :b), Tuple{Int, String}}
+    @test Tables.Schema(NamedTuple{(:a, :b), Tuple{Int, String}}) isa
+        Tables.Schema{(:a, :b), Tuple{Int, String}}
     r = Tables.rows(x)
     Tables.eachcolumn(sch, first(r)) do y, i, nm
         @test y isa Float64
@@ -975,10 +1014,10 @@ end
     @test Set(Tables.columnnames(Dict("a"=>1, SubString("b")=>2))) == Set([:a, :b])
     @test Set(Tables.columnnames(Dict(SubString("a")=>1, SubString("b")=>2))) == Set([:a, :b])
 
-    @test Tables.getcolumn(Dict(:a=>1, :b=>2), 1) == 1
-    @test Tables.getcolumn(Dict("a"=>1, "b"=>2), 1 + (Int === Int64)) == 1
-    @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), 1 + (Int === Int64)) == 1
-    @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), 1 + (Int === Int64)) == 1
+    @test Tables.getcolumn(Dict(:a=>1, :b=>2), :a) == 1
+    @test Tables.getcolumn(Dict("a"=>1, "b"=>2), :a) == 1
+    @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), :a) == 1
+    @test Tables.getcolumn(Dict(SubString("a")=>1, SubString("b")=>2), :a) == 1
     @test Tables.getcolumn(Dict(:a=>1, :b=>2), :a) == 1
     @test Tables.getcolumn(Dict("a"=>1, "b"=>2), :a) == 1
     @test Tables.getcolumn(Dict("a"=>1, SubString("b")=>2), :a) == 1
@@ -1080,3 +1119,6 @@ Tables.columnnames(::MockRow) = fieldnames(MockRow)
     expected_compact = "MockRow[(a = 1, b = 2, c = 3), (a = 4, b = 5, c = 6)]"
     @test sprint(show, tbl, context=:compact => true) == expected_compact
 end
+include("scan.jl")
+
+include("buffering.jl")

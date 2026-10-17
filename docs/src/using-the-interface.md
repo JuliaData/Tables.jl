@@ -2,6 +2,9 @@
 
 We start by discussing _usage_ of the Tables.jl interface functions, since that can help contextualize _implementing_ them for custom table types.
 
+To select columns, filter rows, or apply row limits through a shared request,
+see the consumer section of [Scan Requests](scan.md#Consumer-API).
+
 At a high level, Tables.jl provides two powerful APIs for predictably accessing data from any table-like source:
 ```julia
 # access data of input table `x` row-by-row
@@ -172,6 +175,52 @@ as an `AbstractVector`, as is required by the DataFrame constructor.
 Note in both the rows and columns usages, we didn't need to worry about the natural orientation
 of the input data; we just called [`Tables.rows`](@ref) or [`Tables.columns`](@ref) as was most natural for
 the table-specific use-case, knowing that it will Just Work™️.
+
+## Getting column names from any table
+
+Call `Tables.columnnames(Tables.columns(x))` to get the column names of a
+Tables.jl-compatible source. [`Tables.columnnames`](@ref) accepts a columns object
+or an individual row. A row table, such as a vector of named tuples or the result
+of [`Tables.dictrowtable`](@ref), is a container of rows. Calling `columnnames`
+directly on that container can return its properties instead of its column names.
+
+```jldoctest; setup = :(using Tables)
+julia> rows = [(a=1, b="x"), (a=2, b="y")];
+
+julia> Tables.columnnames(rows)
+()
+
+julia> Tables.columnnames(Tables.columns(rows))
+(:a, :b)
+
+julia> dictrows = Tables.dictrowtable(rows);
+
+julia> Tables.columnnames(Tables.columns(dictrows))
+(:a, :b)
+
+julia> Tables.columnnames(first(Tables.rows(rows)))
+(:a, :b)
+```
+
+For a row source, `Tables.columns` may read and store all rows. If you only need
+names and the row source has a known schema, use
+`Tables.schema(Tables.rows(x)).names` instead. Check that the schema is not
+`nothing` before accessing its names.
+
+## Memory use when constructing columns
+
+When a row source has no schema, the [`Tables.columns`](@ref) fallback and
+[`Tables.columntable`](@ref) start each column with the type of its first value. A value
+that does not fit the column's element type causes the column to be copied into wider
+storage, so old and new storage briefly coexist. Values keep their original types until
+every row has been read, then are converted once to the column type chosen by
+`promote_type`; a large integer in a column promoted to `Float64` can still round.
+[`Tables.dictcolumntable`](@ref) instead buffers every cell in an `Any` vector, which
+uses more memory but lets columns appear or disappear between rows.
+
+Row sources with a known [`Tables.Schema`](@ref) skip this work: their columns are
+allocated with the final types and filled directly. For large inputs, have the row
+source report its schema, or build typed column vectors directly.
 
 ## Tables.jl Utilities
 
