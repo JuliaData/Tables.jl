@@ -216,6 +216,67 @@ function Base.show(io::IO, x::T) where {T <: AbstractRow}
     end
 end
 
+# Shorten `s` to a display width of at most `width`, marking the cut with `⋯`.
+function _truncate_textwidth(s::AbstractString, width::Integer)
+    textwidth(s) <= width && return s
+    width <= 1 && return "⋯"
+    buf = IOBuffer()
+    used = 0
+    for c in s
+        cw = textwidth(c)
+        used + cw > width - 1 && break
+        print(buf, c)
+        used += cw
+    end
+    print(buf, '⋯')
+    return String(take!(buf))
+end
+
+function _print_row_field(io, valctx, name, namewidth, v, valwidth)
+    s = sprint(show, v; context=valctx)
+    println(io)
+    print(io, ' ', name, ' '^(namewidth - textwidth(name) + 2), _truncate_textwidth(s, valwidth))
+end
+
+# Vertical "name  value" layout used for REPL display; when `:limit` is set, values are
+# truncated to the display width and the middle columns are elided to fit the display height.
+function Base.show(io::IO, ::MIME"text/plain", x::T) where {T <: AbstractRow}
+    get(io, :compact, false) && return show(io, x)
+    names = collect(columnnames(x))
+    N = length(names)
+    print(io, nameof(T), " with ", N, N == 1 ? " column" : " columns")
+    N == 0 && return
+    print(io, ":")
+    strnames = map(string, names)
+    namewidth = maximum(textwidth, strnames)
+    if get(io, :limit, false)
+        h, w = displaysize(io)
+        # leave room for the header, the `⋮` line, and the prompt
+        maxlines = max(h - 4, 3)
+        valwidth = w - namewidth - 3
+    else
+        maxlines = N
+        valwidth = typemax(Int)
+    end
+    valctx = IOContext(io, :compact => true)
+    if N <= maxlines
+        for i in 1:N
+            _print_row_field(io, valctx, strnames[i], namewidth, getcolumn(x, names[i]), valwidth)
+        end
+    else
+        ntop = cld(maxlines - 1, 2)
+        nbottom = maxlines - 1 - ntop
+        for i in 1:ntop
+            _print_row_field(io, valctx, strnames[i], namewidth, getcolumn(x, names[i]), valwidth)
+        end
+        println(io)
+        print(io, " ⋮")
+        for i in (N - nbottom + 1):N
+            _print_row_field(io, valctx, strnames[i], namewidth, getcolumn(x, names[i]), valwidth)
+        end
+    end
+end
+
 function Base.show(io::IO, table::AbstractColumns; max_cols = 20)
     ncols = length(columnnames(table))
     print(io, "$(typeof(table)) with $(rowcount(table)) rows, $(ncols) columns, and ")
