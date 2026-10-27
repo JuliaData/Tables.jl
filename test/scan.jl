@@ -72,6 +72,7 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test_throws ArgumentError T.Scan(filter = !T.col(:a))
         @test_throws ArgumentError T.Scan(filter = T.col(:a) & (T.col(:b) > 1))
         @test_throws ArgumentError T.Scan(filter = (x -> true))       # closures rejected
+        @test_throws "colcmp(==" T.Scan(filter = T.col(:a) == 1)      # `==` is a Bool
     end
 
     @testset "expression algebra" begin

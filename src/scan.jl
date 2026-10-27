@@ -278,6 +278,10 @@ end
 _checkpredicate(e::ScanExpr) = e
 _checkpredicate(e::Col) =
     throw(ArgumentError("a bare column reference is not a predicate; compare it against a value"))
+_checkpredicate(::Bool) =
+    throw(ArgumentError("filter is a Bool, not a filter expression: `==`, `!=`, and `isequal` " *
+                        "on `col(...)` return a Bool. Write equality as " *
+                        "`Tables.colcmp(==, Tables.col(:x), value)`"))
 _checkpredicate(x) =
     throw(ArgumentError("filter must be a Tables.ScanExpr built from Tables.col(...), got $(typeof(x))"))
 
