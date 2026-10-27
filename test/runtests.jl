@@ -622,6 +622,17 @@ end
     # a Dict w/ scalar values isn't a table
     @test_throws Exception Tables.columns(d)
 
+    # rows with different keys union their columns, in either order (#367)
+    rows = Dict{Symbol, Any}[Dict(:a => 1), Dict(:a => 2, :b => "x")]
+    for r in (rows, reverse(rows))
+        ct = Tables.columntable(r)
+        @test isequal(ct.a, [x[:a] for x in r])
+        @test isequal(ct.b, [get(x, :b, missing) for x in r])
+    end
+    ct = Tables.columntable([Dict(:a => 1), Dict(:b => 2)])
+    @test isequal(ct, (a = [1, missing], b = [missing, 2]))
+    @test Tables.columntable(Dict{String, Any}[]) == NamedTuple()
+
     # Dicts with String keys
     d = OrderedDict("a" => 1, "b" => missing, "c" => "7")
     n = (a=1, b=missing, c="7")

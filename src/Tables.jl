@@ -158,6 +158,16 @@ isrowtable(::Type{<:DictRows}) = true
 # row-to-row (e.g. `missing`, then `1.1`, etc.). Therefore, the safest option
 # is to just return `nothing`
 schema(x::DictRows) = nothing
+# Dict rows often omit keys (as JSON objects do), so union the keys of all rows.
+# When every row has the first row's keys, build typed columns directly instead.
+function columns(x::DictRows)
+    if !isempty(x)
+        ks = keys(first(x))
+        all(r -> length(r) == length(ks) && all(k -> haskey(r, k), ks), x) &&
+            return CopiedColumns(buildcolumns(nothing, x))
+    end
+    return CopiedColumns(dictcolumntable(x))
+end
 
 # Dict of AbstractVectors for Tables.columns
 const DictColumns = Union{<:AbstractDict{<:AbstractString, <:AbstractVector}, <:AbstractDict{Symbol, <:AbstractVector}}
