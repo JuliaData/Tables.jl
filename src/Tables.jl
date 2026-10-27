@@ -1,6 +1,7 @@
 module Tables
 
 using DataValueInterfaces, DataAPI, TableTraits, IteratorInterfaceExtensions, OrderedCollections
+using Dates: Dates
 
 export rowtable, columntable
 

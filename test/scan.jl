@@ -104,6 +104,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test o isa T.OrExpr && length(o.args) == 3
         @test T.colin(T.col(:b), ["x"]) isa T.In
         @test startswith(T.col(:b), "z") isa T.StrPred
+        d = Dates.Date(2024, 1, 2)
+        @test (T.col(:d) >= d) == T.colcmp(>=, T.col(:d), d)
+        @test (d < T.col(:d)) == T.colcmp(>, T.col(:d), d)
+        @test (T.col(:t) < Dates.DateTime(2024)) isa T.Cmp{Dates.DateTime}
+        @test (T.col(:p) <= Dates.Hour(2)) == T.colcmp(<=, T.col(:p), Dates.Hour(2))
     end
 
     @testset "resolve" begin

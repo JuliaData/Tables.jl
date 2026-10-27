@@ -76,7 +76,9 @@ Selection order defines output order. Duplicate output names are an error.
 `Tables.col(ref)` creates a column reference. The supported predicates are:
 
 - `Tables.colcmp(op, column, value)` for `==`, `!=`, `<`, `<=`, `>`, and `>=`.
-- Ordered shorthand such as `Tables.col(:price) >= 10`.
+- Ordered shorthand such as `Tables.col(:price) >= 10` for numbers, strings,
+  characters, dates and times (`Dates.TimeType`), and periods (`Dates.Period`).
+  Other literal types use `Tables.colcmp`.
 - `Tables.colin(column, values)` for membership.
 - `Tables.isnull(column)` and its negation for `missing` checks.
 - `startswith`, `endswith`, and `contains` for strings.
