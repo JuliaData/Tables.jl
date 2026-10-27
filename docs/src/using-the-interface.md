@@ -106,7 +106,7 @@ function load!(sch::Nothing, rows, db::SQLite.DB, tablename)
     createtable!(db, tablename, sch)
     # build insert statement
     params = chop(repeat("?,", length(names)))
-    stmt = Stmt(db, "INSERT INTO $nm VALUES ($params)")
+    stmt = Stmt(db, "INSERT INTO $tablename VALUES ($params)")
     # start a transaction for inserting rows
     transaction(db) do
         while true
@@ -124,7 +124,7 @@ function load!(sch::Nothing, rows, db::SQLite.DB, tablename)
             row, st = state
         end
     end
-    return name
+    return
 end
 ```
 
