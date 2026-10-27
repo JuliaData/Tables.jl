@@ -696,6 +696,54 @@ struct DummyRow <: Tables.AbstractRow end
     @test_throws ErrorException("`Tables.columnnames` must be specifically overloaded for DummyRow <: Union{AbstractRow, AbstractColumns}`") Tables.columnnames(r)
 end
 
+@testset "AbstractRow display" begin
+    plain(x; kw...) = sprint(show, MIME"text/plain"(), x; kw...)
+    row = Tables.Row((a=1, bb=missing, ccc="hey"))
+
+    @test plain(row) == "Row with 3 columns:\n a    1\n bb   missing\n ccc  \"hey\""
+    @test plain(row; context=:limit => true) == plain(row)
+    # compact display falls back to the one-line form
+    @test plain(row; context=:compact => true) == sprint(show, row; context=:compact => true)
+    @test sprint(show, row; context=:limit => true) == "$(typeof(row)): (a = 1, bb = missing, ccc = \"hey\")"
+
+    # empty rows
+    empty = Tables.Row(NamedTuple())
+    @test sprint(show, empty; context=:limit => true) == "$(typeof(empty)): NamedTuple()"
+    @test plain(empty) == "Row with 0 columns"
+    @test plain(empty; context=:limit => true) == "Row with 0 columns"
+
+    # unicode values are truncated by character and display width
+    urow = Tables.Row((a=repeat("é", 20),))
+    ctx = (:limit => true, :displaysize => (24, 14))
+    @test sprint(show, urow; context=ctx) == "$(typeof(urow)): (a = \"$(repeat("é", 20))\",)"
+    out = plain(urow; context=ctx)
+    @test out == "Row with 1 column:\n a  \"$(repeat("é", 8))⋯"
+    @test all(textwidth(l) <= 14 for l in split(out, '\n')[2:end])
+    wrow = Tables.Row((a="漢字漢字漢字漢字",))
+    @test all(textwidth(l) <= 14 for l in split(plain(wrow; context=ctx), '\n')[2:end])
+    @test plain(urow; context=(:limit => true, :displaysize => (24, 4))) == "Row with 1 column:\n a  ⋯"
+
+    # wide rows elide middle columns, and all output goes to `io`
+    nt = NamedTuple{Tuple(Symbol.("x", 1:30))}(Tuple(1:30))
+    wide = Tables.Row(nt)
+    buf = IOBuffer()
+    mktemp() do path, f
+        redirect_stdout(f) do
+            show(IOContext(buf, :limit => true, :displaysize => (12, 80)), MIME"text/plain"(), wide)
+            show(IOContext(buf, :limit => true, :displaysize => (12, 80)), wide)
+        end
+        close(f)
+        @test read(path, String) == ""
+    end
+    out = String(take!(buf))
+    lines = split(out, '\n')
+    @test lines[1:6] == ["Row with 30 columns:", " x1   1", " x2   2", " x3   3", " x4   4", " ⋮"]
+    @test lines[7:8] == [" x28  28", " x29  29"]
+    # no trailing newline: the 2-arg show output follows directly on the same line
+    @test startswith(lines[9], " x30  30$(typeof(wide)): (x1 = 1,")
+    @test plain(wide; context=:limit => false) == join(["Row with 30 columns:"; [" x$i" * " "^(4 - ndigits(i)) * "$i" for i in 1:30]], '\n')
+end
+
 struct TestColumns <: Tables.AbstractColumns
     a::Vector{Int}
     b::Vector{Union{Float64, Missing}}
