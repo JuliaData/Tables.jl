@@ -413,6 +413,7 @@ function _findcols(names, r)
     return i === nothing ? Int[] : Int[i]
 end
 _refstr(r) = r isa Regex ? "r$(repr(r.pattern))" : repr(r)
+_refstr(r::Symbol) = repr(String(r))
 
 function _expand!(out::Vector{BoundColumn}, names, it::SelectItem, validate::Bool)
     r = it.ref
@@ -521,70 +522,74 @@ function _resolvecol(cols, ref, strict::Bool)
     return nothing
 end
 
-# Three-valued vectorized evaluation; the top level keeps rows where the
-# result is exactly `true` (SQL WHERE). Comparison kernels close over their
-# literal so collection-valued rows compare whole values per row instead of
-# broadcasting the literal against the column. The fallback uses only the
-# scalar-indexing contract required by Tables.jl; the AbstractVector path
-# keeps broadcast's optimized kernels.
-_columnmap(f, c::AbstractVector, ::Int) = f.(c)
-_columnmap(f, c, n::Int) = [f(c[i]) for i in 1:n]
+# Filters evaluate to Boolean masks. A row qualifies when its three-valued result
+# is exactly true, or exactly false under negation; `missing` matches neither.
+# De Morgan's laws swap AND and OR under negation.
+# Literals stay inside scalar kernels so collection-valued rows compare whole
+# values. Non-vector columns only require Tables.jl's scalar-indexing contract.
+_columnmap(f::F, c::AbstractVector, ::Int) where {F} = Base.Broadcast.broadcasted(f, c)
+_columnmap(f::F, c, n::Int) where {F} = Base.Broadcast.broadcasted(i -> f(c[i]), 1:n)
 
-function _evalexpr(e::ScanExpr, cols, strict::Bool=true)
+# Fuses a predicate with its mask conversion in one loop per column type.
+@noinline _boolmask(v, n::Int, want::Bool) = Base.Broadcast.materialize!(BitVector(undef, n),
+    Base.Broadcast.broadcasted(x -> x === want, v))
+
+# One kernel per comparison instead of one per operator keeps compilation cheap.
+_compare(op::ComparisonOperator, x, y) =
+    op == OP_EQ ? x == y : op == OP_NE ? x != y : op == OP_LT ? x < y :
+    op == OP_LE ? x <= y : op == OP_GT ? x > y : x >= y
+
+# Leaf predicates call `columnmap(f, column, nrows)`; constants and absent
+# columns return a `Ref` of their value instead.
+function _evalexpr(e::ScanExpr, cols, strict::Bool, columnmap)
     if e isa Cmp
         a = _resolvecol(cols, e.lhs.ref, strict)
-        a === nothing && return fill(missing, rowcount(cols))
-        n = rowcount(cols)
-        return e.op == OP_EQ ? _columnmap(x -> x == e.rhs, a, n) :
-               e.op == OP_NE ? _columnmap(x -> x != e.rhs, a, n) :
-               e.op == OP_LT ? _columnmap(x -> x < e.rhs, a, n) :
-               e.op == OP_LE ? _columnmap(x -> x <= e.rhs, a, n) :
-               e.op == OP_GT ? _columnmap(x -> x > e.rhs, a, n) :
-               e.op == OP_GE ? _columnmap(x -> x >= e.rhs, a, n) :
-               throw(ArgumentError("unknown comparison operator code $(e.op)"))
+        a === nothing && return Ref(missing)
+        op, rhs = e.op, e.rhs
+        return columnmap(x -> _compare(op, x, rhs), a, rowcount(cols))
     elseif e isa In
         a = _resolvecol(cols, e.lhs.ref, strict)
-        a === nothing && return fill(missing, rowcount(cols))
-        return _columnmap(x -> ismissing(x) ? missing : in(x, e.values), a, rowcount(cols))
+        a === nothing && return Ref(missing)
+        return columnmap(x -> ismissing(x) ? missing : in(x, e.values), a, rowcount(cols))
     elseif e isa IsNull
         a = _resolvecol(cols, e.lhs.ref, strict)
-        a === nothing &&
-            return e.negated ? falses(rowcount(cols)) : trues(rowcount(cols))
-        return e.negated ? _columnmap(x -> !ismissing(x), a, rowcount(cols)) :
-                           _columnmap(ismissing, a, rowcount(cols))
+        a === nothing && return Ref(!e.negated)
+        return e.negated ? columnmap(x -> !ismissing(x), a, rowcount(cols)) :
+                           columnmap(ismissing, a, rowcount(cols))
     elseif e isa StrPred
         a = _resolvecol(cols, e.lhs.ref, strict)
-        a === nothing && return fill(missing, rowcount(cols))
+        a === nothing && return Ref(missing)
         f = e.kind == STR_STARTSWITH ? startswith :
             e.kind == STR_ENDSWITH ? endswith :
             e.kind == STR_CONTAINS ? contains :
             throw(ArgumentError("unknown string predicate code $(e.kind)"))
-        return _columnmap(x -> ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
-    elseif e isa AndExpr
-        isempty(e.args) && return trues(rowcount(cols))
-        return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .& y, e.args)
-    elseif e isa OrExpr
-        isempty(e.args) && return falses(rowcount(cols))
-        return mapreduce(a -> _evalexpr(a, cols, strict), (x, y) -> x .| y, e.args)
-    elseif e isa NotExpr
-        return .!_evalexpr(e.arg, cols, strict)
+        return columnmap(x -> ismissing(x) ? missing : f(x, e.s), a, rowcount(cols))
     elseif e isa AlwaysTrue
-        return trues(rowcount(cols))
+        return Ref(true)
     elseif e isa AlwaysFalse
-        return falses(rowcount(cols))
+        return Ref(false)
     end
     throw(ArgumentError("cannot generically evaluate $(typeof(e))"))
 end
 
-# The Bool-mask comprehension runs behind a FUNCTION BARRIER: `_evalexpr`
-# returns an abstractly-typed vector (its result type depends on the
-# expression tree), and `Bool[x === true for x in v]` over an abstract `v`
-# melts into per-element dynamic dispatch — measured 100× slower than the
-# same loop behind a barrier (62 ms → 0.6 ms over a 1M-row mask). The
-# barrier costs ONE dynamic dispatch per mask instead. The column kernels
-# inside `_evalexpr` specialize on the concrete container at their own call
-# boundary.
-@noinline _boolmask(v::AbstractVector) = Bool[x === true for x in v]
+function _filtermask(e::ScanExpr, cols, strict::Bool=true, negated::Bool=false)
+    if e isa Union{AndExpr, OrExpr}
+        conjunction = (e isa AndExpr) != negated
+        isempty(e.args) && return conjunction ? trues(rowcount(cols)) : falses(rowcount(cols))
+        mask = _filtermask(e.args[1], cols, strict, negated)
+        for i in 2:length(e.args)
+            arg = _filtermask(e.args[i], cols, strict, negated)
+            conjunction ? (mask .&= arg) : (mask .|= arg)
+        end
+        return mask
+    elseif e isa NotExpr
+        return _filtermask(e.arg, cols, strict, !negated)
+    end
+    n = rowcount(cols)
+    mask = _evalexpr(e, cols, strict, (f, c, n) -> _boolmask(_columnmap(f, c, n), n, !negated))
+    return mask isa BitVector ? mask : _boolmask(mask, n, !negated)
+end
+
 """
     Tables.filtermask(scan_or_expr, table) -> AbstractVector{Bool}
 
@@ -596,13 +601,13 @@ form follows the scan's `validate` setting. The `BoundScan` form uses its
 resolved filter and is safe to evaluate over a table containing only
 `filtercols`.
 """
-filtermask(e::ScanExpr, table) = _boolmask(_evalexpr(_checkpredicate(e), columns(table)))
+filtermask(e::ScanExpr, table) = _filtermask(_checkpredicate(e), columns(table))
 filtermask(s::Scan, table) = s.filter === nothing ?
     trues(rowcount(columns(table))) :
-    _boolmask(_evalexpr(s.filter, columns(table), s.validate))
+    _filtermask(s.filter, columns(table), s.validate)
 filtermask(s::BoundScan, table) = s.filter === nothing ?
     trues(rowcount(columns(table))) :
-    _boolmask(_evalexpr(s.filter, columns(table), s.validate))
+    _filtermask(s.filter, columns(table), s.validate)
 
 _converted(::Nothing, c::AbstractVector) = c
 function _converted(::Type{T}, c::AbstractVector) where {T}

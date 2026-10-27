@@ -51,3 +51,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+  trim:
+    name: Trim primitive filters - Julia ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1', 'nightly']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v3
+      - name: Install trim environment
+        run: julia --startup-file=no --project=test/trim -e 'using Pkg; Pkg.instantiate()'
+      - name: Compile and run primitive filters
+        run: julia --startup-file=no --project=test/trim test/trim/runtests.jl

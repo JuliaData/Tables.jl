@@ -177,6 +177,14 @@ reject an unconsumed `OpNode` because they do not know its meaning.
 Zero-column results retain their row count. Sources should preserve the same
 property when they return a fully pushed result.
 
+### Static compilation
+
+On Julia 1.13 and later, `Tables.filtermask` with a single comparison,
+membership, null-check, or string predicate over a one-column `NamedTuple` of
+`Int` or `String` values (optionally with `missing`) compiles with JuliaC's
+`--trim=safe`. Compound filters, the `Scan` and `BoundScan` forms, and
+`Tables.scan` can need dynamic dispatch, which trimmed executables do not support.
+
 ```@docs; canonical = false
 Tables.Scan
 Tables.scan
