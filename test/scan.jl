@@ -60,6 +60,11 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test !T._isidentity(T.Scan(limit = 5))
         @test !T._isidentity(T.Scan(offset = 1))
         @test_throws ArgumentError T.Scan(select = (:a => 1.5,))
+        mixed = T.Scan(select = [:a => :key, :c => Float64, :x_one => Int => :one])  # Pair{Symbol,Any}
+        @test [(i.ref, i.type, i.rename) for i in mixed.select] ==
+              [(:a, nothing, :key), (:c, Float64, nothing), (:x_one, Int, :one)]
+        @test_throws ArgumentError T.Scan(select = [:a => :key, :b => 1.5])
+        @test_throws ArgumentError T.Scan(select = [1.5 => :key, :b => :c])
         @test_throws ArgumentError T.Scan(select = (T.Not(:a), :b))   # mixed Not/positive
         @test_throws ArgumentError T.Scan(select = T.Not(1.5))
         @test_throws ArgumentError T.Scan(limit = -1)

@@ -73,12 +73,21 @@ function _selectitem(x::All)
     return SelectItem(x, nothing, nothing)
 end
 _selectitem(x::Union{Symbol, String, Int, Regex, Not}) = SelectItem(x, nothing, nothing)
-_selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, Symbol}) = SelectItem(p.first, nothing, p.second)
-_selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, String}) = SelectItem(p.first, nothing, Symbol(p.second))
-_selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, <:Type}) = SelectItem(p.first, p.second, nothing)
-_selectitem(p::Pair{<:Union{Symbol, String, Int, Regex}, <:Pair{<:Type, Symbol}}) =
-    SelectItem(p.first, p.second.first, p.second.second)
-_selectitem(x) = throw(ArgumentError("unsupported select item $(repr(x)); expected a column " *
+# Pair items are told apart by value, not by type parameters: a vector literal mixing
+# `:a => :b` and `:c => Int` has element type `Pair{Symbol, Any}`.
+function _selectitem(p::Pair)
+    ref, target = p.first, p.second
+    if ref isa ColRef
+        target isa Symbol && return SelectItem(ref, nothing, target)
+        target isa String && return SelectItem(ref, nothing, Symbol(target))
+        target isa Type && return SelectItem(ref, target, nothing)
+        target isa Pair && target.first isa Type && target.second isa Symbol &&
+            return SelectItem(ref, target.first, target.second)
+    end
+    return _selectitemerror(p)
+end
+_selectitem(x) = _selectitemerror(x)
+_selectitemerror(x) = throw(ArgumentError("unsupported select item $(repr(x)); expected a column " *
     "reference (Symbol/String/Int/Regex/Not/All), or ref => name, ref => Type, ref => Type => name"))
 
 # --- the expression algebra ----------------------------------------------------
