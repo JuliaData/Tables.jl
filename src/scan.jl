@@ -147,8 +147,10 @@ Build a comparison predicate for a column and a literal value to be used inside
 a [`Scan`](@ref) filter. `op` must be `==`, `!=`, `<`, `<=`, `>`, or `>=`.
 
 Ordered comparisons can also use operators directly, such as
-`col(:x) < value`, for numeric, string, and character values. Equality must use
-`colcmp` because `==` and `isequal` on expression objects return a `Bool`.
+`col(:x) < value`, for numeric, string, character, date, time, and period
+values. In a `Scan` filter, the pair `:x => op(value)` builds the same predicate
+for any value type. Equality needs that pair or `colcmp`, because `==` and
+`isequal` on expression objects return a `Bool`.
 """
 colcmp(op, c::Col, value) = Cmp(_comparisonoperator(op), c, value)
 
@@ -279,11 +281,36 @@ _checkpredicate(e::ScanExpr) = e
 _checkpredicate(e::Col) =
     throw(ArgumentError("a bare column reference is not a predicate; compare it against a value"))
 _checkpredicate(::Bool) =
-    throw(ArgumentError("filter is a Bool, not a filter expression: `==`, `!=`, and `isequal` " *
-                        "on `col(...)` return a Bool. Write equality as " *
-                        "`Tables.colcmp(==, Tables.col(:x), value)`"))
+    throw(ArgumentError("filter is a Bool, not a filter expression: `==`, `!=`, `in`, and " *
+                        "`isequal` on `col(...)` return a Bool. Write equality as `:x => ==(value)` " *
+                        "or `Tables.colcmp(==, Tables.col(:x), value)`, and membership as " *
+                        "`:x => in(values)` or `Tables.colin(Tables.col(:x), values)`"))
 _checkpredicate(x) =
-    throw(ArgumentError("filter must be a Tables.ScanExpr built from Tables.col(...), got $(typeof(x))"))
+    throw(ArgumentError("filter must be a Tables.ScanExpr built from Tables.col(...), a " *
+                        "`ref => predicate` pair, or a vector of them; got $(typeof(x))"))
+
+# DataFrames-style `ref => predicate` filters (as in `filter(:x => ==(1), df)`), translated
+# into the vocabulary above so a Scan stays plain data. A tuple or vector of predicates
+# keeps the rows where all of them hold.
+_filterexpr(x) = x
+_filterexpr(p::Pair{<:Union{Symbol, AbstractString, Int}}) = _pairpredicate(col(p.first), p.second, p)
+function _filterexpr(xs::Union{Tuple, AbstractVector})
+    isempty(xs) && return nothing
+    return reduce(&, ScanExpr[_checkpredicate(_filterexpr(x)) for x in xs])
+end
+
+const _CmpFix2 = Base.Fix2{<:Union{typeof(==), typeof(!=), typeof(<), typeof(<=), typeof(>), typeof(>=)}}
+_pairpredicate(c::Col, f::_CmpFix2, p) = colcmp(f.f, c, f.x)
+_pairpredicate(c::Col, f::Base.Fix2{typeof(in)}, p) = colin(c, f.x)
+_pairpredicate(c::Col, ::typeof(ismissing), p) = isnull(c)
+_pairpredicate(c::Col, ::ComposedFunction{typeof(!), typeof(ismissing)}, p) = !isnull(c)
+_pairpredicate(c::Col, f::Base.Fix2{typeof(startswith), <:AbstractString}, p) = startswith(c, f.x)
+_pairpredicate(c::Col, f::Base.Fix2{typeof(endswith), <:AbstractString}, p) = endswith(c, f.x)
+_pairpredicate(c::Col, f::Base.Fix2{typeof(contains), <:AbstractString}, p) = contains(c, f.x)
+_pairpredicate(c::Col, f, p) =
+    throw(ArgumentError("unsupported filter $(repr(p)); use `ref => op(value)` with op one of ==, " *
+                        "!=, <, <=, >, >=, or `ref => in(values)`, `ref => ismissing`, " *
+                        "`ref => !ismissing`, `ref => startswith(s)`, `endswith(s)`, `contains(s)`"))
 
 # --- the Scan value --------------------------------------------------------------
 
@@ -299,9 +326,12 @@ the generic executor and the module comment for how sources push it down.
     pair forms are `Symbol`/`String`/`Int`/`Regex`, while bare `Tables.Not`
     and `Tables.All()` items stand alone). `Tables.All()` keeps every column;
     `()` selects zero columns. Selection order = output order.
-  * `filter`: an expression built from `Tables.col`; a row is kept iff the
-    predicate evaluates to exactly `true` (`missing` excludes, SQL-style).
-    Filters see source column names, before renames.
+  * `filter`: an expression built from `Tables.col`, a `ref => predicate`
+    pair (`:x => ==(1)`, `:x => in(values)`, `:x => >(0)`, `:x => ismissing`,
+    `:x => !ismissing`, `:x => startswith("a")`), or a tuple/vector of these
+    that must all hold. A row is kept iff the predicate evaluates to exactly
+    `true` (`missing` excludes, SQL-style). Filters see source column names,
+    before renames.
   * `limit`/`offset`: applied to qualifying rows, after the filter.
   * `validate`: error on select/filter references that match no column.
     `false` is the schema-evolution knob: unmatched SELECT references are
@@ -324,7 +354,7 @@ struct Scan
         nots = count(it -> it.ref isa Not, select)
         0 < nots < length(select) &&
             throw(ArgumentError("Not(...) selections cannot be mixed with positive selections"))
-        return new(select, _checkpredicate(filter), limit, offset, validate)
+        return new(select, _checkpredicate(_filterexpr(filter)), limit, offset, validate)
     end
 end
 

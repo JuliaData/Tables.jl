@@ -112,6 +112,28 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test (T.col(:p) <= Dates.Hour(2)) == T.colcmp(<=, T.col(:p), Dates.Hour(2))
     end
 
+    @testset "pair filters" begin
+        @test T.Scan(filter = :a => ==(1)).filter == T.colcmp(==, T.col(:a), 1)
+        @test T.Scan(filter = "a" => !=(1)).filter == T.colcmp(!=, T.col("a"), 1)
+        @test T.Scan(filter = 3 => >=(1)).filter == T.colcmp(>=, T.col(3), 1)
+        @test T.Scan(filter = :a => <(Dates.Day(1))).filter == T.colcmp(<, T.col(:a), Dates.Day(1))
+        @test T.Scan(filter = :a => in((1, 2))).filter isa T.In
+        @test T.Scan(filter = :a => ismissing).filter == T.isnull(T.col(:a))
+        @test T.Scan(filter = :a => !ismissing).filter == !T.isnull(T.col(:a))
+        @test T.Scan(filter = :b => contains("y")).filter isa T.StrPred
+        e = T.Scan(filter = [:a => >(1), T.col(:c) < 9, (T.col(:a) > 3) | T.isnull(T.col(:a))]).filter
+        @test e isa T.AndExpr && length(e.args) == 3
+        @test T.Scan(filter = (:a => >(1),)).filter == T.colcmp(>, T.col(:a), 1)
+        @test T.Scan(filter = ()).filter === nothing
+        @test_throws "unsupported filter :a => isodd" T.Scan(filter = :a => isodd)
+        @test_throws ":x => ==(value)" T.Scan(filter = [:a => >(1), T.col(:b) == "x"])
+        @test_throws ArgumentError T.Scan(filter = r"a" => ==(1))
+        @test T.scan(nt, T.Scan(filter = :a => ==(2))).a == [2]
+        @test T.scan(nt, T.Scan(filter = :b => in(("x", "w")))).b == ["x", "x", "w"]
+        @test T.scan(nt, T.Scan(filter = [:a => >(1), :a => <(4)])).a == [2, 3]
+        @test length(T.scan(nt, T.Scan(filter = :a => ismissing)).a) == 1
+    end
+
     @testset "resolve" begin
         names = [:a, :b, :c, :x_one, :x_two]
         @test T.All === DataAPI.All
