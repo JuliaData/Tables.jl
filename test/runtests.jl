@@ -1,4 +1,4 @@
-using Test, Tables, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, DataAPI
+using Test, Tables, Dates, OrderedCollections, TableTraits, DataValues, QueryOperators, IteratorInterfaceExtensions, SparseArrays, DataAPI
 
 @testset "utils.jl" begin
 

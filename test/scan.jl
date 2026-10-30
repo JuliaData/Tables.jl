@@ -60,6 +60,14 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test !T._isidentity(T.Scan(limit = 5))
         @test !T._isidentity(T.Scan(offset = 1))
         @test_throws ArgumentError T.Scan(select = (:a => 1.5,))
+        mixed = T.Scan(select = [:a => :key, :c => Float64, :x_one => Int => :one])  # Pair{Symbol,Any}
+        @test [(i.ref, i.type, i.rename) for i in mixed.select] ==
+              [(:a, nothing, :key), (:c, Float64, nothing), (:x_one, Int, :one)]
+        @test_throws ArgumentError T.Scan(select = [:a => :key, :b => 1.5])
+        @test_throws ArgumentError T.Scan(select = [1.5 => :key, :b => :c])
+        selected = T.scan(nt, T.Scan(select = [:a => :key, :c => Float32]))
+        @test isequal(selected.key, nt.a)
+        @test selected.c == Float32.(nt.c)
         @test_throws ArgumentError T.Scan(select = (T.Not(:a), :b))   # mixed Not/positive
         @test_throws ArgumentError T.Scan(select = T.Not(1.5))
         @test_throws ArgumentError T.Scan(limit = -1)
@@ -72,6 +80,7 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test_throws ArgumentError T.Scan(filter = !T.col(:a))
         @test_throws ArgumentError T.Scan(filter = T.col(:a) & (T.col(:b) > 1))
         @test_throws ArgumentError T.Scan(filter = (x -> true))       # closures rejected
+        @test_throws "colcmp(==" T.Scan(filter = T.col(:a) == 1)      # `==` is a Bool
     end
 
     @testset "expression algebra" begin
@@ -104,6 +113,34 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test o isa T.OrExpr && length(o.args) == 3
         @test T.colin(T.col(:b), ["x"]) isa T.In
         @test startswith(T.col(:b), "z") isa T.StrPred
+        d = Dates.Date(2024, 1, 2)
+        @test (T.col(:d) >= d) == T.colcmp(>=, T.col(:d), d)
+        @test (d < T.col(:d)) == T.colcmp(>, T.col(:d), d)
+        @test (T.col(:t) < Dates.DateTime(2024)) isa T.Cmp{Dates.DateTime}
+        @test (T.col(:p) <= Dates.Hour(2)) == T.colcmp(<=, T.col(:p), Dates.Hour(2))
+    end
+
+    @testset "pair filters" begin
+        @test T.Scan(filter = :a => ==(1)).filter == T.colcmp(==, T.col(:a), 1)
+        @test T.Scan(filter = "a" => !=(1)).filter == T.colcmp(!=, T.col("a"), 1)
+        @test T.Scan(filter = 3 => >=(1)).filter == T.colcmp(>=, T.col(3), 1)
+        @test T.Scan(filter = :a => <(Dates.Day(1))).filter == T.colcmp(<, T.col(:a), Dates.Day(1))
+        @test T.Scan(filter = :a => in((1, 2))).filter isa T.In
+        @test T.Scan(filter = :a => ismissing).filter == T.isnull(T.col(:a))
+        @test T.Scan(filter = :a => !ismissing).filter == !T.isnull(T.col(:a))
+        @test T.Scan(filter = :b => contains("y")).filter isa T.StrPred
+        e = T.Scan(filter = [:a => >(1), T.col(:c) < 9, (T.col(:a) > 3) | T.isnull(T.col(:a))]).filter
+        @test e isa T.AndExpr && length(e.args) == 3
+        @test T.Scan(filter = (:a => >(1),)).filter == T.colcmp(>, T.col(:a), 1)
+        @test T.Scan(filter = ()).filter === nothing
+        @test_throws "unsupported filter :a => isodd" T.Scan(filter = :a => isodd)
+        @test_throws ":x => ==(value)" T.Scan(filter = [:a => >(1), T.col(:b) == "x"])
+        @test_throws ArgumentError T.Scan(filter = r"a" => ==(1))
+        @test T.scan(nt, T.Scan(filter = :a => ==(2))).a == [2]
+        @test T.scan(nt, T.Scan(filter = :b => in(("x", "w")))).b == ["x", "x", "w"]
+        @test T.scan(nt, T.Scan(filter = [:a => >(1), :a => <(4)])).a == [2, 3]
+        @test T.scan(nt, T.Scan(filter = [:a => >(1), 1 => <(4)])).a == [2, 3]
+        @test length(T.scan(nt, T.Scan(filter = :a => ismissing)).a) == 1
     end
 
     @testset "resolve" begin
