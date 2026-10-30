@@ -93,6 +93,22 @@ Only ordered comparisons have direct operator shorthand. Equality uses
 `Tables.colcmp(==, column, value)` because `==` on expression objects retains
 its normal Boolean meaning.
 
+The `filter` keyword also accepts a column reference paired with a supported
+predicate, or a tuple/vector of predicates that must all hold:
+
+```julia
+Tables.Scan(filter = :status => ==("active"))
+Tables.Scan(filter = [:price => >=(10), :status => in(("active", "trial"))])
+Tables.Scan(filter = (:name => startswith("A"), :price => !ismissing))
+```
+
+Pair references may be names or column indices. Supported predicates are the
+six comparisons, `in`, `ismissing`, `!ismissing`, `startswith`, `endswith`, and
+`contains`. Comparisons and membership accept any literal type; arbitrary
+functions and closures are rejected. Pairs lower to the same plain expression
+values as `Tables.colcmp`, `Tables.colin`, and `Tables.isnull`, with the same
+missing-value rules below.
+
 ### Missing values
 
 Filter evaluation uses SQL-like three-valued logic:

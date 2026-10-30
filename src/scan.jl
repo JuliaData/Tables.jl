@@ -302,7 +302,10 @@ _checkpredicate(x) =
 # into the vocabulary above so a Scan stays plain data. A tuple or vector of predicates
 # keeps the rows where all of them hold.
 _filterexpr(x) = x
-_filterexpr(p::Pair{<:Union{Symbol, AbstractString, Int}}) = _pairpredicate(col(p.first), p.second, p)
+function _filterexpr(p::Pair)
+    p.first isa Union{Symbol, AbstractString, Int} || return p
+    return _pairpredicate(col(p.first), p.second, p)
+end
 function _filterexpr(xs::Union{Tuple, AbstractVector})
     isempty(xs) && return nothing
     return reduce(&, ScanExpr[_checkpredicate(_filterexpr(x)) for x in xs])

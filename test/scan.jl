@@ -65,6 +65,9 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
               [(:a, nothing, :key), (:c, Float64, nothing), (:x_one, Int, :one)]
         @test_throws ArgumentError T.Scan(select = [:a => :key, :b => 1.5])
         @test_throws ArgumentError T.Scan(select = [1.5 => :key, :b => :c])
+        selected = T.scan(nt, T.Scan(select = [:a => :key, :c => Float32]))
+        @test isequal(selected.key, nt.a)
+        @test selected.c == Float32.(nt.c)
         @test_throws ArgumentError T.Scan(select = (T.Not(:a), :b))   # mixed Not/positive
         @test_throws ArgumentError T.Scan(select = T.Not(1.5))
         @test_throws ArgumentError T.Scan(limit = -1)
@@ -136,6 +139,7 @@ Tables.rowcount(t::ZeroColumnTable) = getfield(t, :nrows)
         @test T.scan(nt, T.Scan(filter = :a => ==(2))).a == [2]
         @test T.scan(nt, T.Scan(filter = :b => in(("x", "w")))).b == ["x", "x", "w"]
         @test T.scan(nt, T.Scan(filter = [:a => >(1), :a => <(4)])).a == [2, 3]
+        @test T.scan(nt, T.Scan(filter = [:a => >(1), 1 => <(4)])).a == [2, 3]
         @test length(T.scan(nt, T.Scan(filter = :a => ismissing)).a) == 1
     end
 
