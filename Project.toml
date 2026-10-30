@@ -6,10 +6,15 @@ version = "1.14.1"
 [deps]
 DataAPI = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 DataValueInterfaces = "e2d170a0-9d28-54be-80f0-106bbe20a464"
-Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 IteratorInterfaceExtensions = "82899510-4779-5014-852e-03e436cf321d"
 OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
+
+[weakdeps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[extensions]
+TablesDatesExt = "Dates"
 
 [compat]
 DataAPI = "1.1"
@@ -22,9 +27,10 @@ julia = "1.9"
 
 [extras]
 DataValues = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 QueryOperators = "2aef5ad7-51ca-5a8f-8e88-e75cf067b44b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "DataValues", "QueryOperators", "SparseArrays"]
+test = ["Test", "DataValues", "Dates", "QueryOperators", "SparseArrays"]

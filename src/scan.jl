@@ -248,7 +248,7 @@ struct OpNode <: ScanExpr
     args::Vector{Any}
 end
 
-for T in (Number, AbstractString, AbstractChar, Dates.TimeType, Dates.Period)
+for T in (Number, AbstractString, AbstractChar)
     @eval begin
         Base.:<(c::Col, v::$T) = colcmp(<, c, v)
         Base.:<(v::$T, c::Col) = colcmp(>, c, v)
